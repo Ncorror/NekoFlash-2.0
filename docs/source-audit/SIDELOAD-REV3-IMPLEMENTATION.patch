@@ -1,0 +1,236 @@
+--- a/app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
++++ b/app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
+@@ -477,7 +477,13 @@
+ 
+         // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
+         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
+-            showFileSelector { file -> viewModel.runSideload(file) }
++            showFileSelector { file ->
++                // The approved REV3 screen shows the chosen ZIP without changing
++                // legacy Sideload transport, verification, or USB ownership.
++                findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
++                    getString(R.string.layout_sideload_selected_file, file.name)
++                viewModel.runSideload(file)
++            }
+         }
+         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
+ 
+--- /dev/null
++++ b/app/src/main/res/drawable/bg_sideload_file.xml
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="utf-8"?>
++<shape xmlns:android="http://schemas.android.com/apk/res/android"
++    android:shape="rectangle">
++    <solid android:color="@android:color/transparent"/>
++    <stroke android:width="1dp" android:color="@color/stroke"/>
++    <corners android:radius="11dp"/>
++</shape>
+--- a/app/src/main/res/layout/page_adb.xml
++++ b/app/src/main/res/layout/page_adb.xml
+@@ -1,6 +1,6 @@
+ <?xml version="1.0" encoding="utf-8"?>
+-<ScrollView
+-    xmlns:android="http://schemas.android.com/apk/res/android"
++<!-- NekoFlash 2.0: approved Sideload REV3; existing IDs and USB handler preserved. -->
++<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+     xmlns:app="http://schemas.android.com/apk/res-auto"
+     android:id="@+id/containerAdb"
+     android:layout_width="match_parent"
+@@ -12,89 +12,93 @@
+         android:layout_width="match_parent"
+         android:layout_height="wrap_content"
+         android:orientation="vertical"
+-        android:padding="10dp">
++        android:paddingStart="17dp"
++        android:paddingTop="25dp"
++        android:paddingEnd="17dp"
++        android:paddingBottom="24dp">
+ 
+-        <com.google.android.material.card.MaterialCardView
++        <TextView
+             android:layout_width="match_parent"
+             android:layout_height="wrap_content"
+-            app:cardBackgroundColor="@color/bg_card"
+-            app:cardCornerRadius="16dp"
++            android:text="@string/layout_sideload_page_title"
++            android:textColor="@color/text_primary"
++            android:textSize="23sp"
++            android:textStyle="bold" />
++
++        <TextView
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="24dp"
++            android:fontFamily="monospace"
++            android:letterSpacing="0.1"
++            android:text="@string/layout_adb_sideload_title"
++            android:textColor="@color/accent"
++            android:textSize="12sp"
++            android:textStyle="bold" />
++
++        <TextView
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="10dp"
++            android:text="@string/layout_sideload_recovery_hint"
++            android:textColor="@color/text_secondary"
++            android:textSize="12.5sp" />
++
++        <TextView
++            android:id="@+id/tvSideloadSelectedZip"
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="21dp"
++            android:background="@drawable/bg_sideload_file"
++            android:minHeight="47dp"
++            android:gravity="center_vertical"
++            android:paddingStart="12dp"
++            android:paddingTop="12dp"
++            android:paddingEnd="12dp"
++            android:paddingBottom="12dp"
++            android:text="@string/layout_sideload_no_file"
++            android:textColor="@color/text_secondary"
++            android:textSize="13sp" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnAdbSideload"
++            android:layout_width="match_parent"
++            android:layout_height="49dp"
++            android:layout_marginTop="14dp"
++            android:insetTop="0dp"
++            android:insetBottom="0dp"
++            android:text="@string/layout_choose_zip_sideload"
++            android:textAllCaps="false"
++            android:textColor="#17100A"
++            android:textSize="13.5sp"
++            android:textStyle="bold"
++            app:backgroundTint="@color/accent"
++            app:cornerRadius="11dp" />
++
++        <com.google.android.material.button.MaterialButton
++            android:id="@+id/btnSideloadImport"
++            android:layout_width="match_parent"
++            android:layout_height="49dp"
++            android:layout_marginTop="10dp"
++            android:insetTop="0dp"
++            android:insetBottom="0dp"
++            android:text="@string/layout_sideload_import"
++            android:textAllCaps="false"
++            android:textColor="@color/text_primary"
++            android:textSize="12.5sp"
++            android:textStyle="bold"
++            app:backgroundTint="@android:color/transparent"
++            app:cornerRadius="11dp"
+             app:strokeColor="@color/stroke"
+-            app:strokeWidth="1dp">
++            app:strokeWidth="1dp" />
+ 
+-            <LinearLayout
+-                android:layout_width="match_parent"
+-                android:layout_height="wrap_content"
+-                android:orientation="vertical"
+-                android:padding="12dp">
+-
+-                <TextView
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:fontFamily="monospace"
+-                    android:letterSpacing="0.1"
+-                    android:text="@string/layout_adb_sideload_title"
+-                    android:textColor="@color/accent"
+-                    android:textSize="11sp"
+-                    android:textStyle="bold" />
+-
+-                <TextView
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="5dp"
+-                    android:fontFamily="monospace"
+-                    android:text="@string/layout_sideload_recovery_hint"
+-                    android:textColor="@color/text_muted"
+-                    android:textSize="11.5sp" />
+-
+-                <com.google.android.material.button.MaterialButton
+-                    android:id="@+id/btnAdbSideload"
+-                    android:layout_width="match_parent"
+-                    android:layout_height="54dp"
+-                    android:layout_marginTop="11dp"
+-                    android:insetTop="0dp"
+-                    android:insetBottom="0dp"
+-                    android:text="@string/layout_choose_zip_sideload"
+-                    android:textAllCaps="false"
+-                    android:textColor="@color/text_primary"
+-                    android:textSize="13.5sp"
+-                    android:textStyle="bold"
+-                    app:backgroundTint="#2E3A2E"
+-                    app:cornerRadius="12dp" />
+-
+-                <LinearLayout
+-                    android:layout_width="match_parent"
+-                    android:layout_height="wrap_content"
+-                    android:layout_marginTop="8dp"
+-                    android:baselineAligned="false"
+-                    android:orientation="horizontal">
+-
+-                    <com.google.android.material.button.MaterialButton
+-                        android:id="@+id/btnSideloadImport"
+-                        android:layout_width="match_parent"
+-                        android:layout_height="44dp"
+-                        android:fontFamily="monospace"
+-                        android:insetTop="0dp"
+-                        android:insetBottom="0dp"
+-                        android:text="@string/layout_sideload_import"
+-                        android:textAllCaps="false"
+-                        android:textColor="@color/text_primary"
+-                        android:textSize="11.5sp"
+-                        android:textStyle="bold"
+-                        app:backgroundTint="@color/cool_accent_dim"
+-                        app:cornerRadius="12dp"
+-                        app:icon="@drawable/ic_nf_import"
+-                        app:iconGravity="textStart"
+-                        app:iconSize="19dp"
+-                        app:iconTint="@null"
+-                        app:strokeColor="#8059B9E7"
+-                        app:strokeWidth="1dp" />
+-
+-                </LinearLayout>
+-
+-            </LinearLayout>
+-        </com.google.android.material.card.MaterialCardView>
+-
++        <TextView
++            android:layout_width="match_parent"
++            android:layout_height="wrap_content"
++            android:layout_marginTop="22dp"
++            android:text="@string/layout_sideload_verdict_note"
++            android:textColor="@color/text_muted"
++            android:textSize="11sp" />
+ 
+     </LinearLayout>
+ </ScrollView>
+--- a/app/src/main/res/values/strings.xml
++++ b/app/src/main/res/values/strings.xml
+@@ -376,4 +376,10 @@
+ 
+     <string name="logs_clipboard_log_label">NekoFlash log</string>
+     <string name="logs_clipboard_folder_label">NekoFlash logs</string>
++
++    <!-- NekoFlash 2.0 / approved Sideload REV3 -->
++    <string name="layout_sideload_page_title">Sideload</string>
++    <string name="layout_sideload_no_file">ZIP file not selected</string>
++    <string name="layout_sideload_selected_file">File: %1$s</string>
++    <string name="layout_sideload_verdict_note">Install runs only in confirmed Sideload mode. The final result is determined by Recovery, not merely by file transfer.</string>
+ </resources>
+--- a/app/src/main/res/values-ru/strings.xml
++++ b/app/src/main/res/values-ru/strings.xml
+@@ -380,4 +380,10 @@
+ 
+     <string name="logs_clipboard_log_label">Журнал NekoFlash</string>
+     <string name="logs_clipboard_folder_label">Журналы NekoFlash</string>
++
++    <!-- NekoFlash 2.0 / approved Sideload REV3 -->
++    <string name="layout_sideload_page_title">Sideload</string>
++    <string name="layout_sideload_no_file">ZIP-файл не выбран</string>
++    <string name="layout_sideload_selected_file">Файл: %1$s</string>
++    <string name="layout_sideload_verdict_note">Установка запускается только в подтверждённом режиме Sideload. Итог определяет Recovery, а не только передача файла.</string>
+ </resources>

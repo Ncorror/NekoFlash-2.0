@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08090b">
+<title>NekoFlash 2.0 — Unlock — макет на согласование REV4</title>
+<style>
+:root{color-scheme:dark;--bg:#08090b;--txt:#ecedef;--muted:#949aa3;--accent:#f18734;--stroke:#2b3036;--success:#83ca99}
+*{box-sizing:border-box}html,body{min-height:100%}body{margin:0;background:#050506;color:var(--txt);font:14px/1.48 system-ui,-apple-system,Roboto,Arial,sans-serif}
+button,select{font:inherit;-webkit-tap-highlight-color:transparent}button{cursor:pointer}button:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{width:min(100%,465px);margin:auto;background:var(--bg);height:100dvh;min-height:630px;display:flex;flex-direction:column;border-inline:1px solid #191b20;padding-top:env(safe-area-inset-top)}
+.demo{padding:7px 10px;text-align:center;background:#20160d;color:#cba179;font:700 10px/1.4 monospace;letter-spacing:.055em}
+.top{display:flex;padding:11px 15px;gap:9px;align-items:center;border-bottom:1px solid #171b20}
+.usb{width:100%;display:flex;align-items:center;gap:10px;border:1px solid var(--stroke);border-radius:11px;background:transparent;text-align:left;color:var(--txt);padding:10px 11px}
+.usb .usbicon{color:var(--accent);font-size:20px}.usb b{display:block;font-size:13px;font-weight:650}.usb small{display:block;color:var(--muted);font-size:11px;margin-top:1px}
+.term{height:48px;min-width:48px;border:1px solid #844c21;background:transparent;color:var(--accent);border-radius:11px;font-size:20px;font-weight:750}
+main{flex:1;min-height:0;overflow:auto;padding:24px 17px 27px;scrollbar-width:thin}h1{font-size:23px;letter-spacing:-.035em;margin:0 0 6px;font-weight:740}.sub{font-size:12.5px;color:var(--muted);margin:0 0 27px}
+.section{margin-bottom:25px}.cap{font:700 12px/1.4 ui-monospace,monospace;letter-spacing:.09em;color:var(--accent);margin:0 0 12px}.line{height:1px;background:#262a2f;margin:0 0 24px}
+.status{display:flex;gap:11px;align-items:center;margin-bottom:13px;min-height:38px}.state-icon{width:31px;height:31px;display:grid;place-items:center;border-radius:9px;border:1px solid #343a43;color:#c5cad2;font-size:17px}.status b{display:block;font-size:13px;font-weight:640}.status small{display:block;font-size:11px;color:var(--muted);margin-top:2px}.ok{color:var(--success)!important}
+.primary,.secondary{width:100%;min-height:48px;border-radius:11px;font-weight:685;text-align:center}.primary{background:var(--accent);color:#17100a;border:1px solid var(--accent);font-size:13.5px}.primary:disabled{background:#292d32;border-color:#393d42;color:#818892;cursor:not-allowed}.secondary{background:transparent;border:1px solid #484d54;color:#e2e4e7;font-size:12.5px}
+.micro{color:#7c848e;font-size:11px;line-height:1.5;margin:9px 0 0}.device{display:flex;align-items:center;justify-content:space-between;gap:9px;margin:0 0 12px;padding:0 1px}.device .left{font-size:13px;font-weight:650}.device .right{font-size:12px;color:#a3aab3;text-align:right}.device-note{font-size:11.7px;color:#a8b0b8;margin:0 0 13px}
+.warning{color:#e4b784;font-size:12px;line-height:1.5;margin:13px 0 13px;display:flex;align-items:flex-start;gap:8px}.warning span:first-child{color:#f3a14e;font-size:15px}
+.extra-btn{display:flex;gap:8px;justify-content:space-between;align-items:center;padding:10px 0;background:none;color:#d0d5dd;border:0;width:100%;text-align:left;font-size:12px}.extra{border-top:1px solid #292d34;margin-top:8px}.extra-panel{border-top:1px solid #292d34;padding:12px 0 3px;font-size:12px;color:var(--muted)}.extra-panel p{margin:4px 0 9px}.extra-panel strong{color:#dedee1}.extra-panel select{width:100%;background:#12151a;color:#eaebed;border:1px solid #3b4049;border-radius:9px;padding:10px 11px;margin:3px 0 12px}.linkbtn{padding:8px 0 1px;background:none;border:0;color:#e1b38d;font-size:12px;font-weight:600}
+.note{font-size:11px;line-height:1.55;color:#717882;margin-top:16px}
+nav{flex-shrink:0;background:#0b0c0e;border-top:1px solid #303239;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));padding:9px 4px calc(8px + env(safe-area-inset-bottom))}.tab{border:0;background:none;color:#888d96;font-size:9.4px;font-weight:650;display:flex;flex-direction:column;gap:4px;align-items:center;padding:3px 0}.tab span{font-size:19px;height:24px}.tab.selected{color:var(--accent)}
+.toast{position:fixed;max-width:440px;width:calc(100% - 25px);bottom:100px;left:50%;transform:translateX(-50%);border:1px solid #5b412d;background:#271d15;color:#f4d3b3;border-radius:11px;padding:12px 16px;font-size:12px;display:none;box-shadow:0 10px 35px #0008;z-index:8}.toast.show{display:block}
+.overlay{display:none;position:fixed;inset:0;background:#08090b;max-width:465px;margin:auto;flex-direction:column;z-index:5}.overlay.open{display:flex}.otop{display:flex;align-items:center;gap:14px;padding:16px;border-bottom:1px solid var(--stroke)}.back{border:0;background:none;color:var(--txt);font-size:26px}.out{flex:1;color:#cbd4c7;font:12px/1.7 monospace;padding:20px;white-space:pre-wrap}
+@media(min-width:550px){body{padding:20px}.app{height:min(95vh,900px);min-height:700px;border:1px solid #303239;border-radius:20px;overflow:hidden}.overlay{inset:20px auto auto 50%;transform:translateX(-50%);height:min(95vh,900px);border:1px solid #303239;border-radius:20px}}
+</style>
+</head>
+<body>
+<div class="app">
+ <div class="demo">МАКЕТ ЭКРАНА · НЕ ПОДКЛЮЧАЕТСЯ К ТЕЛЕФОНУ</div>
+ <header class="top"><button type="button" class="usb" id="usb"><span class="usbicon">⌁</span><span style="flex:1"><b id="usbTitle">USB · нет устройства</b><small id="usbSub">Режим определяется автоматически</small></span><span style="color:#888">⌄</span></button><button type="button" class="term" id="term" aria-label="Открыть терминал">›_</button></header>
+ <main>
+  <h1>Unlock</h1><p class="sub">Разблокировка загрузчика Xiaomi · Mi Unlock</p>
+  <section class="section" aria-labelledby="accountTitle"><h2 class="cap" id="accountTitle">MI-АККАУНТ</h2>
+   <div class="status"><div class="state-icon" id="accountIcon">♙</div><div><b id="accountStatus">Вход не выполнен</b><small id="accountDetail">Требуется авторизация Xiaomi</small></div></div>
+   <button type="button" id="login" class="primary">Войти в Mi-аккаунт</button>
+   <div id="authorizedControls" hidden><div class="extra"><button type="button" class="extra-btn" id="toggleOptions" aria-expanded="false">Параметры аккаунта <span id="optionsArrow">⌄</span></button><div id="options" class="extra-panel" hidden><p>Регион: <strong id="regionLabel">Не определён</strong></p><label for="zone">dataCenterZone</label><select id="zone"><option>Singapore</option><option>China</option><option>India</option><option>Russia</option><option>Europe</option></select><button type="button" class="linkbtn" id="logout">Выйти из Mi-аккаунта</button></div></div></div>
+  </section>
+  <div class="line"></div>
+  <section class="section" aria-labelledby="loaderTitle"><h2 class="cap" id="loaderTitle">ЗАГРУЗЧИК</h2>
+   <div class="device"><span class="left">Состояние</span><span class="right" id="loaderStatus">Не определено</span></div>
+   <p class="device-note" id="loaderDetail">Подключите устройство в режиме Fastboot.</p>
+   <p class="warning"><span>⚠</span><span>Разблокировка может полностью удалить пользовательские данные. Сохраните их заранее.</span></p>
+   <button type="button" id="unlock" class="primary" disabled>Разблокировать загрузчик</button>
+   <p class="micro" id="requirement">Для запуска нужны Mi-аккаунт и подключение Fastboot.</p>
+  </section>
+  <p class="note">После команды разблокировки результат проверяется при повторном подключении Fastboot. Принятая команда ещё не означает успешную разблокировку.</p>
+ </main>
+ <nav aria-label="Навигация"><button type="button" class="tab" data-tab="Главная"><span>⌂</span>Главная</button><button type="button" class="tab" data-tab="Прошивка"><span>⚡</span>Прошивка</button><button type="button" class="tab" data-tab="Sideload"><span>↯</span>Sideload</button><button type="button" class="tab selected" data-tab="Unlock"><span>♢</span>Unlock</button><button type="button" class="tab" data-tab="Настройки"><span>⚙</span>Настройки</button></nav>
+</div>
+<div class="overlay" id="overlay"><div class="otop"><button type="button" class="back" id="back" aria-label="Назад">‹</button><strong>Терминал</strong></div><div class="out">Полноэкранный терминал — уже согласованная отдельная функция.
+Этот макет не выполняет команды.</div></div>
+<div class="toast" id="toast" role="status"></div>
+<script>
+(()=>{
+ const $=id=>document.getElementById(id);let msgTimer;
+ const state={signed:false,device:'none'};
+ const params=new URLSearchParams(location.search);
+ if(params.get('preview')==='ready'){state.signed=true;state.device='fastboot'}
+ if(params.get('preview')==='unlocked'){state.signed=true;state.device='unlocked'}
+ function notify(m){const t=$('toast');t.textContent=m;t.classList.add('show');clearTimeout(msgTimer);msgTimer=setTimeout(()=>t.classList.remove('show'),3800)}
+ function render(){
+  $('accountIcon').textContent=state.signed?'✓':'♙';$('accountIcon').style.color=state.signed?'var(--success)':'#c5cad2';
+  $('accountStatus').textContent=state.signed?'Авторизован (демо)':'Вход не выполнен';$('accountStatus').classList.toggle('ok',state.signed);
+  $('accountDetail').textContent=state.signed?'Демонстрационный аккаунт · без реального входа':'Требуется авторизация Xiaomi';
+  $('login').hidden=state.signed;$('authorizedControls').hidden=!state.signed;
+  if(state.device==='none'){$('usbTitle').textContent='USB · нет устройства';$('usbSub').textContent='Режим определяется автоматически';$('loaderStatus').textContent='Не определено';$('loaderStatus').classList.remove('ok');$('loaderDetail').textContent='Подключите устройство в режиме Fastboot.'}
+  else{$('usbTitle').textContent='USB · Fastboot (демо)';$('usbSub').textContent='Демонстрация без подключения';$('loaderStatus').textContent=state.device==='unlocked'?'Разблокирован':'Заблокирован';$('loaderStatus').classList.toggle('ok',state.device==='unlocked');$('loaderDetail').textContent='POCO X3 Pro · vayu (пример состояния)'}
+  $('unlock').hidden=state.device==='unlocked';$('requirement').textContent=state.device==='unlocked'?'Повторная разблокировка не нужна.':(!state.signed?'Для запуска нужны Mi-аккаунт и подключение Fastboot.':state.device==='none'?'Для запуска подключите устройство в режиме Fastboot.':'Демонстрационный режим: команды не отправляются.');
+  $('unlock').disabled=!(state.signed&&state.device==='fastboot');
+ }
+ $('login').onclick=()=>{state.signed=true;render();notify('Демо: показано состояние после авторизации. Реальный вход Xiaomi здесь не выполняется.')};
+ $('toggleOptions').onclick=()=>{const open=$('options').hidden;$('options').hidden=!open;$('toggleOptions').setAttribute('aria-expanded',String(open));$('optionsArrow').textContent=open?'⌃':'⌄'};
+ $('zone').onchange=()=>notify('Выбор центра показан для дизайна; запросы к Xiaomi не отправляются.');
+ $('logout').onclick=()=>{state.signed=false;$('options').hidden=true;$('toggleOptions').setAttribute('aria-expanded','false');render();notify('Демо-авторизация сброшена')};
+ $('unlock').onclick=()=>notify('Это макет: никаких команд разблокировки или запросов Xiaomi не выполняется.');
+ $('usb').onclick=()=>notify('Общая USB-панель в рабочем приложении показывает реальное устройство. В макете USB не подключается.');
+ $('term').onclick=()=>$('overlay').classList.add('open');$('back').onclick=()=>$('overlay').classList.remove('open');
+ document.querySelectorAll('[data-tab]').forEach(b=>b.onclick=()=>{if(b.dataset.tab!=='Unlock')notify('Здесь показана только вкладка Unlock. Остальные утверждённые экраны не менялись.')});
+ document.onkeydown=e=>{if(e.key==='Escape')$('overlay').classList.remove('open')};
+ render();
+})();
+</script>
+</body>
+</html>

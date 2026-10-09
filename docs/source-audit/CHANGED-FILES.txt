@@ -1,0 +1,5 @@
+app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt
+app/src/main/res/drawable/bg_sideload_file.xml
+app/src/main/res/layout/page_adb.xml
+app/src/main/res/values/strings.xml
+app/src/main/res/values-ru/strings.xml
