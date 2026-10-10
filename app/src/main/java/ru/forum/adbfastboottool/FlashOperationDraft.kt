@@ -3,7 +3,6 @@ package ru.forum.adbfastboottool
 import java.io.File
 import java.net.URI
 import java.util.Base64
-import java.util.Locale
 
 /** Lightweight persistable queue entry. No pre-hashing or mutation authorization state. */
 data class FlashQueueDraftItem(
@@ -92,8 +91,9 @@ object FlashOperationDraftPolicy {
             item.addedAtEpochMs >= 0L
 
     private fun normalizePartition(value: String): String? {
-        val normalized = value.trim().lowercase(Locale.US)
-        return normalized.takeIf { PARTITION_PATTERN.matches(it) }
+        // Exact operator-supplied Fastboot identifiers are case-sensitive.
+        val exact = value.trim()
+        return exact.takeIf { PARTITION_PATTERN.matches(it) }
     }
 }
 

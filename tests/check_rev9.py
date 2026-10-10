@@ -36,4 +36,9 @@ assert 'OnboardingGate.complete(this)' in entry
 assert '!status.allRequiredGranted' not in entry and '!checkbox.isChecked' not in entry
 assert 'android:id="@+id/riskRow"' in layout and 'android:visibility="gone"' in layout
 assert 'showPermissionsDialog()' in main
+draft_policy = (root/'app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt').read_text()
+assert 'val exact = value.trim()' in draft_policy
+assert 'val normalized = value.trim().lowercase(Locale.US)' not in draft_policy
+assert 'manual.text.toString().trim()' in main
+assert 'manual.text.toString().trim().lowercase(Locale.US)' not in main
 print('PASS REV9: Recovery verdict gated, UNKNOWN preserved, Unlock verified, JVM tests wired')

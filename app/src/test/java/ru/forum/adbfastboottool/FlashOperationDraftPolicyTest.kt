@@ -36,6 +36,16 @@ class FlashOperationDraftPolicyTest {
         assertEquals(listOf("boot", "dtbo"), FlashOperationDraftPolicy.remove(moved, "system").items.map { it.partition })
     }
 
+    @Test fun manualPartitionPreservesExactCase() {
+        val original = FlashOperationDraft(listOf(item("boot_a"), item("CustomPartition")))
+        val newDraft = FlashOperationDraftPolicy.upsert(original, item("custompartition"))
+        assertEquals(
+            listOf("boot_a", "CustomPartition", "custompartition"),
+            newDraft.items.map { it.partition }
+        )
+        assertEquals("CustomPartition", newDraft.items[1].partition)
+    }
+
     @Test fun codecDoesNotSilentlyDropEntriesAfterThirtyTwo() {
         val items = (0 until 65).map { item("partition_$it") }
         val encoded = FlashOperationDraftCodec.encode(FlashOperationDraft(items))

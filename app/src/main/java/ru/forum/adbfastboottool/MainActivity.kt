@@ -2653,7 +2653,7 @@ class MainActivity : AppCompatActivity() {
             }
             return {
                 val chosen = if (spinner.selectedItemPosition == namedPartitions.size) {
-                    manual.text.toString().trim().lowercase(Locale.US)
+                    manual.text.toString().trim()
                 } else {
                     namedPartitions.getOrNull(spinner.selectedItemPosition).orEmpty()
                 }
@@ -2801,7 +2801,7 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         fun toolPartition(id: Int): String? {
-            val value = findViewById<EditText>(id).text.toString().trim().lowercase(Locale.US)
+            val value = findViewById<EditText>(id).text.toString().trim()
             return value.takeIf { PARTITION_NAME_PATTERN.matches(it) } ?: run {
                 Toast.makeText(this, R.string.flash_rev7_invalid_target, Toast.LENGTH_SHORT).show()
                 null
@@ -3053,7 +3053,7 @@ class MainActivity : AppCompatActivity() {
             .setView(input)
             .setNegativeButton(getString(R.string.cancel_upper), null)
             .setPositiveButton(getString(R.string.continue_upper)) { _, _ ->
-                val partition = input.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+                val partition = input.text?.toString()?.trim().orEmpty()
                 if (!PARTITION_NAME_PATTERN.matches(partition)) {
                     viewModel.log("❌ Invalid Fastboot partition name: $partition")
                     return@setPositiveButton
