@@ -20,12 +20,12 @@ def run():
     base = ROOT / 'app/src/main'
     for rel in [
         # REV12: narrow ADB Sideload-only source change pinned in check_rev12.py.
-        'app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt',
+        # REV13 deliberately extends Fastboot's source interface; pinned in check_rev13.py.
         # REV7 changes only queue ordering in DeviceViewModel; see check_rev7.py.
         'app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt',
         # REV10 adjusts only inactive tab presentation; pin new blob in check_rev10.py.
-        'app/src/main/cpp/native_usbfs.cpp',
+        # REV13 adds fd-source JNI route; original URB lifecycle pinned in check_rev13.py.
         # REV7 Fastboot screen is pinned by check_rev7.py (transport guard unaffected).
         # REV7 Home informational-only screen is now guarded by check_rev7.py.
     ]:

@@ -505,4 +505,12 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev12_sideload_mode_inactive">ADB Sideload не активен. Режим устройства: %1$s.</string>
     <string name="rev12_sideload_failed">Ошибка ADB Sideload (%1$s): %2$s.</string>
     <string name="rev12_sideload_saf_unsupported">Не удалось прочитать документ напрямую или провайдер не поддерживает произвольный доступ. Используй «Импорт», чтобы скопировать ZIP в прежнюю рабочую папку.</string>
+    <string name="rev13_fastboot_slot_error">Не удалось определить слот Fastboot для раздела %1$s.</string>
+    <string name="rev13_direct_saf_failed">Нельзя прошить выбранный документ напрямую. Провайдер может не поддерживать произвольное чтение или недоступен Native USBFS. Выбери образ из рабочей папки NekoFlash.</string>
+    <string name="rev13_picker_no_document">Android не вернул выбранный образ.</string>
+    <string name="rev13_unnamed_image">selected-image.img</string>
+    <string name="rev13_image_selected">Выбран образ Fastboot: %1$s (напрямую из документов Android).</string>
+    <string name="rev13_image_source_title">Источник образа</string>
+    <string name="rev13_image_source_android">Файлы Android · прямой SAF</string>
+    <string name="rev13_image_source_workspace">Рабочая папка NekoFlash · локальный образ</string>
 </resources>

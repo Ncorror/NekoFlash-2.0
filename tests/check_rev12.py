@@ -14,7 +14,7 @@ source = (base/'FirmwareSource.kt').read_text()
 vm = (base/'DeviceViewModel.kt').read_text()
 main = (base/'MainActivity.kt').read_text()
 
-# Narrow audited protocol change: no modifications to Fastboot or native USBFS.
+# REV12 ADB protocol is pinned here; REV13 Fastboot/native changes have separate guards.
 data = adb_file.read_bytes()
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 assert git_blob == '0487a8b60a27c2bfe8809f4db5db066ffb352777', 'Unreviewed AdbProtocol change'

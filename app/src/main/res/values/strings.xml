@@ -501,4 +501,12 @@ Unlock</string>
     <string name="rev12_sideload_mode_inactive">ADB Sideload is not active. Device mode: %1$s.</string>
     <string name="rev12_sideload_failed">ADB Sideload error (%1$s): %2$s.</string>
     <string name="rev12_sideload_saf_unsupported">The document cannot be read directly or does not support random access. Use Import to copy the ZIP into the existing workspace.</string>
+    <string name="rev13_fastboot_slot_error">Cannot resolve the Fastboot slot for partition %1$s.</string>
+    <string name="rev13_direct_saf_failed">Cannot flash the selected document directly. The provider may not support random access or Native USBFS may be unavailable. Choose an image from the NekoFlash workspace instead.</string>
+    <string name="rev13_picker_no_document">Android did not return a selected image.</string>
+    <string name="rev13_unnamed_image">selected-image.img</string>
+    <string name="rev13_image_selected">Fastboot image selected: %1$s (direct Android document source).</string>
+    <string name="rev13_image_source_title">Choose image source</string>
+    <string name="rev13_image_source_android">Android files · direct SAF</string>
+    <string name="rev13_image_source_workspace">NekoFlash workspace · local image</string>
 </resources>

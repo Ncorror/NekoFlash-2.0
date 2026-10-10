@@ -120,6 +120,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var workspacePath: File
     private lateinit var importFileLauncher: ActivityResultLauncher<Intent>
     private lateinit var sideloadZipLauncher: ActivityResultLauncher<Intent>
+    private lateinit var quickImageLauncher: ActivityResultLauncher<Intent>
+    private var quickFlashSource: FirmwareSource? = null
     private lateinit var miLoginLauncher: ActivityResultLauncher<Intent>
     private var miAuth: MiAccountClient.AuthResult? = null
     private var miAuthExchangeJob: Job? = null
@@ -385,6 +387,7 @@ class MainActivity : AppCompatActivity() {
         registerUsbReceiver()
         registerImportLauncher()
         registerDirectSideloadLauncher()
+        registerQuickImageLauncher()
         registerMiLoginLauncher()
         setupButtons()
         setupFastbootWorkflowUi()
@@ -1632,6 +1635,79 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun registerQuickImageLauncher() {
+        quickImageLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+            val uri = result.data?.data ?: run {
+                viewModel.log(
+                    DiagnosticLogPolicy.Level.ERROR,
+                    getString(R.string.rev13_picker_no_document)
+                )
+                return@registerForActivityResult
+            }
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }.onFailure { error ->
+                viewModel.logFileOnly(
+                    "Fastboot SAF read permission is transient: ${error.javaClass.simpleName}"
+                )
+            }
+            val name = WorkspaceImportNaming.sanitizeImportedFileName(
+                queryDisplayName(uri) ?: getString(R.string.rev13_unnamed_image)
+            )
+            quickFlashSource = FirmwareSource.SafDocument(uri, name, queryFileSize(uri))
+            findViewById<TextView>(R.id.tvQuickSelectedImage).text =
+                getString(R.string.flash_rev7_file_chosen, name)
+            viewModel.log(getString(R.string.rev13_image_selected, name))
+        }
+    }
+
+    private fun startQuickImageDocumentPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+        runCatching { quickImageLauncher.launch(intent) }
+            .onFailure { error ->
+                viewModel.log(
+                    DiagnosticLogPolicy.Level.ERROR,
+                    getString(
+                        R.string.rev11_picker_open_failed,
+                        error.message ?: error.javaClass.simpleName
+                    )
+                )
+            }
+    }
+
+    private fun chooseQuickImageSource() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.rev13_image_source_title)
+            .setItems(arrayOf(
+                getString(R.string.rev13_image_source_android),
+                getString(R.string.rev13_image_source_workspace)
+            )) { _, which ->
+                if (which == 0) {
+                    startQuickImageDocumentPicker()
+                } else {
+                    showFileSelector { file ->
+                        quickFlashSource = FirmwareSource.WorkspaceFile(file)
+                        findViewById<TextView>(R.id.tvQuickSelectedImage).text =
+                            getString(R.string.flash_rev7_file_chosen, file.name)
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel_upper, null)
+            .show()
+    }
+
     private fun registerImportLauncher() {
         importFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
@@ -2691,8 +2767,6 @@ class MainActivity : AppCompatActivity() {
 
         val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition)
         val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition)
-        val quickFile = arrayOfNulls<File>(1)
-        val imageName = findViewById<TextView>(R.id.tvQuickSelectedImage)
         val slotSpinner = findViewById<Spinner>(R.id.spinQuickSlot)
         val slotNames = listOf(
             getString(R.string.flash_rev7_slot_current),
@@ -2719,15 +2793,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         findViewById<View>(R.id.btnQuickSelectImage).setOnClickListener {
-            showFileSelector { file ->
-                quickFile[0] = file
-                imageName.text = getString(R.string.flash_rev7_file_chosen, file.name)
-                updateTargetLabel()
-            }
+            chooseQuickImageSource()
         }
         findViewById<View>(R.id.btnQuickExecute).setOnClickListener {
             val partition = getQuickPartition() ?: return@setOnClickListener
-            val file = quickFile[0] ?: run {
+            val source = quickFlashSource ?: run {
                 Toast.makeText(this, R.string.flash_rev7_no_file_error, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -2752,7 +2822,7 @@ class MainActivity : AppCompatActivity() {
                 else -> null
             }
             autoShowGuiOperation = true
-            viewModel.runFlash(partition, file, chosenSlot)
+            viewModel.runFlash(partition, source, chosenSlot)
         }
         findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
 

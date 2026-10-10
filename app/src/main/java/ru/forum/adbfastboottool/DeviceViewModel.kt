@@ -1212,16 +1212,37 @@ class DeviceViewModel(
         }
     }
 
-    fun runFlash(partition: String, file: File, slot: String? = null) {
+    fun runFlash(partition: String, file: File, slot: String? = null) =
+        runFlash(partition, FirmwareSource.WorkspaceFile(file), slot)
+
+    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null) {
         val label = partition + slot?.let { " --slot=$it" }.orEmpty()
-        startOperation(text(R.string.notif_flash_img), text(R.string.notif_flashing_partition, file.name, label)) {
-            val proto = fastbootProtocol ?: failOperation("No Fastboot connection")
-            if (!proto.isConnected) failOperation("No Fastboot connection")
+        startOperation(
+            text(R.string.notif_flash_img),
+            text(R.string.notif_flashing_partition, source.displayName, label)
+        ) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
-                ?: failOperation("Could not apply Fastboot slot for $partition")
+                ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
             targets.forEach { target ->
-                val result = proto.flashPartitionDetailed(target, file)
-                if (!result.success) failOperation(formatFlashFailure(target, result))
+                val result = when (source) {
+                    is FirmwareSource.WorkspaceFile ->
+                        proto.flashPartitionDetailed(target, source.file)
+                    is FirmwareSource.SafDocument ->
+                        proto.flashPartitionDetailed(
+                            target, source, getApplication<Application>().contentResolver
+                        )
+                }
+                if (!result.success) {
+                    if (source is FirmwareSource.SafDocument &&
+                        result.stage == FastbootProtocol.FlashStage.VALIDATION
+                    ) {
+                        logFileOnly("Fastboot SAF preflight: ${result.message}")
+                        failOperation(text(R.string.rev13_direct_saf_failed))
+                    }
+                    failOperation(formatFlashFailure(target, result))
+                }
             }
         }
     }

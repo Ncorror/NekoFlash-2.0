@@ -20,6 +20,8 @@ internal sealed interface FirmwareSource {
 
     interface Opened : Closeable {
         val sizeBytes: Long
+        /** Read-only descriptor borrowed for the duration of this Opened owner. */
+        val nativeFd: Int? get() = null
         fun readFullyAt(offset: Long, target: ByteArray)
     }
 
@@ -62,6 +64,7 @@ internal sealed interface FirmwareSource {
                     if (size <= 0L) throw IOException("Empty or size-unknown document")
                     return object : Opened {
                         override val sizeBytes: Long = size
+                        override val nativeFd: Int = descriptor.fd
                         override fun readFullyAt(offset: Long, target: ByteArray) {
                             if (offset < 0L || offset > size ||
                                 target.size.toLong() > size - offset) {

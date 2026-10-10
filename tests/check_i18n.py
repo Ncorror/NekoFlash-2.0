@@ -123,5 +123,15 @@ for key in rev12_keys:
     assert key in en and key in ru
     assert "R.string." + key in (main + vm), key
 
+rev13_keys = (
+    "rev13_fastboot_slot_error", "rev13_direct_saf_failed",
+    "rev13_picker_no_document", "rev13_unnamed_image",
+    "rev13_image_selected", "rev13_image_source_title",
+    "rev13_image_source_android", "rev13_image_source_workspace",
+)
+for key in rev13_keys:
+    assert key in en and key in ru
+    assert "R.string." + key in (main + vm), key
+
 print(f"PASS I18N: {len(en)} paired strings, {len(plural_en)} plural keys, "
       "format-safe RU/EN, package and workspace paths unchanged")
