@@ -3312,7 +3312,7 @@ class MainActivity : AppCompatActivity() {
             text = buildString {
                 append(getString(R.string.shell_usb_mode, connectionStatusPresentation().first))
                 append('\n')
-                append(getString(R.string.shell_usb_otg, tvOtgStatus?.text.orEmpty()))
+                append(getString(R.string.shell_usb_otg, tvOtgStatus?.text?.toString().orEmpty()))
                 append('\n')
                 val devices = try { usbManager.deviceList.values.toList() } catch (_: SecurityException) { emptyList() }
                 append(getString(R.string.shell_usb_devices_count, devices.size))
