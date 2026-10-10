@@ -230,7 +230,7 @@ class DeviceViewModel(
 
         val logsDir = File(workspacePath, "logs")
         if (!logsDir.exists() && !logsDir.mkdirs()) {
-            log("⚠️ Could not create logs folder: ${logsDir.absolutePath}")
+            log("⚠️ " + text(R.string.rev11_log_folder_failed, logsDir.absolutePath))
             return
         }
         val stamp = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.US).format(Date())
@@ -238,7 +238,7 @@ class DeviceViewModel(
         val store = try {
             DiagnosticLogStore(logsDir, stamp)
         } catch (e: Exception) {
-            log("⚠️ Could not initialize bounded log store: ${e.message ?: e.javaClass.simpleName}")
+            log("⚠️ " + text(R.string.rev11_log_store_failed, e.message ?: e.javaClass.simpleName))
             return
         }
         logStore = store
@@ -260,7 +260,7 @@ class DeviceViewModel(
         traceLogFile = store.currentTraceFile()
         persistSessionSummary()
         log("Log file: /sdcard/Download/NekoFlash/logs/${createdLog?.name ?: "log-$stamp.txt"}")
-        log("ℹ️ Raw USB/Fastboot trace is separated from the main log and rotates automatically.")
+        log("ℹ️ " + text(R.string.rev11_log_trace_location_info))
     }
 
     fun log(message: String) {
@@ -741,9 +741,11 @@ class DeviceViewModel(
     }
 
     private fun setOperationSteps(steps: List<OperationStep>) {
-        val safeSteps = steps.take(MAX_OPERATION_STEPS_IN_UI)
-        synchronized(operationStepLock) { operationStepSnapshot = safeSteps }
-        _operationSteps.postValue(safeSteps)
+        // Preserve the complete operation; the RecyclerView controls how many rows
+        // are rendered at once. Truncating the model silently loses real steps.
+        val completeSteps = steps.toList()
+        synchronized(operationStepLock) { operationStepSnapshot = completeSteps }
+        _operationSteps.postValue(completeSteps)
     }
 
     private fun markOperationStep(index: Int, status: OperationStepStatus, subtitle: String? = null) {
@@ -862,9 +864,9 @@ class DeviceViewModel(
                             "topology=$topology, incomplete=$incomplete, " +
                             "point-queries=${inventory.pointQueryCount}, status=${inventory.finalStatus}"
                     )
+                    // All non-informational warnings must be retained in diagnostics.
                     inventory.warnings
                         .filter { it.severity != FastbootPartitionInventory.WarningSeverity.INFO }
-                        .take(4)
                         .forEach { warning -> log("⚠️ Inventory ${warning.code}: ${warning.message}") }
                 } else {
                     _fastbootPartitionInventory.postValue(null)
@@ -1026,7 +1028,7 @@ class DeviceViewModel(
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val ok = if (heavy) proto.sendCommand(cmd) else proto.runTerminalCommand(cmd)
-            if (!ok) failOperation("Fastboot command failed: $cmd")
+            if (!ok) failOperation(text(R.string.rev11_fastboot_command_failed, cmd))
         }
     }
 
@@ -1040,14 +1042,14 @@ class DeviceViewModel(
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
-            if (!proto.sendCommand("set_active:$slot")) failOperation("Slot switch failed: $slot")
+            if (!proto.sendCommand("set_active:$slot")) failOperation(text(R.string.rev11_slot_switch_failed, slot))
             val actual = proto.getVar("current-slot")?.trim()?.removePrefix("_")
                 ?.lowercase(Locale.US)
             if (actual != slot) {
-                failOperation("Slot switch unverified: expected=$slot, device=${actual ?: "unavailable"}")
+                failOperation(text(R.string.rev11_slot_switch_unverified, slot, actual ?: text(R.string.device_bool_unknown)))
             }
             proto.currentDiagnostics()?.let { _fastbootDiagnostics.postValue(it) }
-            log("✅ Verified current-slot=$slot")
+            log("✅ " + text(R.string.rev11_slot_switch_verified, slot))
         }
     }
 
@@ -1055,7 +1057,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.downloadAndRun(file, commandAfterDownload)) {
-                failOperation("Fastboot download+run failed: $commandAfterDownload")
+                failOperation(text(R.string.rev11_fastboot_download_failed, commandAfterDownload))
             }
         }
     }
@@ -1064,7 +1066,7 @@ class DeviceViewModel(
     fun runFastbootLogicalPartitionCommand(command: String) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, command)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
-            if (!proto.runLogicalPartitionCommand(command)) failOperation("Fastboot logical command failed: $command")
+            if (!proto.runLogicalPartitionCommand(command)) failOperation(text(R.string.rev11_fastboot_logical_failed, command))
         }
     }
 
@@ -1072,7 +1074,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (proto.inspectLogicalPartition(partition) == null) {
-                failOperation("Could not get logical partition info: $partition")
+                failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
             }
         }
     }
@@ -1210,16 +1212,37 @@ class DeviceViewModel(
         }
     }
 
-    fun runFlash(partition: String, file: File, slot: String? = null) {
+    fun runFlash(partition: String, file: File, slot: String? = null) =
+        runFlash(partition, FirmwareSource.WorkspaceFile(file), slot)
+
+    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null) {
         val label = partition + slot?.let { " --slot=$it" }.orEmpty()
-        startOperation(text(R.string.notif_flash_img), text(R.string.notif_flashing_partition, file.name, label)) {
-            val proto = fastbootProtocol ?: failOperation("No Fastboot connection")
-            if (!proto.isConnected) failOperation("No Fastboot connection")
+        startOperation(
+            text(R.string.notif_flash_img),
+            text(R.string.notif_flashing_partition, source.displayName, label)
+        ) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
-                ?: failOperation("Could not apply Fastboot slot for $partition")
+                ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
             targets.forEach { target ->
-                val result = proto.flashPartitionDetailed(target, file)
-                if (!result.success) failOperation(formatFlashFailure(target, result))
+                val result = when (source) {
+                    is FirmwareSource.WorkspaceFile ->
+                        proto.flashPartitionDetailed(target, source.file)
+                    is FirmwareSource.SafDocument ->
+                        proto.flashPartitionDetailed(
+                            target, source, getApplication<Application>().contentResolver
+                        )
+                }
+                if (!result.success) {
+                    if (source is FirmwareSource.SafDocument &&
+                        result.stage == FastbootProtocol.FlashStage.VALIDATION
+                    ) {
+                        logFileOnly("Fastboot SAF preflight: ${result.message}")
+                        failOperation(text(R.string.rev13_direct_saf_failed))
+                    }
+                    failOperation(formatFlashFailure(target, result))
+                }
             }
         }
     }
@@ -1405,13 +1428,13 @@ class DeviceViewModel(
     private fun sideloadVerificationPrefs() =
         getApplication<Application>().getSharedPreferences(SIDELOAD_VERIFY_PREFS, Context.MODE_PRIVATE)
 
-    private fun persistPendingSideloadVerification(file: File, proto: AdbProtocol) {
+    private fun persistPendingSideloadVerification(source: FirmwareSource, proto: AdbProtocol) {
         val device = adbBannerProperty(proto.currentDiagnostics().remoteBanner, "ro.product.device")
         @Suppress("UseKtx")
         val saved = sideloadVerificationPrefs()
             .edit()
-            .putString(SIDELOAD_VERIFY_PACKAGE, file.name)
-            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, file.length())
+            .putString(SIDELOAD_VERIFY_PACKAGE, source.displayName)
+            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, source.sizeHint ?: -1L)
             .putString(SIDELOAD_VERIFY_DEVICE, device)
             .putLong(SIDELOAD_VERIFY_CREATED_AT, System.currentTimeMillis())
             .commit()
@@ -1601,7 +1624,9 @@ class DeviceViewModel(
         }
     }
 
-    fun runSideload(file: File) {
+    fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))
+
+    internal fun runSideload(source: FirmwareSource) {
         val proto = adbProtocol
         if (proto?.isConnected != true) {
             log(text(R.string.error_no_adb))
@@ -1609,28 +1634,36 @@ class DeviceViewModel(
         }
 
         clearPendingSideloadVerification()
-        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, file.name)) {
-            when (val result = proto.sideloadZip(file)) {
+        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, source.displayName)) {
+            when (val result = proto.sideloadZip(source, getApplication<Application>().contentResolver)) {
                 AdbProtocol.SideloadResult.TransferComplete -> {
-                    persistPendingSideloadVerification(file, proto)
+                    persistPendingSideloadVerification(source, proto)
                     verificationPending(
-                        "File transfer completed. Recovery decides whether the package is valid; the install result will be read after returning to Recovery if a log is available."
+                        text(R.string.rev12_sideload_verify_pending)
                     )
                 }
                 is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
-                    persistPendingSideloadVerification(file, proto)
+                    persistPendingSideloadVerification(source, proto)
                     verificationPending(
-                        "Recovery closed ADB before DONEDONE after ≈${result.percent}% transfer. This is not treated as a transport error; check the final install result on the Recovery screen or after returning to Recovery."
+                        text(R.string.rev12_sideload_disconnect_pending, result.percent)
                     )
                 }
                 AdbProtocol.SideloadResult.Cancelled -> {
-                    throw OperationAbort(OperationOutcome.Cancelled("ADB Sideload cancelled"))
+                    throw OperationAbort(OperationOutcome.Cancelled(text(R.string.rev12_sideload_cancelled)))
                 }
                 is AdbProtocol.SideloadResult.NotInSideloadMode -> {
-                    failOperation("ADB Sideload is not active. Current mode: ${result.mode.name}")
+                    failOperation(text(R.string.rev12_sideload_mode_inactive, result.mode.name))
                 }
                 is AdbProtocol.SideloadResult.Failed -> {
-                    failOperation("ADB Sideload [${result.kind.name}]: ${result.message}")
+                    if (source is FirmwareSource.SafDocument &&
+                        result.kind == AdbProtocol.SideloadFailureKind.FILE
+                    ) {
+                        // Keep raw provider errors in diagnostics, while the GUI
+                        // presents a complete localized message and Import fallback.
+                        logFileOnly("SAF direct read: ${result.message}")
+                        failOperation(text(R.string.rev12_sideload_saf_unsupported))
+                    }
+                    failOperation(text(R.string.rev12_sideload_failed, result.kind.name, result.message))
                 }
             }
         }
@@ -1845,7 +1878,6 @@ class DeviceViewModel(
         private const val TRANSPORT_IDLE_POLL_MS = 10L
         private const val MI_UNLOCK_VERIFY_TIMEOUT_MS = 24L * 60L * 60L * 1000L
         private const val SIDELOAD_VERIFY_TIMEOUT_MS = 60L * 60L * 1000L
-        private const val MAX_OPERATION_STEPS_IN_UI = 240
         private const val MI_UNLOCK_VERIFY_PREFS = "mi_unlock_verify"
         private const val SIDELOAD_VERIFY_PREFS = "sideload_verify"
         private const val MI_UNLOCK_VERIFY_PRODUCT = "product"

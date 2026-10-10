@@ -880,7 +880,51 @@ class FastbootProtocol(
     fun flashPartition(partition: String, file: File): Boolean =
         flashPartitionDetailed(partition, file).success
 
-    fun flashPartitionDetailed(partition: String, file: File): FlashResult = transactionLock.withLock {
+    fun flashPartitionDetailed(partition: String, file: File): FlashResult =
+        flashPartitionDetailedInternal(partition, file, file.name, file.length(), null)
+
+    /**
+     * Direct SAF Fastboot on Native USBFS only. The descriptor remains owned
+     * by FirmwareSource through all command, DATA, and final-response stages.
+     * No silent transport switch or temporary workspace copy.
+     */
+    internal fun flashPartitionDetailed(
+        partition: String,
+        source: FirmwareSource,
+        resolver: android.content.ContentResolver
+    ): FlashResult {
+        if (source is FirmwareSource.WorkspaceFile) {
+            return flashPartitionDetailed(partition, source.file)
+        }
+        val reader = try {
+            source.open(resolver)
+        } catch (error: Exception) {
+            return FlashResult.fail(
+                FlashStage.VALIDATION, FlashFailureKind.VALIDATION,
+                "Cannot read Fastboot image: ${error.message ?: error.javaClass.simpleName}"
+            )
+        }
+        return reader.use { opened ->
+            val fd = opened.nativeFd
+            if (fd == null || dataTransportMode != DataTransportMode.NATIVE_USBFS) {
+                return@use FlashResult.fail(
+                    FlashStage.VALIDATION, FlashFailureKind.VALIDATION,
+                    "Direct SAF requires Native USBFS and a seekable descriptor; use explicit Import for this provider/transport"
+                )
+            }
+            flashPartitionDetailedInternal(
+                partition, null, source.displayName, opened.sizeBytes, fd
+            )
+        }
+    }
+
+    private fun flashPartitionDetailedInternal(
+        partition: String,
+        file: File?,
+        displayName: String,
+        imageSize: Long,
+        sourceFd: Int?
+    ): FlashResult = transactionLock.withLock {
         if (!ensureSessionReady("flash:$partition")) {
             return@withLock FlashResult.fail(
                 FlashStage.VALIDATION,
@@ -890,7 +934,7 @@ class FastbootProtocol(
             )
         }
 
-        val normalizedPartition = partition.trim().lowercase(Locale.US)
+        val normalizedPartition = partition.trim()
         if (normalizedPartition.isBlank() || !normalizedPartition.matches(Regex("[A-Za-z0-9._:-]+"))) {
             val message = "Invalid partition name: $partition"
             onLog("❌ ERROR: $message")
@@ -901,26 +945,26 @@ class FastbootProtocol(
             onLog("⚠️ Partition $normalizedPartition is not in the standard list. The hard block is removed; the command is allowed in terminal mode.")
         }
 
-        if (!file.exists() || !file.isFile || !file.canRead()) {
-            val message = "File is unavailable: ${file.name}"
+        if (file != null && (!file.exists() || !file.isFile || !file.canRead())) {
+            val message = "File is unavailable: $displayName"
             onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
-        if (file.length() <= 0L) {
-            val message = "File is empty: ${file.name}"
+        if (imageSize <= 0L) {
+            val message = "File is empty: $displayName"
             onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
-        if (file.length() > 0xFFFF_FFFFL) {
-            val message = "Fastboot download supports sizes up to 4 GiB in this implementation"
+        if (imageSize > 0xFFFF_FFFFL) {
+            val message = "Fastboot 32-bit download cannot represent this image size"
             onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
 
-        val fileSizeMb = file.length().toDouble() / 1024.0 / 1024.0
-        onLog("Flashing $normalizedPartition. File: ${file.name} (${"%.2f".format(fileSizeMb)} MB)")
+        val fileSizeMb = imageSize.toDouble() / 1024.0 / 1024.0
+        onLog("Flashing $normalizedPartition. File: ${displayName} (${"%.2f".format(fileSizeMb)} MB)")
 
-        val hexSize = String.format("%08x", file.length())
+        val hexSize = String.format("%08x", imageSize)
         if (!writeCommand("download:$hexSize", 5000)) {
             return@withLock flashTransportFailure(FlashStage.SEND_DOWNLOAD, "Failed to send download command")
         }
@@ -941,7 +985,13 @@ class FastbootProtocol(
             }
         }
 
-        val transfer = transferDownloadPayload(file, "flash:$normalizedPartition")
+        val transfer = if (file != null) {
+            transferDownloadPayload(file, "flash:$normalizedPartition")
+        } else {
+            transferDownloadPayloadNativeUsbfs(
+                null, "flash:$normalizedPartition", imageSize, sourceFd ?: -1
+            )
+        }
         if (!transfer.success) {
             val kind = if (transfer.cancelled) FlashFailureKind.CANCELLED else FlashFailureKind.TRANSPORT
             return@withLock FlashResult.fail(
@@ -956,7 +1006,7 @@ class FastbootProtocol(
         sessionState = SessionState.AWAITING_DATA_FINAL
         val downloadDone = readUntilFinalWithRetry(singleReadTimeoutMs = 2000, maxTotalTimeMs = 30_000)
             ?: return@withLock flashTransportFailure(FlashStage.WAIT_DOWNLOAD_FINAL, "No final response after DATA")
-                .copy(dataBytesTransferred = file.length())
+                .copy(dataBytesTransferred = imageSize)
         if (downloadDone.type != "OKAY") {
             val message = downloadDone.payload.ifBlank { downloadDone.raw }
             logFastbootFailure("Device rejected the image after transfer", message)
@@ -964,24 +1014,24 @@ class FastbootProtocol(
                 FlashStage.WAIT_DOWNLOAD_FINAL,
                 FlashFailureKind.PROTOCOL,
                 message,
-                dataBytesTransferred = file.length()
+                dataBytesTransferred = imageSize
             )
         }
 
         onLog("Writing image to partition $normalizedPartition (this may take several minutes)...")
         if (!writeCommand("flash:$normalizedPartition", 5000)) {
             return@withLock flashTransportFailure(FlashStage.SEND_FLASH, "Failed to send flash command")
-                .copy(dataBytesTransferred = file.length())
+                .copy(dataBytesTransferred = imageSize)
         }
         sessionState = SessionState.AWAITING_COMMAND_FINAL
 
         val flashDone = readUntilFinalWithRetry(singleReadTimeoutMs = 2000, maxTotalTimeMs = 600_000)
             ?: return@withLock flashTransportFailure(FlashStage.WAIT_FLASH_FINAL, "No final flash response")
-                .copy(dataBytesTransferred = file.length())
+                .copy(dataBytesTransferred = imageSize)
 
         if (flashDone.type == "OKAY") {
             onLog("✅ Flashing $normalizedPartition completed successfully!")
-            FlashResult.ok(dataBytesTransferred = file.length())
+            FlashResult.ok(dataBytesTransferred = imageSize)
         } else {
             val message = flashDone.payload.ifBlank { flashDone.raw }
             logFastbootFailure("Partition write ERROR $normalizedPartition", message)
@@ -989,7 +1039,7 @@ class FastbootProtocol(
                 FlashStage.WAIT_FLASH_FINAL,
                 FlashFailureKind.PROTOCOL,
                 message,
-                dataBytesTransferred = file.length()
+                dataBytesTransferred = imageSize
             )
         }
     }
@@ -1420,7 +1470,9 @@ class FastbootProtocol(
      * Production DATA transfer through Linux usbfs URB ioctls using the raw
      * UsbDeviceConnection file descriptor and a bounded two-URB pipeline.
      */
-    private fun transferDownloadPayloadNativeUsbfs(file: File, label: String, totalBytes: Long): TransferResult {
+    private fun transferDownloadPayloadNativeUsbfs(
+        file: File?, label: String, totalBytes: Long, sourceFd: Int = -1
+    ): TransferResult {
         val conn = connection
         val out = endpointOut
         val preflight = NativeUsbfsBackend.preflightError(conn, out)
@@ -1465,6 +1517,8 @@ class FastbootProtocol(
             connection = activeConnection,
             outEndpoint = activeOut,
             payloadFile = file,
+            payloadFd = sourceFd,
+            payloadSizeBytes = totalBytes,
             blockBytes = blockBytes,
             pipelineDepth = pipelineDepth,
             stallTimeoutMs = NATIVE_USBFS_URB_TIMEOUT_MS,

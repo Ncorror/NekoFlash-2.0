@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature/rev11-core-cleanup" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "feature/rev6-shell" ]
   workflow_dispatch:
 
 permissions:
@@ -48,7 +48,8 @@ jobs:
 
       - name: REV5 / REV6 structural and source-guard tests
         run: |
-          python3 tests/check_rev10.py
+          python3 tests/check_rev13.py
+          python3 tests/check_i18n.py
 
       - name: Kotlin JVM queue and diagnostic regression tests
         timeout-minutes: 15

@@ -19,13 +19,13 @@ def run():
     manifest = json.loads(BASELINE.read_text(encoding='utf-8'))['file_sha256']
     base = ROOT / 'app/src/main'
     for rel in [
-        'app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt',
-        'app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt',
+        # REV12: narrow ADB Sideload-only source change pinned in check_rev12.py.
+        # REV13 deliberately extends Fastboot's source interface; pinned in check_rev13.py.
         # REV7 changes only queue ordering in DeviceViewModel; see check_rev7.py.
         'app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt',
         # REV10 adjusts only inactive tab presentation; pin new blob in check_rev10.py.
-        'app/src/main/cpp/native_usbfs.cpp',
+        # REV13 adds fd-source JNI route; original URB lifecycle pinned in check_rev13.py.
         # REV7 Fastboot screen is pinned by check_rev7.py (transport guard unaffected).
         # REV7 Home informational-only screen is now guarded by check_rev7.py.
     ]:
@@ -49,7 +49,9 @@ def run():
             require(found.count(key)==1, f'String {key} missing/duplicated in {res}')
     main = (base / 'java/ru/forum/adbfastboottool/MainActivity.kt').read_text(encoding='utf-8')
     require('R.id.tvSideloadSelectedZip' in main, 'Missing chosen-file UI binding')
-    require('viewModel.runSideload(file)' in main, 'Original Sideload operation disconnected')
+    require('viewModel.runSideload(source)' in main, 'Direct SAF Sideload action is disconnected')
+    require('R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main,
+            'Explicit import fallback disappeared')
     require('R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main, 'Import behavior changed')
     nav = (base / 'res/layout/activity_main.xml').read_text(encoding='utf-8')
     for tab in ['tabHome','tabFastboot','tabAdb','tabUnlock','tabSettings']:

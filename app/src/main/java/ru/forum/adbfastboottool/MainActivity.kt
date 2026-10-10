@@ -119,6 +119,9 @@ class MainActivity : AppCompatActivity() {
     private val folderName = "NekoFlash"
     private lateinit var workspacePath: File
     private lateinit var importFileLauncher: ActivityResultLauncher<Intent>
+    private lateinit var sideloadZipLauncher: ActivityResultLauncher<Intent>
+    private lateinit var quickImageLauncher: ActivityResultLauncher<Intent>
+    private var quickFlashSource: FirmwareSource? = null
     private lateinit var miLoginLauncher: ActivityResultLauncher<Intent>
     private var miAuth: MiAccountClient.AuthResult? = null
     private var miAuthExchangeJob: Job? = null
@@ -383,6 +386,8 @@ class MainActivity : AppCompatActivity() {
 
         registerUsbReceiver()
         registerImportLauncher()
+        registerDirectSideloadLauncher()
+        registerQuickImageLauncher()
         registerMiLoginLauncher()
         setupButtons()
         setupFastbootWorkflowUi()
@@ -504,14 +509,8 @@ class MainActivity : AppCompatActivity() {
 
         // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
-            showFileSelector { file ->
-                // The approved REV3 screen shows the chosen ZIP without changing
-                // legacy Sideload transport, verification, or USB ownership.
-                findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
-                    getString(R.string.layout_sideload_selected_file, file.name)
-                autoShowGuiOperation = true
-                viewModel.runSideload(file)
-            }
+            // Direct SAF selection; no all-files workspace permission or copy.
+            startDirectSideloadFilePicker()
         }
         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
 
@@ -584,11 +583,11 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             if (device == null) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: USB device was not provided by the system")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_usb_missing_from_system))
                 return
             }
 
-            viewModel.log("USB access granted. Analyzing interfaces...")
+            viewModel.log(getString(R.string.rev11_usb_access_granted))
             val pending = takePendingUsbConnect(device)
             analyzeAndConnectDevice(device, pending)
         }
@@ -597,7 +596,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleUsbDetached(intent: Intent) {
         val device = intent.parcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
         if (device == null) {
-            viewModel.log("USB device disconnected: unknown")
+            viewModel.log(getString(R.string.rev11_usb_disconnected_unknown))
             updateOtgStatus()
             return
         }
@@ -616,7 +615,7 @@ class MainActivity : AppCompatActivity() {
                         "Reconnect the device before the next command."
                 )
             } else {
-                viewModel.log("USB device disconnected: ${device.productName ?: device.deviceName}")
+                viewModel.log(getString(R.string.rev11_usb_disconnected, device.productName ?: device.deviceName))
             }
             viewModel.disconnectCurrent()
             startModeSwitchWatch(previousSignature, previousVendorId)
@@ -642,7 +641,7 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra(EXTRA_USB_INTENT_CONSUMED, true)
 
         if (device == null) {
-            viewModel.log("⚠️ USB attach: system did not provide a device")
+            viewModel.log("⚠️ " + getString(R.string.rev11_usb_attach_missing))
             return true
         }
 
@@ -650,7 +649,7 @@ class MainActivity : AppCompatActivity() {
         stopModeSwitchWatch()
         val candidate = UsbDeviceInspector.selectPrimaryCandidate(device, allowGenericFastboot = true)
         if (candidate == null) {
-            viewModel.log("⚠️ USB device connected, but no ADB/Fastboot bulk interface was found")
+            viewModel.log("⚠️ " + getString(R.string.rev11_usb_unsupported_interface))
             viewModel.logFileOnly(UsbDeviceInspector.summarizeDevice(device))
             return true
         }
@@ -672,7 +671,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         if (usbManager.hasPermission(device)) {
-            viewModel.log("USB access already granted")
+            viewModel.log(getString(R.string.rev11_usb_already_authorized))
             pendingUsbCandidates.remove(device.deviceId)
             connectCandidate(candidate, automatic)
             return
@@ -1585,6 +1584,130 @@ class MainActivity : AppCompatActivity() {
 
     // ─── РАЗРЕШЕНИЯ И ФАЙЛЫ ──────────────────────────────────────────────────
 
+    private fun registerDirectSideloadLauncher() {
+        sideloadZipLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+            val uri = result.data?.data ?: run {
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev12_sideload_no_uri))
+                return@registerForActivityResult
+            }
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }.onFailure { error ->
+                viewModel.logFileOnly(
+                    "SAF document permission is transient: ${error.javaClass.simpleName}"
+                )
+            }
+            val display = WorkspaceImportNaming.sanitizeImportedFileName(
+                queryDisplayName(uri) ?: getString(R.string.rev12_sideload_unnamed)
+            )
+            val source = FirmwareSource.SafDocument(uri, display, queryFileSize(uri))
+            findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
+                getString(R.string.layout_sideload_selected_file, display)
+            viewModel.log(getString(R.string.rev12_sideload_source_selected, display))
+            autoShowGuiOperation = true
+            viewModel.runSideload(source)
+        }
+    }
+
+    private fun startDirectSideloadFilePicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                "application/zip", "application/x-zip-compressed",
+                "application/octet-stream", "*/*"
+            ))
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+        try {
+            sideloadZipLauncher.launch(intent)
+        } catch (error: Exception) {
+            viewModel.log(
+                DiagnosticLogPolicy.Level.ERROR,
+                getString(R.string.rev11_picker_open_failed, error.message ?: error.javaClass.simpleName)
+            )
+        }
+    }
+
+    private fun registerQuickImageLauncher() {
+        quickImageLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+            val uri = result.data?.data ?: run {
+                viewModel.log(
+                    DiagnosticLogPolicy.Level.ERROR,
+                    getString(R.string.rev13_picker_no_document)
+                )
+                return@registerForActivityResult
+            }
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }.onFailure { error ->
+                viewModel.logFileOnly(
+                    "Fastboot SAF read permission is transient: ${error.javaClass.simpleName}"
+                )
+            }
+            val name = WorkspaceImportNaming.sanitizeImportedFileName(
+                queryDisplayName(uri) ?: getString(R.string.rev13_unnamed_image)
+            )
+            quickFlashSource = FirmwareSource.SafDocument(uri, name, queryFileSize(uri))
+            findViewById<TextView>(R.id.tvQuickSelectedImage).text =
+                getString(R.string.flash_rev7_file_chosen, name)
+            viewModel.log(getString(R.string.rev13_image_selected, name))
+        }
+    }
+
+    private fun startQuickImageDocumentPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+        runCatching { quickImageLauncher.launch(intent) }
+            .onFailure { error ->
+                viewModel.log(
+                    DiagnosticLogPolicy.Level.ERROR,
+                    getString(
+                        R.string.rev11_picker_open_failed,
+                        error.message ?: error.javaClass.simpleName
+                    )
+                )
+            }
+    }
+
+    private fun chooseQuickImageSource() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.rev13_image_source_title)
+            .setItems(arrayOf(
+                getString(R.string.rev13_image_source_android),
+                getString(R.string.rev13_image_source_workspace)
+            )) { _, which ->
+                if (which == 0) {
+                    startQuickImageDocumentPicker()
+                } else {
+                    showFileSelector { file ->
+                        quickFlashSource = FirmwareSource.WorkspaceFile(file)
+                        findViewById<TextView>(R.id.tvQuickSelectedImage).text =
+                            getString(R.string.flash_rev7_file_chosen, file.name)
+                    }
+                }
+            }
+            .setNegativeButton(R.string.cancel_upper, null)
+            .show()
+    }
+
     private fun registerImportLauncher() {
         importFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
@@ -1675,13 +1798,13 @@ class MainActivity : AppCompatActivity() {
         try {
             importFileLauncher.launch(intent)
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not open the system file picker: ${e.message}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_picker_open_failed, e.message ?: e.javaClass.simpleName))
         }
     }
 
     private fun ensureWorkspaceReady(): Boolean {
         if (::workspacePath.isInitialized && workspacePath.exists()) return true
-        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready. Open Permissions and grant file access for the selected file workflow.")
+        viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_permission_needed))
         showPermissionsDialog()
         return false
     }
@@ -1689,11 +1812,11 @@ class MainActivity : AppCompatActivity() {
     private fun importFirmwareFile(uri: Uri) {
         if (!ensureWorkspaceReady()) return
 
-        val displayName = sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
-        val target = uniqueTargetFile(displayName)
+        val displayName = WorkspaceImportNaming.sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
+        val target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
         val expectedSize = queryFileSize(uri)
-        viewModel.log("File import: $displayName → /sdcard/Download/$folderName/${target.name}")
-        expectedSize?.let { viewModel.log("Expected source size: $it bytes") }
+        viewModel.log(getString(R.string.rev11_import_started, displayName, "${workspaceDisplayPath()}/${target.name}"))
+        expectedSize?.let { viewModel.log(getString(R.string.rev11_import_expected_size, it)) }
 
         lifecycleScope.launch(Dispatchers.IO) {
             target.parentFile?.listFiles()
@@ -1718,11 +1841,11 @@ class MainActivity : AppCompatActivity() {
                 if (!temp.renameTo(target)) {
                     throw IllegalStateException("could not finish the import atomically")
                 }
-                viewModel.log("✅ File imported: /sdcard/Download/$folderName/${target.name} (${formatFileSize(target.length())})")
+                viewModel.log("✅ " + getString(R.string.rev11_import_finished, "${workspaceDisplayPath()}/${target.name}", formatFileSize(target.length())))
             } catch (e: Exception) {
                 temp.delete()
                 target.delete()
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not import file: ${e.message ?: e.javaClass.simpleName}")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_import_failed, e.message ?: e.javaClass.simpleName))
             }
         }
     }
@@ -1743,29 +1866,6 @@ class MainActivity : AppCompatActivity() {
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/')
-
-    private fun sanitizeImportedFileName(name: String): String {
-        val safe = name.trim()
-            .replace(Regex("[\\/:*?\"<>|\r\n]+"), "_")
-            .replace(Regex("\\s+"), "_")
-            .take(160)
-        return safe.ifBlank { "imported-${System.currentTimeMillis()}" }
-    }
-
-    private fun uniqueTargetFile(fileName: String): File {
-        var candidate = File(workspacePath, fileName)
-        if (!candidate.exists()) return candidate
-
-        val dot = fileName.lastIndexOf('.')
-        val base = if (dot > 0) fileName.substring(0, dot) else fileName
-        val ext = if (dot > 0) fileName.substring(dot) else ""
-        var index = 1
-        while (candidate.exists()) {
-            candidate = File(workspacePath, "$base-$index$ext")
-            index++
-        }
-        return candidate
-    }
 
     private fun formatFileSize(bytes: Long): String {
         val mb = bytes.toDouble() / 1024.0 / 1024.0
@@ -1822,10 +1922,10 @@ class MainActivity : AppCompatActivity() {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         workspacePath = File(downloadsDir, folderName)
         if (!workspacePath.exists() && !workspacePath.mkdirs()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Could not create folder ${workspaceDisplayPath()}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_create_failed, workspaceDisplayPath()))
             return
         }
-        viewModel.log("Workspace folder: ${workspaceDisplayPath()}")
+        viewModel.log(getString(R.string.rev11_workspace_location, workspaceDisplayPath()))
         viewModel.configureLogDirectory(workspacePath)
         updateDeviceOverview()
     }
@@ -1836,7 +1936,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFileSelector(onFileSelected: (File) -> Unit) {
         if (!::workspacePath.isInitialized || !workspacePath.exists()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Workspace is not ready for file selection.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_select_unavailable))
             showPermissionsDialog()
             return
         }
@@ -1847,7 +1947,7 @@ class MainActivity : AppCompatActivity() {
             ?.toTypedArray()
 
         if (files.isNullOrEmpty()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: No readable files in the $folderName folder. Tap Import to add a file through the system picker.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_no_files, folderName))
             return
         }
         runOnUiThread {
@@ -2667,8 +2767,6 @@ class MainActivity : AppCompatActivity() {
 
         val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition)
         val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition)
-        val quickFile = arrayOfNulls<File>(1)
-        val imageName = findViewById<TextView>(R.id.tvQuickSelectedImage)
         val slotSpinner = findViewById<Spinner>(R.id.spinQuickSlot)
         val slotNames = listOf(
             getString(R.string.flash_rev7_slot_current),
@@ -2695,15 +2793,11 @@ class MainActivity : AppCompatActivity() {
             }
         }
         findViewById<View>(R.id.btnQuickSelectImage).setOnClickListener {
-            showFileSelector { file ->
-                quickFile[0] = file
-                imageName.text = getString(R.string.flash_rev7_file_chosen, file.name)
-                updateTargetLabel()
-            }
+            chooseQuickImageSource()
         }
         findViewById<View>(R.id.btnQuickExecute).setOnClickListener {
             val partition = getQuickPartition() ?: return@setOnClickListener
-            val file = quickFile[0] ?: run {
+            val source = quickFlashSource ?: run {
                 Toast.makeText(this, R.string.flash_rev7_no_file_error, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -2728,7 +2822,7 @@ class MainActivity : AppCompatActivity() {
                 else -> null
             }
             autoShowGuiOperation = true
-            viewModel.runFlash(partition, file, chosenSlot)
+            viewModel.runFlash(partition, source, chosenSlot)
         }
         findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
 

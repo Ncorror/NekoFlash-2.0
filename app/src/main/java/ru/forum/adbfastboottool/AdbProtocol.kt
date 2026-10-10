@@ -438,7 +438,12 @@ class AdbProtocol(
 
 
 
-    fun sideloadZip(file: File): SideloadResult {
+    fun sideloadZip(file: File): SideloadResult = sideloadZip(FirmwareSource.WorkspaceFile(file))
+
+    internal fun sideloadZip(
+        source: FirmwareSource,
+        resolver: android.content.ContentResolver? = null
+    ): SideloadResult {
         if (!isConnected) {
             return SideloadResult.Failed(SideloadFailureKind.TRANSPORT, "No ADB connection")
         }
@@ -448,20 +453,28 @@ class AdbProtocol(
             return SideloadResult.NotInSideloadMode(peerMode)
         }
 
-        if (!file.exists() || !file.isFile || !file.canRead()) {
-            return SideloadResult.Failed(SideloadFailureKind.FILE, "File is unavailable: ${file.absolutePath}")
+        // SAF permissions and seekability must be verified before USB writes.
+        val opened = try {
+            source.open(resolver)
+        } catch (error: Exception) {
+            return SideloadResult.Failed(
+                SideloadFailureKind.FILE,
+                "Cannot open seekable ZIP: ${error.message ?: error.javaClass.simpleName}. Use Import for providers without random-access files."
+            )
         }
-        val fileSize = file.length()
+        val fileSize = opened.sizeBytes
         if (fileSize <= 0L) {
-            return SideloadResult.Failed(SideloadFailureKind.FILE, "File is empty: ${file.name}")
+            opened.close()
+            return SideloadResult.Failed(SideloadFailureKind.FILE, "ZIP is empty or has unknown length")
         }
 
         cancelled = false
         var terminalState = SideloadTerminalState.RUNNING
-        onLog("Starting ADB Sideload: ${file.name} ($fileSize bytes)")
+        onLog("Starting ADB Sideload: ${source.displayName} ($fileSize bytes)")
         onProgress(0, "ADB Sideload · waiting for recovery requests")
 
-        return try {
+        return opened.use { reader ->
+          try {
             sendMessageInternal(
                 A_OPEN, 1, 0,
                 "sideload-host:${fileSize}:$SIDELOAD_BLOCK_SIZE\u0000".toByteArray()
@@ -529,7 +542,7 @@ class AdbProtocol(
                 }
             }
 
-            RandomAccessFile(file, "r").use { raf ->
+            run {
                 sideloadLoop@ while (!cancelled && result == null) {
                     val reqHeader = readHeader()
                     if (reqHeader == null) {
@@ -607,8 +620,7 @@ class AdbProtocol(
 
                             val payloadSize = minOf(SIDELOAD_BLOCK_SIZE.toLong(), fileSize - offset).toInt()
                             val payload = ByteArray(payloadSize)
-                            raf.seek(offset)
-                            raf.readFully(payload)
+                            reader.readFullyAt(offset, payload)
 
                             sendMessageInternal(A_WRTE, 1, remoteId, payload)
                             result = readStreamAck()
@@ -663,6 +675,7 @@ class AdbProtocol(
                 onLog("ERROR Sideload: $message")
                 SideloadResult.Failed(SideloadFailureKind.TRANSPORT, message)
             }
+          }
         }
     }
 
