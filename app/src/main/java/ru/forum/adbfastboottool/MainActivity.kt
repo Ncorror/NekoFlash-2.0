@@ -28,6 +28,9 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.Spinner
+import android.widget.ArrayAdapter
+import android.widget.AdapterView
 import android.widget.Toast
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -382,6 +385,7 @@ class MainActivity : AppCompatActivity() {
         registerImportLauncher()
         registerMiLoginLauncher()
         setupButtons()
+        setupFastbootWorkflowUi()
         initializeOperationCenterDialog()
         buildSettingsPage()
         restoreWindowState(savedInstanceState)
@@ -2614,6 +2618,232 @@ class MainActivity : AppCompatActivity() {
         val currentSlot: String?,
         val slotCount: Int
     )
+
+    private fun setupFastbootWorkflowUi() {
+        // REV7 binds only proven legacy operations. Old compatibility views remain
+        // hidden for existing handlers; neither USB transport nor slot topology
+        // is guessed by the GUI.
+        val pages = listOf(
+            findViewById<View>(R.id.fastbootQuickSection),
+            findViewById<View>(R.id.fastbootMassSection),
+            findViewById<View>(R.id.fastbootToolsSection)
+        )
+        val controls = listOf(
+            findViewById<View>(R.id.btnFastbootSectionQuick),
+            findViewById<View>(R.id.btnFastbootSectionMass),
+            findViewById<View>(R.id.btnFastbootSectionTools)
+        )
+        controls.forEachIndexed { index, button ->
+            button.setOnClickListener {
+                pages.forEachIndexed { n, page -> page.visibility = if (n == index) View.VISIBLE else View.GONE }
+            }
+        }
+
+        val namedPartitions = listOf(
+            "boot", "init_boot", "recovery", "vendor_boot", "dtbo",
+            "vbmeta", "system", "vendor", "product", "super"
+        )
+        val labels = namedPartitions + getString(R.string.flash_rev7_partition_manual)
+
+        fun partitionSelector(spinnerId: Int, manualId: Int): () -> String? {
+            val spinner = findViewById<Spinner>(spinnerId)
+            val manual = findViewById<EditText>(manualId)
+            spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    manual.visibility = if (position == namedPartitions.size) View.VISIBLE else View.GONE
+                }
+            }
+            return {
+                val chosen = if (spinner.selectedItemPosition == namedPartitions.size) {
+                    manual.text.toString().trim().lowercase(Locale.US)
+                } else {
+                    namedPartitions.getOrNull(spinner.selectedItemPosition).orEmpty()
+                }
+                chosen.takeIf { PARTITION_NAME_PATTERN.matches(it) } ?: run {
+                    Toast.makeText(this, getString(R.string.flash_rev7_invalid_target), Toast.LENGTH_SHORT).show()
+                    null
+                }
+            }
+        }
+
+        val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition)
+        val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition)
+        val quickFile = arrayOfNulls<File>(1)
+        val imageName = findViewById<TextView>(R.id.tvQuickSelectedImage)
+        val slotSpinner = findViewById<Spinner>(R.id.spinQuickSlot)
+        val slotNames = listOf(
+            getString(R.string.flash_rev7_slot_current),
+            getString(R.string.flash_rev7_slot_other),
+            getString(R.string.flash_rev7_slot_a),
+            getString(R.string.flash_rev7_slot_b),
+            getString(R.string.flash_rev7_slot_all)
+        )
+        slotSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, slotNames)
+        val targetLabel = findViewById<TextView>(R.id.tvQuickTarget)
+        fun updateTargetLabel() {
+            val partition = getQuickPartition() ?: return
+            val slot = if (quickFlashPartitionAlreadySuffixed(partition)) {
+                getString(R.string.flash_rev7_slot_current)
+            } else {
+                slotNames[slotSpinner.selectedItemPosition.coerceIn(slotNames.indices)]
+            }
+            targetLabel.text = getString(R.string.flash_rev7_target_display, partition, slot)
+        }
+        slotSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                updateTargetLabel()
+            }
+        }
+        findViewById<View>(R.id.btnQuickSelectImage).setOnClickListener {
+            showFileSelector { file ->
+                quickFile[0] = file
+                imageName.text = getString(R.string.flash_rev7_file_chosen, file.name)
+                updateTargetLabel()
+            }
+        }
+        findViewById<View>(R.id.btnQuickExecute).setOnClickListener {
+            val partition = getQuickPartition() ?: return@setOnClickListener
+            val file = quickFile[0] ?: run {
+                Toast.makeText(this, R.string.flash_rev7_no_file_error, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val currentSlot = normalizeQuickFlashSlot(
+                viewModel.currentFastbootPartitionInventory()?.currentSlot
+                    ?: viewModel.currentFastbootDiagnostics()?.currentSlot
+            )
+            val chosenSlot = if (quickFlashPartitionAlreadySuffixed(partition)) {
+                null
+            } else when (slotSpinner.selectedItemPosition) {
+                1 -> when (currentSlot) {
+                    "a" -> "b"
+                    "b" -> "a"
+                    else -> {
+                        Toast.makeText(this, R.string.flash_rev7_slot_unknown, Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                }
+                2 -> "a"
+                3 -> "b"
+                4 -> "all"
+                else -> null
+            }
+            autoShowGuiOperation = true
+            viewModel.runFlash(partition, file, chosenSlot)
+        }
+        findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
+
+        val queueRows = findViewById<LinearLayout>(R.id.llMassQueueRows)
+        val queueHeading = findViewById<TextView>(R.id.tvMassQueueTitle)
+        val queueExecute = findViewById<MaterialButton>(R.id.btnMassExecute)
+        fun renderQueue(draft: FlashOperationDraft) {
+            queueRows.removeAllViews()
+            queueHeading.text = if (draft.items.isEmpty()) {
+                getString(R.string.flash_rev7_queue_empty)
+            } else getString(R.string.flash_rev7_queue_count, draft.items.size)
+            queueExecute.isEnabled = draft.items.isNotEmpty()
+            draft.items.forEachIndexed { index, item ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(2), dp(8), dp(2), dp(8))
+                }
+                row.addView(TextView(this).apply {
+                    text = getString(R.string.flash_rev7_row_title, item.partition, item.displayName)
+                    setTextColor(getColor(R.color.text_primary))
+                    textSize = 12f
+                    typeface = android.graphics.Typeface.MONOSPACE
+                })
+                val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                fun action(label: Int, enabled: Boolean = true, onClick: () -> Unit) {
+                    actions.addView(MaterialButton(this).apply {
+                        text = getString(label)
+                        isAllCaps = false
+                        textSize = 10f
+                        isEnabled = enabled
+                        setOnClickListener { onClick() }
+                    }, LinearLayout.LayoutParams(0, dp(42), 1f))
+                }
+                action(R.string.flash_rev7_row_up, index > 0) {
+                    viewModel.moveFlashQueueDraftItem(item.partition, -1)
+                }
+                action(R.string.flash_rev7_row_down, index + 1 < draft.items.size) {
+                    viewModel.moveFlashQueueDraftItem(item.partition, 1)
+                }
+                action(R.string.flash_rev7_row_remove) {
+                    viewModel.removeFlashQueueDraftItem(item.partition)
+                }
+                row.addView(actions)
+                queueRows.addView(row)
+            }
+        }
+        viewModel.flashOperationDraft.observe(this) { renderQueue(it) }
+        findViewById<View>(R.id.btnMassSelectImage).setOnClickListener {
+            val partition = getMassPartition() ?: return@setOnClickListener
+            showFileSelector { file -> viewModel.addFlashQueueFile(partition, file) }
+        }
+        queueExecute.setOnClickListener {
+            if (viewModel.currentFlashOperationDraft().items.isNotEmpty()) {
+                autoShowGuiOperation = true
+                viewModel.executeFlashQueueDraft()
+            }
+        }
+
+        val toolBlocks = listOf(
+            findViewById<View>(R.id.toolBlockInfo),
+            findViewById<View>(R.id.toolBlockPartitions),
+            findViewById<View>(R.id.toolBlockSlots),
+            findViewById<View>(R.id.toolBlockDynamic)
+        )
+        listOf(R.id.btnShowInfo, R.id.btnShowPartitions, R.id.btnShowSlots, R.id.btnShowDynamic)
+            .forEachIndexed { index, id ->
+                findViewById<View>(id).setOnClickListener {
+                    toolBlocks.forEachIndexed { i, block ->
+                        block.visibility = if (index == i) View.VISIBLE else View.GONE
+                    }
+                }
+            }
+        fun toolPartition(id: Int): String? {
+            val value = findViewById<EditText>(id).text.toString().trim().lowercase(Locale.US)
+            return value.takeIf { PARTITION_NAME_PATTERN.matches(it) } ?: run {
+                Toast.makeText(this, R.string.flash_rev7_invalid_target, Toast.LENGTH_SHORT).show()
+                null
+            }
+        }
+        findViewById<View>(R.id.btnToolGetvar).setOnClickListener {
+            val key = findViewById<EditText>(R.id.edGetvarKey).text.toString().trim()
+            if (key.matches(Regex("[A-Za-z0-9._-]{1,64}"))) {
+                viewModel.runFastbootCommand("getvar:$key", heavy = false)
+            }
+        }
+        findViewById<View>(R.id.btnToolInventory).setOnClickListener {
+            viewModel.refreshFastbootDiagnostics()
+        }
+        findViewById<View>(R.id.btnToolErase).setOnClickListener {
+            toolPartition(R.id.edToolPartition)?.let {
+                autoShowGuiOperation = true
+                viewModel.runFastbootPartitionCommand("erase", it)
+            }
+        }
+        findViewById<View>(R.id.btnToolBoot).setOnClickListener {
+            showFileSelector { file ->
+                autoShowGuiOperation = true
+                viewModel.runFastbootDownloadAndRun(file, "boot")
+            }
+        }
+        findViewById<View>(R.id.btnToolSetSlotA).setOnClickListener {
+            autoShowGuiOperation = true
+            viewModel.setActiveSlotAndVerify("a")
+        }
+        findViewById<View>(R.id.btnToolSetSlotB).setOnClickListener {
+            autoShowGuiOperation = true
+            viewModel.setActiveSlotAndVerify("b")
+        }
+        findViewById<View>(R.id.btnToolInspectLogical).setOnClickListener {
+            toolPartition(R.id.edToolLogicalPartition)?.let { viewModel.inspectFastbootLogicalPartition(it) }
+        }
+    }
 
     private fun startDirectFlash(partition: String) {
         chooseQuickFlashSlotTarget(partition) { slot ->

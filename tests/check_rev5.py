@@ -26,7 +26,7 @@ def run():
         'app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/TabController.kt',
         'app/src/main/cpp/native_usbfs.cpp',
-        'app/src/main/res/layout/page_fastboot.xml',
+        # REV7 Fastboot screen is pinned by check_rev7.py (transport guard unaffected).
         # REV7 Home informational-only screen is now guarded by check_rev7.py.
     ]:
         require(hashlib.sha256((ROOT / rel).read_bytes()).hexdigest() == manifest[rel], 'Changed guarded original: ' + rel)

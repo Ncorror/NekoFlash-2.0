@@ -15,7 +15,7 @@ import hashlib
 # Git blob identity pins the narrow orchestrator change; protocol files remain
 # guarded by LEGACY-SOURCE-SHA256.json in REV5.
 raw_vm = (root/'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt').read_bytes()
-expected_blob = '3b68a4739c8492c1521466e5f47f2adb96e7ee1a'
+expected_blob = 'be5e6e30dfbd34612fa3e0b879eaba0376742666'
 assert hashlib.sha1(b'blob ' + str(len(raw_vm)).encode() + b'\0' + raw_vm).hexdigest() == expected_blob, 'Unexpected change to DeviceViewModel'
 assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm
@@ -36,4 +36,15 @@ activity = (root/'app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt').r
 assert 'initializeOperationCenterDialog()' in activity and 'parent.removeView(cardOperationCenter)' in activity
 assert 'val cancelButton = cardOperationCenter.findViewById' in activity
 assert 'switchTab("home")' not in activity.split('private fun openOperationCenter()')[1].split('private fun requestOperationCancelFromUi()')[0]
+flash_path = root/'app/src/main/res/layout/page_fastboot.xml'
+raw_flash = flash_path.read_bytes()
+expected_flash_blob = '45a493b590c437f6436463975d6cd86fb433b079'
+assert hashlib.sha1(b'blob ' + str(len(raw_flash)).encode() + b'\0' + raw_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
+flash = ET.parse(flash_path).getroot()
+flash_ids = [node.attrib.get(a+'id','') for node in flash.iter()]
+for key in ['fastbootQuickSection','fastbootMassSection','fastbootToolsSection','btnQuickExecute','btnMassExecute','toolBlockInfo','toolBlockPartitions','toolBlockSlots','toolBlockDynamic']:
+    assert flash_ids.count('@+id/'+key) == 1, key
+assert 'setupFastbootWorkflowUi()' in activity and 'viewModel.executeFlashQueueDraft()' in activity
+assert 'viewModel.setActiveSlotAndVerify("a")' in activity
+assert 'fun setActiveSlotAndVerify(slot: String)' in vm and 'getVar("current-slot")' in vm
 print('PASS REV7: queue order, duplicate replacement, no silent 32-item truncation, moving, removal')

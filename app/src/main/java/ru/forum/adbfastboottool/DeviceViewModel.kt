@@ -1020,6 +1020,26 @@ class DeviceViewModel(
     }
 
 
+    /** A slot switch is complete only when the bootloader reports it back. */
+    fun setActiveSlotAndVerify(slot: String) {
+        require(slot == "a" || slot == "b") { "Invalid slot" }
+        startOperation(
+            text(R.string.notif_fastboot_command),
+            text(R.string.notif_executing, "set_active:$slot")
+        ) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
+            if (!proto.sendCommand("set_active:$slot")) failOperation("Slot switch failed: $slot")
+            val actual = proto.getVar("current-slot")?.trim()?.removePrefix("_")
+                ?.lowercase(Locale.US)
+            if (actual != slot) {
+                failOperation("Slot switch unverified: expected=$slot, device=${actual ?: "unavailable"}")
+            }
+            proto.currentDiagnostics()?.let { _fastbootDiagnostics.postValue(it) }
+            log("✅ Verified current-slot=$slot")
+        }
+    }
+
     fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
