@@ -584,11 +584,11 @@ class MainActivity : AppCompatActivity() {
                 return
             }
             if (device == null) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: USB device was not provided by the system")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_usb_missing_from_system))
                 return
             }
 
-            viewModel.log("USB access granted. Analyzing interfaces...")
+            viewModel.log(getString(R.string.rev11_usb_access_granted))
             val pending = takePendingUsbConnect(device)
             analyzeAndConnectDevice(device, pending)
         }
@@ -597,7 +597,7 @@ class MainActivity : AppCompatActivity() {
     private fun handleUsbDetached(intent: Intent) {
         val device = intent.parcelableExtra<UsbDevice>(UsbManager.EXTRA_DEVICE)
         if (device == null) {
-            viewModel.log("USB device disconnected: unknown")
+            viewModel.log(getString(R.string.rev11_usb_disconnected_unknown))
             updateOtgStatus()
             return
         }
@@ -616,7 +616,7 @@ class MainActivity : AppCompatActivity() {
                         "Reconnect the device before the next command."
                 )
             } else {
-                viewModel.log("USB device disconnected: ${device.productName ?: device.deviceName}")
+                viewModel.log(getString(R.string.rev11_usb_disconnected, device.productName ?: device.deviceName))
             }
             viewModel.disconnectCurrent()
             startModeSwitchWatch(previousSignature, previousVendorId)
@@ -642,7 +642,7 @@ class MainActivity : AppCompatActivity() {
         intent.putExtra(EXTRA_USB_INTENT_CONSUMED, true)
 
         if (device == null) {
-            viewModel.log("⚠️ USB attach: system did not provide a device")
+            viewModel.log("⚠️ " + getString(R.string.rev11_usb_attach_missing))
             return true
         }
 
@@ -650,7 +650,7 @@ class MainActivity : AppCompatActivity() {
         stopModeSwitchWatch()
         val candidate = UsbDeviceInspector.selectPrimaryCandidate(device, allowGenericFastboot = true)
         if (candidate == null) {
-            viewModel.log("⚠️ USB device connected, but no ADB/Fastboot bulk interface was found")
+            viewModel.log("⚠️ " + getString(R.string.rev11_usb_unsupported_interface))
             viewModel.logFileOnly(UsbDeviceInspector.summarizeDevice(device))
             return true
         }
@@ -672,7 +672,7 @@ class MainActivity : AppCompatActivity() {
         )
 
         if (usbManager.hasPermission(device)) {
-            viewModel.log("USB access already granted")
+            viewModel.log(getString(R.string.rev11_usb_already_authorized))
             pendingUsbCandidates.remove(device.deviceId)
             connectCandidate(candidate, automatic)
             return
@@ -1675,13 +1675,13 @@ class MainActivity : AppCompatActivity() {
         try {
             importFileLauncher.launch(intent)
         } catch (e: Exception) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not open the system file picker: ${e.message}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_picker_open_failed, e.message ?: e.javaClass.simpleName))
         }
     }
 
     private fun ensureWorkspaceReady(): Boolean {
         if (::workspacePath.isInitialized && workspacePath.exists()) return true
-        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready. Open Permissions and grant file access for the selected file workflow.")
+        viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_permission_needed))
         showPermissionsDialog()
         return false
     }
@@ -1692,8 +1692,8 @@ class MainActivity : AppCompatActivity() {
         val displayName = sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
         val target = uniqueTargetFile(displayName)
         val expectedSize = queryFileSize(uri)
-        viewModel.log("File import: $displayName → /sdcard/Download/$folderName/${target.name}")
-        expectedSize?.let { viewModel.log("Expected source size: $it bytes") }
+        viewModel.log(getString(R.string.rev11_import_started, displayName, "${workspaceDisplayPath()}/${target.name}"))
+        expectedSize?.let { viewModel.log(getString(R.string.rev11_import_expected_size, it)) }
 
         lifecycleScope.launch(Dispatchers.IO) {
             target.parentFile?.listFiles()
@@ -1718,11 +1718,11 @@ class MainActivity : AppCompatActivity() {
                 if (!temp.renameTo(target)) {
                     throw IllegalStateException("could not finish the import atomically")
                 }
-                viewModel.log("✅ File imported: /sdcard/Download/$folderName/${target.name} (${formatFileSize(target.length())})")
+                viewModel.log("✅ " + getString(R.string.rev11_import_finished, "${workspaceDisplayPath()}/${target.name}", formatFileSize(target.length())))
             } catch (e: Exception) {
                 temp.delete()
                 target.delete()
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: could not import file: ${e.message ?: e.javaClass.simpleName}")
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_import_failed, e.message ?: e.javaClass.simpleName))
             }
         }
     }
@@ -1822,10 +1822,10 @@ class MainActivity : AppCompatActivity() {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         workspacePath = File(downloadsDir, folderName)
         if (!workspacePath.exists() && !workspacePath.mkdirs()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Could not create folder ${workspaceDisplayPath()}")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_create_failed, workspaceDisplayPath()))
             return
         }
-        viewModel.log("Workspace folder: ${workspaceDisplayPath()}")
+        viewModel.log(getString(R.string.rev11_workspace_location, workspaceDisplayPath()))
         viewModel.configureLogDirectory(workspacePath)
         updateDeviceOverview()
     }
@@ -1836,7 +1836,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFileSelector(onFileSelected: (File) -> Unit) {
         if (!::workspacePath.isInitialized || !workspacePath.exists()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Workspace is not ready for file selection.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_select_unavailable))
             showPermissionsDialog()
             return
         }
@@ -1847,7 +1847,7 @@ class MainActivity : AppCompatActivity() {
             ?.toTypedArray()
 
         if (files.isNullOrEmpty()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: No readable files in the $folderName folder. Tap Import to add a file through the system picker.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_no_files, folderName))
             return
         }
         runOnUiThread {

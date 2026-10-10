@@ -66,5 +66,47 @@ assert 'AppCompatDelegate.setApplicationLocales' in main
 for key in ("rev11_slot_switch_failed", "rev11_slot_switch_unverified",
             "rev11_slot_switch_verified"):
     assert key in en and key in ru, key
+# Every new user-facing message is available in both locales and referenced in Kotlin.
+required_localized_messages = (
+    "rev11_import_started",
+    "rev11_import_expected_size",
+    "rev11_import_finished",
+    "rev11_import_failed",
+    "rev11_picker_open_failed",
+    "rev11_workspace_permission_needed",
+    "rev11_workspace_create_failed",
+    "rev11_workspace_location",
+    "rev11_workspace_select_unavailable",
+    "rev11_workspace_no_files",
+    "rev11_usb_missing_from_system",
+    "rev11_usb_access_granted",
+    "rev11_usb_disconnected_unknown",
+    "rev11_usb_disconnected",
+    "rev11_usb_attach_missing",
+    "rev11_usb_unsupported_interface",
+    "rev11_usb_already_authorized",
+    "rev11_log_folder_failed",
+    "rev11_log_store_failed",
+    "rev11_log_trace_location_info",
+    "rev11_fastboot_command_failed",
+    "rev11_fastboot_download_failed",
+    "rev11_fastboot_logical_failed",
+    "rev11_fastboot_logical_info_failed",
+)
+vm = (ROOT/"app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt").read_text()
+for key in required_localized_messages:
+    assert key in en and key in ru, key
+    assert "R.string." + key in (main + vm), "Unreferenced translation: " + key
+
+# Guard against reintroducing the known fixed English-only messages.
+for literal in (
+    'viewModel.log("File import: ',
+    'viewModel.log("Workspace folder: ',
+    'viewModel.log("USB access already granted")',
+    'failOperation("Fastboot logical command failed:',
+    'failOperation("Fastboot command failed:',
+):
+    assert literal not in (main + vm), "English-only status returned: " + literal
+
 print(f"PASS I18N: {len(en)} paired strings, {len(plural_en)} plural keys, "
       "format-safe RU/EN, package and workspace paths unchanged")

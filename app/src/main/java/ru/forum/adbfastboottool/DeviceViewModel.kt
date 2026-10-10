@@ -230,7 +230,7 @@ class DeviceViewModel(
 
         val logsDir = File(workspacePath, "logs")
         if (!logsDir.exists() && !logsDir.mkdirs()) {
-            log("⚠️ Could not create logs folder: ${logsDir.absolutePath}")
+            log("⚠️ " + text(R.string.rev11_log_folder_failed, logsDir.absolutePath))
             return
         }
         val stamp = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.US).format(Date())
@@ -238,7 +238,7 @@ class DeviceViewModel(
         val store = try {
             DiagnosticLogStore(logsDir, stamp)
         } catch (e: Exception) {
-            log("⚠️ Could not initialize bounded log store: ${e.message ?: e.javaClass.simpleName}")
+            log("⚠️ " + text(R.string.rev11_log_store_failed, e.message ?: e.javaClass.simpleName))
             return
         }
         logStore = store
@@ -260,7 +260,7 @@ class DeviceViewModel(
         traceLogFile = store.currentTraceFile()
         persistSessionSummary()
         log("Log file: /sdcard/Download/NekoFlash/logs/${createdLog?.name ?: "log-$stamp.txt"}")
-        log("ℹ️ Raw USB/Fastboot trace is separated from the main log and rotates automatically.")
+        log("ℹ️ " + text(R.string.rev11_log_trace_location_info))
     }
 
     fun log(message: String) {
@@ -1028,7 +1028,7 @@ class DeviceViewModel(
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val ok = if (heavy) proto.sendCommand(cmd) else proto.runTerminalCommand(cmd)
-            if (!ok) failOperation("Fastboot command failed: $cmd")
+            if (!ok) failOperation(text(R.string.rev11_fastboot_command_failed, cmd))
         }
     }
 
@@ -1057,7 +1057,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.downloadAndRun(file, commandAfterDownload)) {
-                failOperation("Fastboot download+run failed: $commandAfterDownload")
+                failOperation(text(R.string.rev11_fastboot_download_failed, commandAfterDownload))
             }
         }
     }
@@ -1066,7 +1066,7 @@ class DeviceViewModel(
     fun runFastbootLogicalPartitionCommand(command: String) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, command)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
-            if (!proto.runLogicalPartitionCommand(command)) failOperation("Fastboot logical command failed: $command")
+            if (!proto.runLogicalPartitionCommand(command)) failOperation(text(R.string.rev11_fastboot_logical_failed, command))
         }
     }
 
@@ -1074,7 +1074,7 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (proto.inspectLogicalPartition(partition) == null) {
-                failOperation("Could not get logical partition info: $partition")
+                failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
             }
         }
     }

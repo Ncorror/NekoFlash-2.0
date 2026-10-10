@@ -40,3 +40,10 @@ Status: active refactor. Original base: the tested NekoFlash 6.0.0-alpha11 (**no
 4. Run bilingual screen/device tests, Android CI, SAF providers, terminal IME/PTY and safely prepared large-file tests before merge.
 
 **Scope boundary:** this document records decisions and partial refactor progress, not successful hardware testing or completion of all localization.
+
+## Next REV11 localization pass
+
+- Moved **24 additional user-facing messages** from Kotlin literals to paired EN/RU resources: file imports, unchanged workspace paths, USB device state, diagnostics and several Fastboot errors.
+- Extended the localization contract test to require both languages, actual Kotlin references, and absence of the replaced English-only messages.
+- No behavior or permission changes to Fastboot commands, USB transports, package identifiers, or workspace paths.
+- **Remaining work:** other legacy string literals, notably terminal, USB recovery and flashing failure messages. Full localization still requires follow-up edits and bilingual device testing.
