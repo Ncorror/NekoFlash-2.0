@@ -35,7 +35,7 @@ controller = (KOTLIN/'ConsoleDockController.kt').read_text()
 check('R.dimen.usb_panel_height' in controller and 'peekHeight = 0' in controller, 'terminal has wrong bounds')
 check('behavior.isDraggable = false' in controller, 'fullscreen terminal could shrink via drag')
 activity = (KOTLIN/'MainActivity.kt').read_text()
-for expected in ['WindowCompat.setDecorFitsSystemWindows(window, true)', 'R.id.usbPanel).setOnClickListener { showUsbPanel() }','R.id.btnTerminalOpen).setOnClickListener', 'openConsole(requestCommandFocus = true)', 'private fun showUsbPanel()', 'usbManager.deviceList.values.toList()', 'scanForDevices()', 'viewModel.runSideload(file)']:
+for expected in ['WindowCompat.setDecorFitsSystemWindows(window, true)', 'R.id.usbPanel).setOnClickListener { showUsbPanel() }','R.id.btnTerminalOpen).setOnClickListener', 'openConsole(requestCommandFocus = true)', 'private fun showUsbPanel()', 'usbManager.deviceList.values.toList()', 'scanForDevices()', 'viewModel.runSideload(source)']:
     check(expected in activity, 'Shell/legacy handler missing: '+expected)
 for locale in ['values','values-ru']:
     resources = ET.parse(RES/locale/'strings.xml').getroot()
