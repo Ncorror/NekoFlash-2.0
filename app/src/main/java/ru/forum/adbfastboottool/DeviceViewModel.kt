@@ -1444,6 +1444,39 @@ class DeviceViewModel(
             .trimToNull()
     }
 
+    /**
+     * A verified Recovery verdict finalizes the *same* pending Sideload GUI
+     * operation. A recent unrelated operation must never be overwritten.
+     * Unknown Recovery results remain unverified, never labelled SUCCESS.
+     */
+    private fun publishSideloadRecoveryVerdict(
+        message: String,
+        outcome: OperationOutcomeKind
+    ) {
+        val current = _operationProgress.value
+        val sideloadTitle = text(R.string.notif_adb_sideload)
+        if (_operationActive.value == true || (
+                current != null &&
+                    !(current.title == sideloadTitle &&
+                      current.outcome == OperationOutcomeKind.VERIFY_PENDING)
+            )
+        ) {
+            logFileOnly("Recovery verdict saved in diagnostics; a different operation owns the GUI state.")
+            return
+        }
+        _operationProgress.postValue(
+            OperationProgress(
+                title = sideloadTitle,
+                percent = if (outcome == OperationOutcomeKind.SUCCESS) 100 else -1,
+                detail = message,
+                finished = true,
+                success = outcome == OperationOutcomeKind.SUCCESS,
+                outcome = outcome
+            )
+        )
+        persistSessionSummary()
+    }
+
     private fun verifyPendingSideloadIfReady(proto: AdbProtocol) {
         val pending = readPendingSideloadVerification() ?: return
         if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY) return
@@ -1471,6 +1504,10 @@ class DeviceViewModel(
             RecoveryInstallVerifier.Verdict.SUCCESS -> {
                 clearPendingSideloadVerification()
                 log("✅ Recovery reports successful installation: ${verification.message}")
+                publishSideloadRecoveryVerdict(
+                    "Recovery confirmed installation: ${verification.message}",
+                    OperationOutcomeKind.SUCCESS
+                )
             }
             RecoveryInstallVerifier.Verdict.FAILED -> {
                 clearPendingSideloadVerification()
@@ -1479,6 +1516,10 @@ class DeviceViewModel(
                     verification.evidence?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                 }
                 log("❌ Recovery reports an install error: $detail")
+                publishSideloadRecoveryVerdict(
+                    "Recovery installation failed: $detail",
+                    OperationOutcomeKind.FAILED
+                )
             }
             RecoveryInstallVerifier.Verdict.UNKNOWN -> {
                 log("ℹ️ Transfer completed; Recovery did not provide a clear install result.")
