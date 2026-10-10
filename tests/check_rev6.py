@@ -42,4 +42,7 @@ for locale in ['values','values-ru']:
     keys = [x.attrib.get('name') for x in resources.findall('string')]
     for key in ['shell_usb_panel_desc','shell_terminal_open_desc','shell_usb_details_title','shell_usb_device_entry','shell_usb_refresh','shell_usb_diagnostics']:
         check(keys.count(key)==1,f'{locale}: missing or duplicate {key}')
+gradle = (ROOT/'app/build.gradle').read_text()
+check('applicationIdSuffix = ".dev"' in gradle, 'Debug builds must coexist with the original signed NekoFlash')
+check('versionNameSuffix = "-rev6-dev"' in gradle, 'DEV version must be clearly identified')
 print('PASS REV6: single USB header, full-screen terminal, bottom nav, operation strip, existing handlers, RU/EN')
