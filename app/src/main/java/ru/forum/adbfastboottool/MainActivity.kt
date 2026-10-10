@@ -3360,6 +3360,12 @@ class MainActivity : AppCompatActivity() {
     // ─── UI ──────────────────────────────────────────────────────────────────
 
 
+    private fun adbBannerProperty(banner: String, property: String): String? {
+        val marker = "$property="
+        val after = banner.substringAfter(marker, "")
+        return after.substringBefore(';').trim().takeIf { it.isNotEmpty() }
+    }
+
     private fun formatDeviceBoolean(value: String): String = when (value.trim().lowercase(Locale.US)) {
         "yes", "true", "1" -> getString(R.string.device_bool_yes)
         "no", "false", "0" -> getString(R.string.device_bool_no)
