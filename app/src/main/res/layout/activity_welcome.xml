@@ -169,6 +169,7 @@
 
         <LinearLayout
             android:id="@+id/riskRow"
+            android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="@dimen/welcome_risk_row_height"
             android:layout_marginTop="6dp"

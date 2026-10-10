@@ -26,4 +26,14 @@ assert 'val canRunUnlock = fastbootReady && lockStateVerified && !operationActiv
 assert 'Kotlin JVM queue and diagnostic regression tests' in ci
 assert ':app:testDebugUnitTest' in ci
 assert (root/'docs/testing/REV9-BIG-DEVICE-TEST-RU.md').is_file()
+# Optional permission/risk gate: UI can open without mandatory storage access.
+welcome = (root/'app/src/main/java/ru/forum/adbfastboottool/WelcomeActivity.kt').read_text()
+gate = (root/'app/src/main/java/ru/forum/adbfastboottool/OnboardingGate.kt').read_text()
+layout = (root/'app/src/main/res/layout/activity_welcome.xml').read_text()
+assert 'fun canEnterMain(context: Context): Boolean = sessionAuthorized' in gate
+entry = welcome.split('private fun handlePrimaryAction()')[1].split('private fun launchMainAfterGate()')[0]
+assert 'OnboardingGate.complete(this)' in entry
+assert '!status.allRequiredGranted' not in entry and '!checkbox.isChecked' not in entry
+assert 'android:id="@+id/riskRow"' in layout and 'android:visibility="gone"' in layout
+assert 'showPermissionsDialog()' in main
 print('PASS REV9: Recovery verdict gated, UNKNOWN preserved, Unlock verified, JVM tests wired')

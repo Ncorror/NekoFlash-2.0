@@ -1681,8 +1681,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun ensureWorkspaceReady(): Boolean {
         if (::workspacePath.isInitialized && workspacePath.exists()) return true
-        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready yet. Grant access to all files and try again.")
-        checkPermissions()
+        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready. Open Permissions and grant file access for the selected file workflow.")
+        showPermissionsDialog()
         return false
     }
 
@@ -1773,46 +1773,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                viewModel.log("⚠️ All-files access is required to read /sdcard/Download/$folderName.")
-                try {
-                    startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                        data = "package:$packageName".toUri()
-                    })
-                } catch (e: Exception) {
-                    // Многоуровневый фолбэк для прошивок без точечного экрана.
-                    try {
-                        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-                    } catch (e2: Exception) {
-                        try {
-                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = "package:$packageName".toUri()
-                            })
-                        } catch (e3: Exception) {
-                            Toast.makeText(
-                                this,
-                                getString(R.string.perm_open_settings_manually),
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }
-                }
-            } else if (!::workspacePath.isInitialized) {
-                initWorkspace()
-            }
-        } else {
-            if (!PermissionGate.hasStorage(this)) {
-                requestPermissions(
-                    arrayOf(
-                        android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                        android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ),
-                    100
-                )
-            } else if (!::workspacePath.isInitialized) {
-                initWorkspace()
-            }
+        // Welcome/first launch must not force the system settings screen.
+        // File operations ask for access at point of use.
+        if (PermissionGate.hasStorage(this)) {
+            if (!::workspacePath.isInitialized) initWorkspace()
+        } else if (::viewModel.isInitialized) {
+            viewModel.log("ℹ️ Workspace permission is optional until importing or selecting files.")
         }
     }
 
