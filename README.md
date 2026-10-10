@@ -1,5 +1,7 @@
 # NekoFlash 2.0 — development checkpoint REV5
 
+> **REV6 (отдельная ветка, не main):** [PR #1](https://github.com/Ncorror/NekoFlash-2.0/pull/1) — новая оболочка, USB-панель, нижние вкладки и терминал. [Проверка на двух телефонах](docs/testing/REV6-DEVICE-SMOKE-RU.md). **DEV-APK устанавливается отдельно от оригинала** (`ru.forum.adbfastboottool.dev`). Ссылки на релиз v6.0.0-alpha11 ниже — исторические ссылки на оригинальный NekoFlash, **не REV6**. Последнюю тестовую сборку ищи в [Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml). До аппаратной проверки не сливать REV6 в `main`.
+
 > **Статус:** проект в разработке. Это полный Android-исходник оригинального NekoFlash 6.0.0-alpha11 с первым переносом согласованного экрана **Sideload REV3**. Это **не NekoFlash Pro** и **не готовый APK NekoFlash 2.0**. Остальной утверждённый дизайн REV2/REV4 ещё не перенесён в Android-код. Не выполняйте разблокировку без отдельного разрешения владельца устройства.
 
 - [Аудит и дорожная карта REV5](docs/source-audit/NEKOFLASH2-REV5-AUDIT-AND-ROADMAP-RU.md)
