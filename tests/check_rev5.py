@@ -21,7 +21,7 @@ def run():
     for rel in [
         'app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt',
         'app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt',
-        'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt',
+        # REV7 changes only queue ordering in DeviceViewModel; see check_rev7.py.
         'app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/TabController.kt',
