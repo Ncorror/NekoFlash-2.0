@@ -28,7 +28,7 @@ assert all(val.strip() for val in ru.values()), "Empty Russian string resource"
 
 # Compare order/position and format type across translations. '%' literals
 # and platform resource references are not replacement parameters.
-FORMAT = re.compile(r"%(?!%)(?:(\d+)\$)?[-+ 0,#(]*\d*(?:\.\d+)?([a-zA-Z])")
+FORMAT = re.compile(r"(?<!%)%(?!%)(?:(\d+)\$)?[-+ 0,#(]*\d*(?:\.\d+)?([a-zA-Z])")
 def params(value):
     return Counter((arg or str(n + 1), kind.lower()) for n, (arg, kind)
                    in enumerate(FORMAT.findall(value)))
