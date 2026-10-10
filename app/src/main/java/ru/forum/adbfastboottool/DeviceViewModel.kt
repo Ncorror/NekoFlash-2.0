@@ -1042,14 +1042,14 @@ class DeviceViewModel(
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
-            if (!proto.sendCommand("set_active:$slot")) failOperation("Slot switch failed: $slot")
+            if (!proto.sendCommand("set_active:$slot")) failOperation(text(R.string.rev11_slot_switch_failed, slot))
             val actual = proto.getVar("current-slot")?.trim()?.removePrefix("_")
                 ?.lowercase(Locale.US)
             if (actual != slot) {
-                failOperation("Slot switch unverified: expected=$slot, device=${actual ?: "unavailable"}")
+                failOperation(text(R.string.rev11_slot_switch_unverified, slot, actual ?: text(R.string.device_bool_unknown)))
             }
             proto.currentDiagnostics()?.let { _fastbootDiagnostics.postValue(it) }
-            log("✅ Verified current-slot=$slot")
+            log("✅ " + text(R.string.rev11_slot_switch_verified, slot))
         }
     }
 

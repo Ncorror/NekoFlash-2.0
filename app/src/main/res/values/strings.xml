@@ -465,4 +465,7 @@ Unlock</string>
     <string name="shell_usb_compact_idle">OTG · no device</string>
     <string name="shell_usb_compact_active">OTG · connected</string>
     <string name="shell_usb_compact_unsupported">OTG · unavailable</string>
+    <string name="rev11_slot_switch_failed">Cannot switch active slot to %1$s.</string>
+    <string name="rev11_slot_switch_unverified">Active slot not confirmed: requested %1$s, device reports %2$s.</string>
+    <string name="rev11_slot_switch_verified">Active slot confirmed: %1$s.</string>
 </resources>

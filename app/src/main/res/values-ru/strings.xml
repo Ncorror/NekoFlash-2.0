@@ -469,4 +469,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="shell_usb_compact_idle">OTG · нет устройства</string>
     <string name="shell_usb_compact_active">OTG · подключено</string>
     <string name="shell_usb_compact_unsupported">OTG · недоступно</string>
+    <string name="rev11_slot_switch_failed">Не удалось переключить активный слот на %1$s.</string>
+    <string name="rev11_slot_switch_unverified">Активный слот не подтверждён: запрошен %1$s, устройство сообщает %2$s.</string>
+    <string name="rev11_slot_switch_verified">Активный слот подтверждён: %1$s.</string>
 </resources>
