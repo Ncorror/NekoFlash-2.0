@@ -400,4 +400,17 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="shell_usb_no">не разрешён</string>
     <string name="shell_usb_refresh">Обновить / поиск устройств</string>
     <string name="shell_usb_diagnostics">Журналы и диагностика</string>
+    <string name="home_device_image_placeholder">Фото модели недоступно; стандартная иллюстрация NekoFlash</string>
+    <string name="home_actual_device_facts">СВЕДЕНИЯ ОБ УСТРОЙСТВЕ</string>
+    <string name="home_codename_unknown">Codename: недоступно</string>
+    <string name="home_codename_value">Codename: %1$s</string>
+    <string name="home_android_unknown">Android: недоступно</string>
+    <string name="home_android_value">Android: %1$s</string>
+    <string name="home_advanced_information">Расширенная информация</string>
+    <string name="home_model_specs">Характеристики модели</string>
+    <string name="home_specs_unavailable">Проверенные офлайн-характеристики для этой модели отсутствуют. Сведения выше получены из USB-диагностики.</string>
+    <string name="home_data_current">Актуальные данные подключения</string>
+    <string name="home_data_cached">Ранее получено — USB-подключение изменилось</string>
+    <string name="home_data_empty">Данные устройства пока недоступны</string>
+    <string name="operation_center_collapse">Свернуть</string>
 </resources>

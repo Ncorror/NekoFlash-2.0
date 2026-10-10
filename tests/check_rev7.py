@@ -21,4 +21,19 @@ assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm
 assert 'fun moveFlashQueueDraftItem' in vm and 'fun removeFlashQueueDraftItem' in vm
 assert 'testImplementation(\'junit:junit:4.13.2\')' in (root/'app/build.gradle').read_text()
+# Stable, reviewed Home replacement; all other original page/protocol hashes stay guarded.
+home_path = root/'app/src/main/res/layout/page_home.xml'
+raw_home = home_path.read_bytes()
+expected_home_blob = '4c2dca5acbc7a699c7e86447849f0552d6d18875'
+assert hashlib.sha1(b'blob ' + str(len(raw_home)).encode() + b'\0' + raw_home).hexdigest() == expected_home_blob, 'Unexpected Home layout change'
+from xml.etree import ElementTree as ET
+home = ET.parse(home_path).getroot()
+a = '{http://schemas.android.com/apk/res/android}'
+home_ids = [node.attrib.get(a+'id','') for node in home.iter()]
+for expected in ['tvHomeCodename','tvDeviceAndroidValue','btnHomeAdvancedToggle','homeAdvancedInfo','btnHomeSpecsToggle','homeModelSpecs']:
+    assert home_ids.count('@+id/'+expected) == 1, expected
+activity = (root/'app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt').read_text()
+assert 'initializeOperationCenterDialog()' in activity and 'parent.removeView(cardOperationCenter)' in activity
+assert 'val cancelButton = cardOperationCenter.findViewById' in activity
+assert 'switchTab("home")' not in activity.split('private fun openOperationCenter()')[1].split('private fun requestOperationCancelFromUi()')[0]
 print('PASS REV7: queue order, duplicate replacement, no silent 32-item truncation, moving, removal')

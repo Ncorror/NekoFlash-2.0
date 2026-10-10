@@ -396,4 +396,17 @@ Unlock</string>
     <string name="shell_usb_no">not granted</string>
     <string name="shell_usb_refresh">Refresh / scan devices</string>
     <string name="shell_usb_diagnostics">Logs and diagnostics</string>
+    <string name="home_device_image_placeholder">Device image not available; NekoFlash placeholder</string>
+    <string name="home_actual_device_facts">DEVICE INFORMATION</string>
+    <string name="home_codename_unknown">Codename: unavailable</string>
+    <string name="home_codename_value">Codename: %1$s</string>
+    <string name="home_android_unknown">Android: unavailable</string>
+    <string name="home_android_value">Android: %1$s</string>
+    <string name="home_advanced_information">Extended information</string>
+    <string name="home_model_specs">Model specifications</string>
+    <string name="home_specs_unavailable">No verified offline specifications for this model. Device information above is sourced from USB diagnostics.</string>
+    <string name="home_data_current">Current connection</string>
+    <string name="home_data_cached">Previously obtained — USB connection changed</string>
+    <string name="home_data_empty">No device data available</string>
+    <string name="operation_center_collapse">Minimize</string>
 </resources>

@@ -24,6 +24,7 @@ import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.InputType
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
@@ -51,6 +52,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -78,6 +80,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
     private var tvOtgStatus: TextView? = null
     private lateinit var cardOperationCenter: MaterialCardView
+    private var operationCenterDialog: BottomSheetDialog? = null
+    private var autoShowGuiOperation: Boolean = false
     private lateinit var operationCenterDetails: View
     private lateinit var tvOperationCenterStatus: TextView
     private lateinit var tvOperationCenterLastEvent: TextView
@@ -346,6 +350,7 @@ class MainActivity : AppCompatActivity() {
                     operationRunTracksProgress = false
                     operationCancelRequested = false
                 }
+                autoShowGuiOperation = false
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 restoreBrightness()
             }
@@ -377,6 +382,7 @@ class MainActivity : AppCompatActivity() {
         registerImportLauncher()
         registerMiLoginLauncher()
         setupButtons()
+        initializeOperationCenterDialog()
         buildSettingsPage()
         restoreWindowState(savedInstanceState)
         updateDeviceOverview()
@@ -447,8 +453,17 @@ class MainActivity : AppCompatActivity() {
         // Режим перезагрузки в блоке прошивки — то же меню, что было на главной.
         findViewById<View>(R.id.btnFlashRebootMode).setOnClickListener { showRebootMenu() }
         findViewById<Button>(R.id.btnHomeRefreshData).setOnClickListener { refreshDeviceDataFromUi() }
-        findViewById<Button>(R.id.btnOperationCenterConsole).setOnClickListener {
-            openConsole(requestCommandFocus = false)
+        findViewById<View>(R.id.btnHomeAdvancedToggle).setOnClickListener {
+            val details = findViewById<View>(R.id.homeAdvancedInfo)
+            details.visibility = if (details.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
+        findViewById<View>(R.id.btnHomeSpecsToggle).setOnClickListener {
+            val specs = findViewById<View>(R.id.homeModelSpecs)
+            specs.visibility = if (specs.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
+        findViewById<Button>(R.id.btnOperationCenterConsole).apply {
+            text = getString(R.string.operation_center_collapse)
+            setOnClickListener { operationCenterDialog?.dismiss() }
         }
         findViewById<View>(R.id.btnReportsMenu).setOnClickListener { showReportsMenu() }
         findViewById<Button>(R.id.btnOperationCenterCancel).setOnClickListener { requestOperationCancelFromUi() }
@@ -490,6 +505,7 @@ class MainActivity : AppCompatActivity() {
                 // legacy Sideload transport, verification, or USB ownership.
                 findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
                     getString(R.string.layout_sideload_selected_file, file.name)
+                autoShowGuiOperation = true
                 viewModel.runSideload(file)
             }
         }
@@ -2555,6 +2571,7 @@ class MainActivity : AppCompatActivity() {
         // ── Сервис ──
         container.addView(sectionTitle(getString(R.string.settings_section_service)))
         val svcCard = card()
+        svcCard.addView(row(getString(R.string.layout_reports_menu)) { showReportsMenu() })
         svcCard.addView(row(getString(R.string.settings_clear_workspace),
             getString(R.string.settings_clear_workspace_sub)) { confirmClearWorkspace() })
         svcCard.addView(row(getString(R.string.settings_about),
@@ -2601,6 +2618,7 @@ class MainActivity : AppCompatActivity() {
     private fun startDirectFlash(partition: String) {
         chooseQuickFlashSlotTarget(partition) { slot ->
             showFileSelector { file ->
+                autoShowGuiOperation = true
                 viewModel.runFlash(partition, file, slot)
             }
         }
@@ -3154,10 +3172,20 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.device_extra_bootloader_version, it)
         } ?: ""
 
+        val activeAdb = viewModel.adbProtocol?.takeIf { it.isConnected }
+        val adbBanner = activeAdb?.currentDiagnostics()?.remoteBanner
+        val actualCodename = adbBanner?.let { adbBannerProperty(it, "ro.product.device") }
+            ?: if (viewModel.fastbootProtocol?.isConnected == true) product.takeUnless { it == "—" } else null
+        val actualAndroid = adbBanner?.let { adbBannerProperty(it, "ro.build.version.release") }
+        findViewById<TextView>(R.id.tvHomeCodename).text = actualCodename?.let {
+            getString(R.string.home_codename_value, it)
+        } ?: getString(R.string.home_codename_unknown)
+        findViewById<TextView>(R.id.tvDeviceAndroidValue).text = actualAndroid?.let {
+            getString(R.string.home_android_value, it)
+        } ?: getString(R.string.home_android_unknown)
         findViewById<TextView>(R.id.tvDeviceModeValue).text =
             getString(R.string.device_mode_value, modeText)
-        findViewById<TextView>(R.id.tvDeviceProductValue).text =
-            getString(R.string.device_product_value, product, serialno, vbl)
+        findViewById<TextView>(R.id.tvDeviceProductValue).text = product
         findViewById<TextView>(R.id.tvDeviceSlotValue).text =
             getString(R.string.device_slot_value, slotDisplay)
         findViewById<TextView>(R.id.tvDeviceUnlockedValue).text =
@@ -3243,12 +3271,19 @@ class MainActivity : AppCompatActivity() {
         consoleDockController.open(requestCommandFocus = requestCommandFocus)
     }
 
-    private fun openOperationCenter() {
-        switchTab("home")
-        val home = findViewById<ScrollView>(R.id.pageHome)
-        home.post {
-            home.smoothScrollTo(0, cardOperationCenter.top.coerceAtLeast(0))
+    private fun initializeOperationCenterDialog() {
+        // Reuse the existing progress views and listeners without leaving a
+        // permanent operation card on Home. This is a contextual GUI-only sheet.
+        val parent = cardOperationCenter.parent as? ViewGroup ?: return
+        parent.removeView(cardOperationCenter)
+        operationCenterDialog = BottomSheetDialog(this).apply {
+            setContentView(cardOperationCenter)
         }
+    }
+
+    private fun openOperationCenter() {
+        if (viewModel.operationProgress.value == null || operationStoredProgressHidden) return
+        operationCenterDialog?.let { if (!it.isShowing) it.show() }
     }
 
     private fun requestOperationCancelFromUi() {
@@ -3453,6 +3488,12 @@ class MainActivity : AppCompatActivity() {
             tvOperationCenterProgress.visibility = if (detail.isNotBlank()) View.VISIBLE else View.GONE
         }
         updateOperationCenter(viewModel.logSnapshot())
+        if (autoShowGuiOperation && viewModel.operationActive.value == true &&
+            rawProgress?.finished == false && !operationStoredProgressHidden
+        ) {
+            autoShowGuiOperation = false
+            openOperationCenter()
+        }
         if (rawProgress != null && selectedWindow == "unlock") buildUnlockPage()
     }
 
@@ -3636,7 +3677,7 @@ class MainActivity : AppCompatActivity() {
         tvOperationCenterLastEvent.visibility = if (showLastEvent) View.VISIBLE else View.GONE
 
         val canRequestCancel = active && !operationCancelRequested
-        val cancelButton = findViewById<Button>(R.id.btnOperationCenterCancel)
+        val cancelButton = cardOperationCenter.findViewById<Button>(R.id.btnOperationCenterCancel)
         cancelButton.isEnabled = canRequestCancel
         cancelButton.text = getString(
             if (operationCancelRequested) R.string.layout_operation_cancelling_action
