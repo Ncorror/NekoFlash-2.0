@@ -1836,7 +1836,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFileSelector(onFileSelected: (File) -> Unit) {
         if (!::workspacePath.isInitialized || !workspacePath.exists()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Folder is not initialized. Grant permissions.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Workspace is not ready for file selection.")
+            showPermissionsDialog()
             return
         }
         val files = workspacePath
@@ -3271,13 +3272,31 @@ class MainActivity : AppCompatActivity() {
             .setMessage(message)
             .setPositiveButton(getString(R.string.ok_understood_upper), null)
             .setNeutralButton(getString(R.string.open_app_settings_upper)) { _, _ ->
-                try {
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                // An explicit file operation may need MANAGE_EXTERNAL_STORAGE.
+                // Prefer the exact Android special-access page, then fall back.
+                val requests = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    !Environment.isExternalStorageManager()
+                ) {
+                    listOf(
+                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = "package:$packageName".toUri()
+                        },
+                        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = "package:$packageName".toUri()
+                        }
+                    )
+                } else {
+                    listOf(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = "package:$packageName".toUri()
                     })
-                } catch (e: Exception) {
-                    viewModel.log(getString(R.string.app_settings_open_error, e.message ?: e.javaClass.simpleName))
                 }
+                val launched = requests.any { request ->
+                    runCatching { startActivity(request) }.isSuccess
+                }
+                if (!launched) viewModel.log(getString(
+                    R.string.app_settings_open_error, "Android settings unavailable"
+                ))
             }
             .setNegativeButton(getString(R.string.close_upper), null)
             .show()
