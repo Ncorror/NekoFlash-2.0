@@ -1,12 +1,20 @@
-# NekoFlash 2.0 — development checkpoint REV5
+# NekoFlash 2.0 — развитие исходного NekoFlash (REV9)
 
-> **Статус:** проект в разработке. Это полный Android-исходник оригинального NekoFlash 6.0.0-alpha11 с первым переносом согласованного экрана **Sideload REV3**. Это **не NekoFlash Pro** и **не готовый APK NekoFlash 2.0**. Остальной утверждённый дизайн REV2/REV4 ещё не перенесён в Android-код. Не выполняйте разблокировку без отдельного разрешения владельца устройства.
+> **Текущая работа:** [PR #1](https://github.com/Ncorror/NekoFlash-2.0/pull/1), ветка feature/rev6-shell. Только подписанный оригинал находится вне этой ветки; **main оставлена на стабильном REV5**. Это NekoFlash 2.0, **не NekoFlash Pro**.
 
-- [Аудит и дорожная карта REV5](docs/source-audit/NEKOFLASH2-REV5-AUDIT-AND-ROADMAP-RU.md)
-- [Утверждённый дизайн и контрольные решения](docs/design-approved/README.md)
-- [Детали исходной точки и локальные проверки](docs/source-audit/README-FIRST-RU.md)
+**Что добавлено в DEV:** USB-панель и пять нижних вкладок; раскрываемый полноэкранный терминал; информационная Главная; три внутренних раздела Прошивки; минимальный Sideload REV3 и Unlock REV4; контекстный Центр операций; очередь массовой прошивки с сохранением порядка и без предела 32 строки; полное сохранение диагностических сегментов и потоковый редактируемый экспорт; передача подтверждённого Recovery-результата Sideload в состояние операции.
 
-**CI:** push и Pull Request проверяют lint + Debug APK; подписанный Release в workflow сборки запускается вручную с настроенными secrets. Выпуск по тегу остаётся отдельным workflow. Отсутствие release-ключей не должно делать первоначальный push красным.
+**Проверки CI:** регрессии исходных USB/ADB/Fastboot-файлов, автоматические структурные проверки REV5–REV9, настоящие JVM unit-тесты, Android lint, Debug APK. Успех CI означает сборку и офлайн-регрессии, а **не успешный аппаратный тест**.
+
+**Где взять DEV APK:** [последний успешный workflow для ветки](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml). Отдельный Debug package ID: ru.forum.adbfastboottool.dev, поэтому **оригинальное приложение удалять нельзя и не нужно**. Подписанный Release не выпускался.
+
+**Большой тест:** [подробный сценарий REV9](docs/testing/REV9-BIG-DEVICE-TEST-RU.md) и [автозагрузка только SHA-совпадающего DEV APK](scripts/termux-fetch-rev9-dev.sh). Проверки USB/ADB/Fastboot разрешены только на выделенном разблокированном Poco X3 Pro, а любые потенциально разрушительные действия требуют отдельной подготовки совместимых тестовых файлов и плана восстановления.
+
+**Известные инженерные долги до заявления о полной поддержке:** полноценно проверенные GUI format/fetch/update-super/logical partition modifications; URI/FD без лишней копии, >4GiB RAW/sparse и USB stall; реальная интерактивность PTY/IME; полный долгоживущий USB lifecycle, фото/характеристики без неподтверждённого каталога. **Не считать эти возможности подтверждёнными лишь потому, что CI зелёный.**
+
+- [Утверждённые макеты и решения](docs/design-approved/README.md)
+- [Аудит оригинального исходника](docs/source-audit/NEKOFLASH2-REV5-AUDIT-AND-ROADMAP-RU.md)
+- [Исходные контрольные суммы](docs/source-audit/LEGACY-SOURCE-SHA256.json)
 
 ---
 

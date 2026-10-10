@@ -24,9 +24,13 @@ import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.InputType
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.view.inputmethod.EditorInfo
 import android.widget.Button
+import android.widget.Spinner
+import android.widget.ArrayAdapter
+import android.widget.AdapterView
 import android.widget.Toast
 import android.widget.EditText
 import android.widget.LinearLayout
@@ -42,6 +46,7 @@ import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -50,6 +55,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.bottomsheet.BottomSheetDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -77,6 +83,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvStatus: TextView
     private var tvOtgStatus: TextView? = null
     private lateinit var cardOperationCenter: MaterialCardView
+    private var operationCenterDialog: BottomSheetDialog? = null
+    private var autoShowGuiOperation: Boolean = false
     private lateinit var operationCenterDetails: View
     private lateinit var tvOperationCenterStatus: TextView
     private lateinit var tvOperationCenterLastEvent: TextView
@@ -216,6 +224,9 @@ class MainActivity : AppCompatActivity() {
             redirectToWelcome(intent)
             return
         }
+        // Keep navigation above the OS gesture/three-button bar. The existing
+        // ConsoleDockController observes IME insets without consuming them.
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContentView(R.layout.activity_main)
 
         rvConsoleOutput = findViewById(R.id.rvConsoleOutput)
@@ -342,6 +353,7 @@ class MainActivity : AppCompatActivity() {
                     operationRunTracksProgress = false
                     operationCancelRequested = false
                 }
+                autoShowGuiOperation = false
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 restoreBrightness()
             }
@@ -373,6 +385,8 @@ class MainActivity : AppCompatActivity() {
         registerImportLauncher()
         registerMiLoginLauncher()
         setupButtons()
+        setupFastbootWorkflowUi()
+        initializeOperationCenterDialog()
         buildSettingsPage()
         restoreWindowState(savedInstanceState)
         updateDeviceOverview()
@@ -434,13 +448,26 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         findViewById<Button>(R.id.btnScan).setOnClickListener { updateOtgStatus(); scanForDevices() }
+        findViewById<View>(R.id.usbPanel).setOnClickListener { showUsbPanel() }
+        findViewById<View>(R.id.btnTerminalOpen).setOnClickListener {
+            openConsole(requestCommandFocus = true)
+        }
         // Импорт файла из угла блока прошивки (в контексте Fastboot).
         findViewById<View>(R.id.btnBlockImportFastboot).setOnClickListener { startImportFilePicker() }
         // Режим перезагрузки в блоке прошивки — то же меню, что было на главной.
         findViewById<View>(R.id.btnFlashRebootMode).setOnClickListener { showRebootMenu() }
         findViewById<Button>(R.id.btnHomeRefreshData).setOnClickListener { refreshDeviceDataFromUi() }
-        findViewById<Button>(R.id.btnOperationCenterConsole).setOnClickListener {
-            openConsole(requestCommandFocus = false)
+        findViewById<View>(R.id.btnHomeAdvancedToggle).setOnClickListener {
+            val details = findViewById<View>(R.id.homeAdvancedInfo)
+            details.visibility = if (details.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
+        findViewById<View>(R.id.btnHomeSpecsToggle).setOnClickListener {
+            val specs = findViewById<View>(R.id.homeModelSpecs)
+            specs.visibility = if (specs.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+        }
+        findViewById<Button>(R.id.btnOperationCenterConsole).apply {
+            text = getString(R.string.operation_center_collapse)
+            setOnClickListener { operationCenterDialog?.dismiss() }
         }
         findViewById<View>(R.id.btnReportsMenu).setOnClickListener { showReportsMenu() }
         findViewById<Button>(R.id.btnOperationCenterCancel).setOnClickListener { requestOperationCancelFromUi() }
@@ -482,6 +509,7 @@ class MainActivity : AppCompatActivity() {
                 // legacy Sideload transport, verification, or USB ownership.
                 findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
                     getString(R.string.layout_sideload_selected_file, file.name)
+                autoShowGuiOperation = true
                 viewModel.runSideload(file)
             }
         }
@@ -837,6 +865,9 @@ class MainActivity : AppCompatActivity() {
     private fun handleCommandInput() {
         val raw = etCommand.text.toString().trim()
         if (raw.isEmpty()) return
+        // Terminal commands never inherit a pending GUI Operation Center
+        // request (for example after a rejected GUI action with no USB).
+        autoShowGuiOperation = false
         etCommand.text.clear()
         addToHistory(raw)
 
@@ -1650,8 +1681,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun ensureWorkspaceReady(): Boolean {
         if (::workspacePath.isInitialized && workspacePath.exists()) return true
-        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready yet. Grant access to all files and try again.")
-        checkPermissions()
+        viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: workspace folder is not ready. Open Permissions and grant file access for the selected file workflow.")
+        showPermissionsDialog()
         return false
     }
 
@@ -1742,46 +1773,12 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun checkPermissions() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
-                viewModel.log("⚠️ All-files access is required to read /sdcard/Download/$folderName.")
-                try {
-                    startActivity(Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
-                        data = "package:$packageName".toUri()
-                    })
-                } catch (e: Exception) {
-                    // Многоуровневый фолбэк для прошивок без точечного экрана.
-                    try {
-                        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
-                    } catch (e2: Exception) {
-                        try {
-                            startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = "package:$packageName".toUri()
-                            })
-                        } catch (e3: Exception) {
-                            Toast.makeText(
-                                this,
-                                getString(R.string.perm_open_settings_manually),
-                                Toast.LENGTH_LONG
-                            ).show()
-                        }
-                    }
-                }
-            } else if (!::workspacePath.isInitialized) {
-                initWorkspace()
-            }
-        } else {
-            if (!PermissionGate.hasStorage(this)) {
-                requestPermissions(
-                    arrayOf(
-                        android.Manifest.permission.READ_EXTERNAL_STORAGE,
-                        android.Manifest.permission.WRITE_EXTERNAL_STORAGE
-                    ),
-                    100
-                )
-            } else if (!::workspacePath.isInitialized) {
-                initWorkspace()
-            }
+        // Welcome/first launch must not force the system settings screen.
+        // File operations ask for access at point of use.
+        if (PermissionGate.hasStorage(this)) {
+            if (!::workspacePath.isInitialized) initWorkspace()
+        } else if (::viewModel.isInitialized) {
+            viewModel.log("ℹ️ Workspace permission is optional until importing or selecting files.")
         }
     }
 
@@ -1839,7 +1836,8 @@ class MainActivity : AppCompatActivity() {
 
     private fun showFileSelector(onFileSelected: (File) -> Unit) {
         if (!::workspacePath.isInitialized || !workspacePath.exists()) {
-            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Folder is not initialized. Grant permissions.")
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: Workspace is not ready for file selection.")
+            showPermissionsDialog()
             return
         }
         val files = workspacePath
@@ -2337,6 +2335,7 @@ class MainActivity : AppCompatActivity() {
      * Action-first Mi Unlock page: account state, Fastboot precondition and unlock action.
      */
     private fun runMiUnlockFromUi(auth: MiAccountClient.AuthResult) {
+        autoShowGuiOperation = true
         viewModel.runMiUnlock(
             auth = auth,
             onClearInfo = { _, _ -> },
@@ -2396,8 +2395,10 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(2), dp(2), dp(2), dp(6))
         }
 
-        val unlocked = isBootloaderUnlocked()
         val fastbootReady = isFastbootConnected()
+        val unlocked = fastbootReady && isBootloaderUnlocked()
+        val lockState = viewModel.fastbootDiagnostics.value?.unlocked?.trim()?.lowercase(Locale.US)
+        val lockStateVerified = fastbootReady && (lockState == "yes" || lockState == "no")
         val operationActive = viewModel.operationActive.value == true
 
         container.addView(title(getString(R.string.mi_unlock_page_title), "#E9782B"))
@@ -2420,11 +2421,24 @@ class MainActivity : AppCompatActivity() {
                     setOnClickListener { startMiLogin() }
                 })
             })
+            container.addView(title(getString(R.string.mi_unlock_bootloader_section)))
+            container.addView(card().apply {
+                addView(body(
+                    if (fastbootReady) unlockStatusSummary()
+                    else getString(R.string.mi_unlock_status_unverified),
+                    "#AEB8C5"
+                ))
+                addView(body(getString(R.string.mi_unlock_data_warning_short), "#F2B766"))
+            })
         } else {
             container.addView(card().apply {
                 addView(body(getString(R.string.mi_unlock_authorized, auth.userId), "#69C779"))
-                addView(body(getString(R.string.mi_unlock_region_zone, auth.region, auth.dataCenterZone, auth.zoneSource), "#AEB8C5"))
-                addView(android.widget.Button(this@MainActivity).apply {
+                val advanced = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    visibility = View.GONE
+                }
+                advanced.addView(body(getString(R.string.mi_unlock_region_zone, auth.region, auth.dataCenterZone, auth.zoneSource), "#AEB8C5"))
+                advanced.addView(android.widget.Button(this@MainActivity).apply {
                     text = getString(R.string.mi_unlock_change_zone_button)
                     isAllCaps = false
                     setTextColor("#F3F6FA".toColorInt())
@@ -2445,6 +2459,16 @@ class MainActivity : AppCompatActivity() {
                             .show()
                     }
                 })
+                addView(android.widget.Button(this@MainActivity).apply {
+                    text = getString(R.string.mi_unlock_advanced_options)
+                    isAllCaps = false
+                    setTextColor("#F3F6FA".toColorInt())
+                    setBackgroundColor("#192431".toColorInt())
+                    setOnClickListener {
+                        advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                    }
+                })
+                addView(advanced)
                 addView(android.widget.Button(this@MainActivity).apply {
                     text = getString(R.string.mi_unlock_sign_out_switch)
                     isAllCaps = false
@@ -2476,10 +2500,11 @@ class MainActivity : AppCompatActivity() {
                     addView(body(unlockStatusSummary(), if (fastbootReady) "#AEB8C5" else "#F2B766"))
                     addView(body(getString(R.string.mi_unlock_data_warning_short), "#F2B766"))
                     addView(android.widget.Button(this@MainActivity).apply {
-                        val canRunUnlock = fastbootReady && !operationActive
+                        val canRunUnlock = fastbootReady && lockStateVerified && !operationActive
                         text = when {
                             operationActive -> getString(R.string.mi_unlock_operation_running)
                             !fastbootReady -> getString(R.string.mi_unlock_connect_fastboot)
+                            !lockStateVerified -> getString(R.string.mi_unlock_status_unverified)
                             else -> getString(R.string.mi_unlock_action)
                         }
                         isAllCaps = false
@@ -2547,6 +2572,7 @@ class MainActivity : AppCompatActivity() {
         // ── Сервис ──
         container.addView(sectionTitle(getString(R.string.settings_section_service)))
         val svcCard = card()
+        svcCard.addView(row(getString(R.string.layout_reports_menu)) { showReportsMenu() })
         svcCard.addView(row(getString(R.string.settings_clear_workspace),
             getString(R.string.settings_clear_workspace_sub)) { confirmClearWorkspace() })
         svcCard.addView(row(getString(R.string.settings_about),
@@ -2590,9 +2616,236 @@ class MainActivity : AppCompatActivity() {
         val slotCount: Int
     )
 
+    private fun setupFastbootWorkflowUi() {
+        // REV7 binds only proven legacy operations. Old compatibility views remain
+        // hidden for existing handlers; neither USB transport nor slot topology
+        // is guessed by the GUI.
+        val pages = listOf(
+            findViewById<View>(R.id.fastbootQuickSection),
+            findViewById<View>(R.id.fastbootMassSection),
+            findViewById<View>(R.id.fastbootToolsSection)
+        )
+        val controls = listOf(
+            findViewById<View>(R.id.btnFastbootSectionQuick),
+            findViewById<View>(R.id.btnFastbootSectionMass),
+            findViewById<View>(R.id.btnFastbootSectionTools)
+        )
+        controls.forEachIndexed { index, button ->
+            button.setOnClickListener {
+                pages.forEachIndexed { n, page -> page.visibility = if (n == index) View.VISIBLE else View.GONE }
+            }
+        }
+
+        val namedPartitions = listOf(
+            "boot", "init_boot", "recovery", "vendor_boot", "dtbo",
+            "vbmeta", "system", "vendor", "product", "super"
+        )
+        val labels = namedPartitions + getString(R.string.flash_rev7_partition_manual)
+
+        fun partitionSelector(spinnerId: Int, manualId: Int): () -> String? {
+            val spinner = findViewById<Spinner>(spinnerId)
+            val manual = findViewById<EditText>(manualId)
+            spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+            spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+                override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                    manual.visibility = if (position == namedPartitions.size) View.VISIBLE else View.GONE
+                }
+            }
+            return {
+                val chosen = if (spinner.selectedItemPosition == namedPartitions.size) {
+                    manual.text.toString().trim()
+                } else {
+                    namedPartitions.getOrNull(spinner.selectedItemPosition).orEmpty()
+                }
+                chosen.takeIf { PARTITION_NAME_PATTERN.matches(it) } ?: run {
+                    Toast.makeText(this, getString(R.string.flash_rev7_invalid_target), Toast.LENGTH_SHORT).show()
+                    null
+                }
+            }
+        }
+
+        val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition)
+        val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition)
+        val quickFile = arrayOfNulls<File>(1)
+        val imageName = findViewById<TextView>(R.id.tvQuickSelectedImage)
+        val slotSpinner = findViewById<Spinner>(R.id.spinQuickSlot)
+        val slotNames = listOf(
+            getString(R.string.flash_rev7_slot_current),
+            getString(R.string.flash_rev7_slot_other),
+            getString(R.string.flash_rev7_slot_a),
+            getString(R.string.flash_rev7_slot_b),
+            getString(R.string.flash_rev7_slot_all)
+        )
+        slotSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, slotNames)
+        val targetLabel = findViewById<TextView>(R.id.tvQuickTarget)
+        fun updateTargetLabel() {
+            val partition = getQuickPartition() ?: return
+            val slot = if (quickFlashPartitionAlreadySuffixed(partition)) {
+                getString(R.string.flash_rev7_slot_current)
+            } else {
+                slotNames[slotSpinner.selectedItemPosition.coerceIn(slotNames.indices)]
+            }
+            targetLabel.text = getString(R.string.flash_rev7_target_display, partition, slot)
+        }
+        slotSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                updateTargetLabel()
+            }
+        }
+        findViewById<View>(R.id.btnQuickSelectImage).setOnClickListener {
+            showFileSelector { file ->
+                quickFile[0] = file
+                imageName.text = getString(R.string.flash_rev7_file_chosen, file.name)
+                updateTargetLabel()
+            }
+        }
+        findViewById<View>(R.id.btnQuickExecute).setOnClickListener {
+            val partition = getQuickPartition() ?: return@setOnClickListener
+            val file = quickFile[0] ?: run {
+                Toast.makeText(this, R.string.flash_rev7_no_file_error, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val currentSlot = normalizeQuickFlashSlot(
+                viewModel.currentFastbootPartitionInventory()?.currentSlot
+                    ?: viewModel.currentFastbootDiagnostics()?.currentSlot
+            )
+            val chosenSlot = if (quickFlashPartitionAlreadySuffixed(partition)) {
+                null
+            } else when (slotSpinner.selectedItemPosition) {
+                1 -> when (currentSlot) {
+                    "a" -> "b"
+                    "b" -> "a"
+                    else -> {
+                        Toast.makeText(this, R.string.flash_rev7_slot_unknown, Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                }
+                2 -> "a"
+                3 -> "b"
+                4 -> "all"
+                else -> null
+            }
+            autoShowGuiOperation = true
+            viewModel.runFlash(partition, file, chosenSlot)
+        }
+        findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
+
+        val queueRows = findViewById<LinearLayout>(R.id.llMassQueueRows)
+        val queueHeading = findViewById<TextView>(R.id.tvMassQueueTitle)
+        val queueExecute = findViewById<MaterialButton>(R.id.btnMassExecute)
+        fun renderQueue(draft: FlashOperationDraft) {
+            queueRows.removeAllViews()
+            queueHeading.text = if (draft.items.isEmpty()) {
+                getString(R.string.flash_rev7_queue_empty)
+            } else getString(R.string.flash_rev7_queue_count, draft.items.size)
+            queueExecute.isEnabled = draft.items.isNotEmpty()
+            draft.items.forEachIndexed { index, item ->
+                val row = LinearLayout(this).apply {
+                    orientation = LinearLayout.VERTICAL
+                    setPadding(dp(2), dp(8), dp(2), dp(8))
+                }
+                row.addView(TextView(this).apply {
+                    text = getString(R.string.flash_rev7_row_title, item.partition, item.displayName)
+                    setTextColor(getColor(R.color.text_primary))
+                    textSize = 12f
+                    typeface = android.graphics.Typeface.MONOSPACE
+                })
+                val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+                fun action(label: Int, enabled: Boolean = true, onClick: () -> Unit) {
+                    actions.addView(MaterialButton(this).apply {
+                        text = getString(label)
+                        isAllCaps = false
+                        textSize = 10f
+                        isEnabled = enabled
+                        setOnClickListener { onClick() }
+                    }, LinearLayout.LayoutParams(0, dp(42), 1f))
+                }
+                action(R.string.flash_rev7_row_up, index > 0) {
+                    viewModel.moveFlashQueueDraftItem(item.partition, -1)
+                }
+                action(R.string.flash_rev7_row_down, index + 1 < draft.items.size) {
+                    viewModel.moveFlashQueueDraftItem(item.partition, 1)
+                }
+                action(R.string.flash_rev7_row_remove) {
+                    viewModel.removeFlashQueueDraftItem(item.partition)
+                }
+                row.addView(actions)
+                queueRows.addView(row)
+            }
+        }
+        viewModel.flashOperationDraft.observe(this) { renderQueue(it) }
+        findViewById<View>(R.id.btnMassSelectImage).setOnClickListener {
+            val partition = getMassPartition() ?: return@setOnClickListener
+            showFileSelector { file -> viewModel.addFlashQueueFile(partition, file) }
+        }
+        queueExecute.setOnClickListener {
+            if (viewModel.currentFlashOperationDraft().items.isNotEmpty()) {
+                autoShowGuiOperation = true
+                viewModel.executeFlashQueueDraft()
+            }
+        }
+
+        val toolBlocks = listOf(
+            findViewById<View>(R.id.toolBlockInfo),
+            findViewById<View>(R.id.toolBlockPartitions),
+            findViewById<View>(R.id.toolBlockSlots),
+            findViewById<View>(R.id.toolBlockDynamic)
+        )
+        listOf(R.id.btnShowInfo, R.id.btnShowPartitions, R.id.btnShowSlots, R.id.btnShowDynamic)
+            .forEachIndexed { index, id ->
+                findViewById<View>(id).setOnClickListener {
+                    toolBlocks.forEachIndexed { i, block ->
+                        block.visibility = if (index == i) View.VISIBLE else View.GONE
+                    }
+                }
+            }
+        fun toolPartition(id: Int): String? {
+            val value = findViewById<EditText>(id).text.toString().trim()
+            return value.takeIf { PARTITION_NAME_PATTERN.matches(it) } ?: run {
+                Toast.makeText(this, R.string.flash_rev7_invalid_target, Toast.LENGTH_SHORT).show()
+                null
+            }
+        }
+        findViewById<View>(R.id.btnToolGetvar).setOnClickListener {
+            val key = findViewById<EditText>(R.id.edGetvarKey).text.toString().trim()
+            if (key.matches(Regex("[A-Za-z0-9._-]{1,64}"))) {
+                viewModel.runFastbootCommand("getvar:$key", heavy = false)
+            }
+        }
+        findViewById<View>(R.id.btnToolInventory).setOnClickListener {
+            viewModel.refreshFastbootDiagnostics()
+        }
+        findViewById<View>(R.id.btnToolErase).setOnClickListener {
+            toolPartition(R.id.edToolPartition)?.let {
+                autoShowGuiOperation = true
+                viewModel.runFastbootPartitionCommand("erase", it)
+            }
+        }
+        findViewById<View>(R.id.btnToolBoot).setOnClickListener {
+            showFileSelector { file ->
+                autoShowGuiOperation = true
+                viewModel.runFastbootDownloadAndRun(file, "boot")
+            }
+        }
+        findViewById<View>(R.id.btnToolSetSlotA).setOnClickListener {
+            autoShowGuiOperation = true
+            viewModel.setActiveSlotAndVerify("a")
+        }
+        findViewById<View>(R.id.btnToolSetSlotB).setOnClickListener {
+            autoShowGuiOperation = true
+            viewModel.setActiveSlotAndVerify("b")
+        }
+        findViewById<View>(R.id.btnToolInspectLogical).setOnClickListener {
+            toolPartition(R.id.edToolLogicalPartition)?.let { viewModel.inspectFastbootLogicalPartition(it) }
+        }
+    }
+
     private fun startDirectFlash(partition: String) {
         chooseQuickFlashSlotTarget(partition) { slot ->
             showFileSelector { file ->
+                autoShowGuiOperation = true
                 viewModel.runFlash(partition, file, slot)
             }
         }
@@ -2801,7 +3054,7 @@ class MainActivity : AppCompatActivity() {
             .setView(input)
             .setNegativeButton(getString(R.string.cancel_upper), null)
             .setPositiveButton(getString(R.string.continue_upper)) { _, _ ->
-                val partition = input.text?.toString()?.trim()?.lowercase(Locale.US).orEmpty()
+                val partition = input.text?.toString()?.trim().orEmpty()
                 if (!PARTITION_NAME_PATTERN.matches(partition)) {
                     viewModel.log("❌ Invalid Fastboot partition name: $partition")
                     return@setPositiveButton
@@ -3019,13 +3272,31 @@ class MainActivity : AppCompatActivity() {
             .setMessage(message)
             .setPositiveButton(getString(R.string.ok_understood_upper), null)
             .setNeutralButton(getString(R.string.open_app_settings_upper)) { _, _ ->
-                try {
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                // An explicit file operation may need MANAGE_EXTERNAL_STORAGE.
+                // Prefer the exact Android special-access page, then fall back.
+                val requests = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R &&
+                    !Environment.isExternalStorageManager()
+                ) {
+                    listOf(
+                        Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                            data = "package:$packageName".toUri()
+                        },
+                        Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION),
+                        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                            data = "package:$packageName".toUri()
+                        }
+                    )
+                } else {
+                    listOf(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                         data = "package:$packageName".toUri()
                     })
-                } catch (e: Exception) {
-                    viewModel.log(getString(R.string.app_settings_open_error, e.message ?: e.javaClass.simpleName))
                 }
+                val launched = requests.any { request ->
+                    runCatching { startActivity(request) }.isSuccess
+                }
+                if (!launched) viewModel.log(getString(
+                    R.string.app_settings_open_error, "Android settings unavailable"
+                ))
             }
             .setNegativeButton(getString(R.string.close_upper), null)
             .show()
@@ -3104,6 +3375,12 @@ class MainActivity : AppCompatActivity() {
     // ─── UI ──────────────────────────────────────────────────────────────────
 
 
+    private fun adbBannerProperty(banner: String, property: String): String? {
+        val marker = "$property="
+        val after = banner.substringAfter(marker, "")
+        return after.substringBefore(';').trim().takeIf { it.isNotEmpty() }
+    }
+
     private fun formatDeviceBoolean(value: String): String = when (value.trim().lowercase(Locale.US)) {
         "yes", "true", "1" -> getString(R.string.device_bool_yes)
         "no", "false", "0" -> getString(R.string.device_bool_no)
@@ -3146,10 +3423,20 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.device_extra_bootloader_version, it)
         } ?: ""
 
+        val activeAdb = viewModel.adbProtocol?.takeIf { it.isConnected }
+        val adbBanner = activeAdb?.currentDiagnostics()?.remoteBanner
+        val actualCodename = adbBanner?.let { adbBannerProperty(it, "ro.product.device") }
+            ?: if (viewModel.fastbootProtocol?.isConnected == true) product.takeUnless { it == "—" } else null
+        val actualAndroid = adbBanner?.let { adbBannerProperty(it, "ro.build.version.release") }
+        findViewById<TextView>(R.id.tvHomeCodename).text = actualCodename?.let {
+            getString(R.string.home_codename_value, it)
+        } ?: getString(R.string.home_codename_unknown)
+        findViewById<TextView>(R.id.tvDeviceAndroidValue).text = actualAndroid?.let {
+            getString(R.string.home_android_value, it)
+        } ?: getString(R.string.home_android_unknown)
         findViewById<TextView>(R.id.tvDeviceModeValue).text =
             getString(R.string.device_mode_value, modeText)
-        findViewById<TextView>(R.id.tvDeviceProductValue).text =
-            getString(R.string.device_product_value, product, serialno, vbl)
+        findViewById<TextView>(R.id.tvDeviceProductValue).text = product
         findViewById<TextView>(R.id.tvDeviceSlotValue).text =
             getString(R.string.device_slot_value, slotDisplay)
         findViewById<TextView>(R.id.tvDeviceUnlockedValue).text =
@@ -3235,12 +3522,19 @@ class MainActivity : AppCompatActivity() {
         consoleDockController.open(requestCommandFocus = requestCommandFocus)
     }
 
-    private fun openOperationCenter() {
-        switchTab("home")
-        val home = findViewById<ScrollView>(R.id.pageHome)
-        home.post {
-            home.smoothScrollTo(0, cardOperationCenter.top.coerceAtLeast(0))
+    private fun initializeOperationCenterDialog() {
+        // Reuse the existing progress views and listeners without leaving a
+        // permanent operation card on Home. This is a contextual GUI-only sheet.
+        val parent = cardOperationCenter.parent as? ViewGroup ?: return
+        parent.removeView(cardOperationCenter)
+        operationCenterDialog = BottomSheetDialog(this).apply {
+            setContentView(cardOperationCenter)
         }
+    }
+
+    private fun openOperationCenter() {
+        if (viewModel.operationProgress.value == null || operationStoredProgressHidden) return
+        operationCenterDialog?.let { if (!it.isShowing) it.show() }
     }
 
     private fun requestOperationCancelFromUi() {
@@ -3281,19 +3575,80 @@ class MainActivity : AppCompatActivity() {
      * в deviceList. Если OTG отключён в системе, deviceList пуст даже при кабеле —
      * пользователь видит подсказку включить OTG.
      */
+    private fun showUsbPanel() {
+        // Read the live Android USB inventory; never infer actual Fastbootd/ADB
+        // mode from vendor IDs or select an arbitrary target on reconnect.
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density + 0.5f).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+        }
+        val title = TextView(this).apply {
+            text = getString(R.string.shell_usb_details_title)
+            textSize = 18f
+            setTextColor(getColor(R.color.text_primary))
+        }
+        root.addView(title)
+        val details = TextView(this).apply {
+            textSize = 12f
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, dp(12), 0, dp(12))
+            text = buildString {
+                append(getString(R.string.shell_usb_mode, connectionStatusPresentation().first))
+                append('\n')
+                append(getString(R.string.shell_usb_otg, tvOtgStatus?.text?.toString().orEmpty()))
+                append('\n')
+                val devices = try { usbManager.deviceList.values.toList() } catch (_: SecurityException) { emptyList() }
+                append(getString(R.string.shell_usb_devices_count, devices.size))
+                devices.forEachIndexed { index, device ->
+                    append("\n\n")
+                    append(getString(R.string.shell_usb_device_entry, index + 1, device.vendorId, device.productId))
+                    append("\n")
+                    append(getString(R.string.shell_usb_permission,
+                        if (usbManager.hasPermission(device)) getString(R.string.shell_usb_yes)
+                        else getString(R.string.shell_usb_no)))
+                    append("\n")
+                    append(getString(R.string.shell_usb_interfaces, device.interfaceCount))
+                }
+            }
+        }
+        root.addView(details)
+        val refreshButton = MaterialButton(this).apply {
+            text = getString(R.string.shell_usb_refresh)
+            setOnClickListener {
+                dialog.dismiss()
+                updateOtgStatus()
+                scanForDevices() // Reuses the original candidate/permission chooser.
+            }
+        }
+        root.addView(refreshButton)
+        val logsButton = MaterialButton(this).apply {
+            text = getString(R.string.shell_usb_diagnostics)
+            setOnClickListener {
+                dialog.dismiss()
+                showLogsMenu()
+            }
+        }
+        root.addView(logsButton)
+        dialog.setContentView(ScrollView(this).apply { addView(root) })
+        dialog.show()
+    }
+
     private fun updateOtgStatus() {
         val tv = tvOtgStatus ?: return
         if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST)) {
-            tv.text = getString(R.string.otg_status_unsupported)
+            tv.text = getString(R.string.shell_usb_compact_unsupported)
             tv.setTextColor("#E06C75".toColorInt())
             return
         }
         val hasDevices = try { usbManager.deviceList.isNotEmpty() } catch (_: Exception) { false }
         if (hasDevices) {
-            tv.text = getString(R.string.otg_status_active)
+            tv.text = getString(R.string.shell_usb_compact_active)
             tv.setTextColor("#69C779".toColorInt())
         } else {
-            tv.text = getString(R.string.otg_status_no_device)
+            tv.text = getString(R.string.shell_usb_compact_idle)
             tv.setTextColor("#F2B766".toColorInt())
         }
     }
@@ -3384,6 +3739,12 @@ class MainActivity : AppCompatActivity() {
             tvOperationCenterProgress.visibility = if (detail.isNotBlank()) View.VISIBLE else View.GONE
         }
         updateOperationCenter(viewModel.logSnapshot())
+        if (autoShowGuiOperation && viewModel.operationActive.value == true &&
+            rawProgress?.finished == false && !operationStoredProgressHidden
+        ) {
+            autoShowGuiOperation = false
+            openOperationCenter()
+        }
         if (rawProgress != null && selectedWindow == "unlock") buildUnlockPage()
     }
 
@@ -3567,7 +3928,7 @@ class MainActivity : AppCompatActivity() {
         tvOperationCenterLastEvent.visibility = if (showLastEvent) View.VISIBLE else View.GONE
 
         val canRequestCancel = active && !operationCancelRequested
-        val cancelButton = findViewById<Button>(R.id.btnOperationCenterCancel)
+        val cancelButton = cardOperationCenter.findViewById<Button>(R.id.btnOperationCenterCancel)
         cancelButton.isEnabled = canRequestCancel
         cancelButton.text = getString(
             if (operationCancelRequested) R.string.layout_operation_cancelling_action
@@ -3577,6 +3938,7 @@ class MainActivity : AppCompatActivity() {
 
         val globalCancelButton = findViewById<Button>(R.id.btnCancel)
         globalCancelButton.isEnabled = canRequestCancel
+        globalCancelButton.visibility = if (active) View.VISIBLE else View.GONE
         globalCancelButton.alpha = if (canRequestCancel) 1f else 0.42f
         globalCancelButton.contentDescription = getString(
             if (operationCancelRequested) R.string.layout_operation_cancelling_action

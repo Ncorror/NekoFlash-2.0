@@ -3,7 +3,6 @@ package ru.forum.adbfastboottool
 import java.io.File
 import java.net.URI
 import java.util.Base64
-import java.util.Locale
 
 /** Lightweight persistable queue entry. No pre-hashing or mutation authorization state. */
 data class FlashQueueDraftItem(
@@ -22,7 +21,6 @@ data class FlashOperationDraft(
 }
 
 object FlashOperationDraftPolicy {
-    const val MAX_QUEUE_ITEMS = 32
     private const val MAX_URI_LENGTH = 4096
     private const val MAX_DISPLAY_NAME_LENGTH = 256
     private val PARTITION_PATTERN = Regex("^[A-Za-z0-9._-]{1,64}$")
@@ -51,12 +49,29 @@ object FlashOperationDraftPolicy {
     fun upsert(draft: FlashOperationDraft, item: FlashQueueDraftItem): FlashOperationDraft {
         require(isPersistable(item)) { "Draft item is not persistable" }
         val next = LinkedHashMap<String, FlashQueueDraftItem>()
-        draft.items.forEach { existing ->
-            if (existing.partition != item.partition) next[existing.partition] = existing
-        }
+        // LinkedHashMap.put replaces an existing target without changing its position.
+        // Visible order is execution order; names are concrete targets, including _a/_b.
+        draft.items.forEach { existing -> next[existing.partition] = existing }
         next[item.partition] = item
-        require(next.size <= MAX_QUEUE_ITEMS) { "Flash queue is too large" }
         return FlashOperationDraft(next.values.toList(), draft.revision + 1L)
+    }
+
+    /** Move a visible row by one place without sorting the queue. */
+    fun move(draft: FlashOperationDraft, partition: String, delta: Int): FlashOperationDraft {
+        require(delta == -1 || delta == 1) { "Only adjacent moves are supported" }
+        val list = draft.items.toMutableList()
+        val original = list.indexOfFirst { it.partition == partition }
+        if (original < 0) return draft
+        val destination = original + delta
+        if (destination !in list.indices) return draft
+        val item = list.removeAt(original)
+        list.add(destination, item)
+        return FlashOperationDraft(list.toList(), draft.revision + 1L)
+    }
+
+    fun remove(draft: FlashOperationDraft, partition: String): FlashOperationDraft {
+        if (draft.items.none { it.partition == partition }) return draft
+        return FlashOperationDraft(draft.items.filterNot { it.partition == partition }, draft.revision + 1L)
     }
 
     fun clear(draft: FlashOperationDraft): FlashOperationDraft =
@@ -76,8 +91,9 @@ object FlashOperationDraftPolicy {
             item.addedAtEpochMs >= 0L
 
     private fun normalizePartition(value: String): String? {
-        val normalized = value.trim().lowercase(Locale.US)
-        return normalized.takeIf { PARTITION_PATTERN.matches(it) }
+        // Exact operator-supplied Fastboot identifiers are case-sensitive.
+        val exact = value.trim()
+        return exact.takeIf { PARTITION_PATTERN.matches(it) }
     }
 }
 
@@ -91,7 +107,6 @@ object FlashOperationDraftCodec {
     fun encode(draft: FlashOperationDraft): ArrayList<String> = ArrayList(
         draft.items
             .filter(FlashOperationDraftPolicy::isPersistable)
-            .take(FlashOperationDraftPolicy.MAX_QUEUE_ITEMS)
             .map { item ->
                 listOf(
                     SCHEMA,
@@ -107,7 +122,7 @@ object FlashOperationDraftCodec {
     fun decode(encoded: List<String>?): FlashOperationDraft {
         if (encoded.isNullOrEmpty()) return FlashOperationDraft()
         val items = LinkedHashMap<String, FlashQueueDraftItem>()
-        encoded.take(FlashOperationDraftPolicy.MAX_QUEUE_ITEMS).forEach { row ->
+        encoded.forEach { row ->
             val parts = row.split(SEPARATOR)
             if (parts.size != 6 || parts[0] != SCHEMA) return@forEach
             val item = runCatching {

@@ -22,10 +22,9 @@ import kotlinx.coroutines.launch
  * Welcome / onboarding screen.
  *
  * The original user-owned artwork remains an immutable centerCrop background.
- * The risk acknowledgement is persisted, but entry authorization is session-scoped:
+ * Entry authorization is session-scoped:
  * every cold/full app restart returns here. Exported USB attach intents cannot bypass
- * the gate. Storage and risk acceptance are mandatory; notification
- * and battery permissions remain visible recommendations.
+ * the gate. A clear file-access action is available, but never blocks entry.
  */
 class WelcomeActivity : AppCompatActivity() {
 
@@ -86,20 +85,9 @@ class WelcomeActivity : AppCompatActivity() {
     }
 
     private fun handlePrimaryAction() {
-        val status = PermissionGate.status(this)
-        if (!status.allRequiredGranted) {
-            requestNextRequiredPermission()
-            return
-        }
-        if (!checkbox.isChecked) {
-            Toast.makeText(this, getString(R.string.onboarding_confirm_risk_first), Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (!OnboardingGate.complete(this)) {
-            Toast.makeText(this, getString(R.string.onboarding_gate_save_failed), Toast.LENGTH_LONG).show()
-            refreshGateState()
-            return
-        }
+        // Entry is available without a mandatory risk checkbox or storage grant.
+        // File-dependent workflows request their actual permission when needed.
+        OnboardingGate.complete(this)
         launchMainAfterGate()
     }
 
@@ -111,39 +99,23 @@ class WelcomeActivity : AppCompatActivity() {
         finish()
     }
 
-    /** Updates compact permission chips and the mandatory storage/risk gate. */
+    /** Recheck access after returning from Android system settings. */
     private fun refreshGateState() {
-        val status = PermissionGate.status(this)
-        val requiredReady = status.allRequiredGranted
-
-        chip(tvStorageChip, getString(R.string.perm_storage), status.storage, required = true)
-        chip(tvNotificationsChip, getString(R.string.perm_notifications), status.notifications, required = false)
-        chip(tvBatteryChip, getString(R.string.perm_battery_opt), status.batteryOptIgnored, required = false)
-
-        checkbox.isEnabled = requiredReady
-
-        val welcomeReady = status.storage && checkbox.isChecked
-        tvWelcomeStatus.text = when {
-            !status.storage -> getString(R.string.onboarding_need_storage_short)
-            !checkbox.isChecked -> getString(R.string.onboarding_confirm_risk_short)
-            else -> getString(R.string.onboarding_ready_short)
-        }
-        tvWelcomeStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            if (welcomeReady) R.drawable.ic_status_check_green else R.drawable.ic_status_warning_amber,
-            0,
-            0,
-            0
+        val storageGranted = PermissionGate.hasStorage(this)
+        tvStorageChip.text = getString(
+            if (storageGranted) R.string.onboarding_storage_granted
+            else R.string.onboarding_storage_grant
         )
-        tvWelcomeStatus.setTextColor(
-            getColor(if (welcomeReady) R.color.log_success else R.color.log_warning)
+        tvStorageChip.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (storageGranted) R.drawable.ic_status_check_green
+            else R.drawable.ic_status_warning_amber, 0, 0, 0
         )
-
-        btnPrimaryAction.text = if (requiredReady) {
-            getString(R.string.onboarding_enter_button)
-        } else {
-            getString(R.string.onboarding_grant_button)
-        }
-        btnPrimaryAction.alpha = if (welcomeReady || !requiredReady) 1.0f else 0.78f
+        tvStorageChip.setTextColor(getColor(R.color.text_primary))
+        tvStorageChip.alpha = 1f
+        tvWelcomeStatus.visibility = android.view.View.GONE
+        btnPrimaryAction.text = getString(R.string.onboarding_enter_button)
+        btnPrimaryAction.isEnabled = true
+        btnPrimaryAction.alpha = 1f
     }
 
     private fun chip(view: TextView, label: String, granted: Boolean, required: Boolean) {

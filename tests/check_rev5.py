@@ -21,13 +21,13 @@ def run():
     for rel in [
         'app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt',
         'app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt',
-        'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt',
+        # REV7 changes only queue ordering in DeviceViewModel; see check_rev7.py.
         'app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt',
-        'app/src/main/java/ru/forum/adbfastboottool/TabController.kt',
+        # REV10 adjusts only inactive tab presentation; pin new blob in check_rev10.py.
         'app/src/main/cpp/native_usbfs.cpp',
-        'app/src/main/res/layout/page_fastboot.xml',
-        'app/src/main/res/layout/page_home.xml',
+        # REV7 Fastboot screen is pinned by check_rev7.py (transport guard unaffected).
+        # REV7 Home informational-only screen is now guarded by check_rev7.py.
     ]:
         require(hashlib.sha256((ROOT / rel).read_bytes()).hexdigest() == manifest[rel], 'Changed guarded original: ' + rel)
 

@@ -49,12 +49,14 @@ internal class ConsoleDockController(
             isFitToContents = false
             isHideable = false
             skipCollapsed = false
-            isDraggable = true
+            isDraggable = false
             halfExpandedRatio = HALF_EXPANDED_RATIO
-            expandedOffset = 0
-            peekHeight = activity.resources.getDimensionPixelSize(
-                R.dimen.console_collapsed_height,
+            // Leave the fixed USB panel accessible while the terminal owns the
+            // entire remaining working area.
+            expandedOffset = activity.resources.getDimensionPixelSize(
+                R.dimen.usb_panel_height,
             )
+            peekHeight = 0 // REV6: terminal is visible only after explicit open().
             saveFlags = BottomSheetBehavior.SAVE_ALL
             state = BottomSheetBehavior.STATE_COLLAPSED
             addBottomSheetCallback(
@@ -141,25 +143,16 @@ internal class ConsoleDockController(
             else -> ConsoleSheetPolicy.StableState.TRANSIENT
         }
 
-        return when (ConsoleSheetPolicy.backAction(imeOrCommandActive, stableState)) {
-            ConsoleSheetPolicy.BackAction.HIDE_IME -> {
+        return when {
+            imeOrCommandActive -> {
                 hideCommandIme()
                 true
             }
-
-            ConsoleSheetPolicy.BackAction.HALF_EXPAND -> {
-                focusCommandWhenExpanded = false
-                commandInput.clearFocus()
-                behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
-                true
-            }
-
-            ConsoleSheetPolicy.BackAction.COLLAPSE -> {
+            stableState != ConsoleSheetPolicy.StableState.COLLAPSED -> {
                 collapse()
                 true
             }
-
-            ConsoleSheetPolicy.BackAction.DELEGATE -> false
+            else -> false
         }
     }
 
@@ -250,7 +243,7 @@ internal class ConsoleDockController(
             val nextImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
             if (nextImeVisible != imeVisible) {
                 imeVisible = nextImeVisible
-                behavior.isDraggable = !imeVisible
+                behavior.isDraggable = false
                 panel.requestLayout()
                 panel.post { updateVisibleBodyHeight() }
             }
@@ -277,7 +270,7 @@ internal class ConsoleDockController(
             WindowInsetsCompat.Type.ime(),
         )
         imeVisible = false
-        behavior.isDraggable = true
+        behavior.isDraggable = false
         commandInput.clearFocus()
     }
 

@@ -65,11 +65,11 @@ class TabController(private val activity: Activity) {
         tabButtons.forEach { (key, buttonId) ->
             val button = activity.findViewById<MaterialButton>(buttonId)
             val selected = key == targetTab
-            button.alpha = if (selected) 1.0f else 0.7f
+            button.alpha = 1.0f
             button.setTextColor(
                 ContextCompat.getColor(
                     activity,
-                    if (selected) R.color.accent else R.color.text_muted
+                    if (selected) R.color.accent else R.color.text_secondary
                 )
             )
             button.backgroundTintList = ColorStateList.valueOf(

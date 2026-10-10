@@ -165,6 +165,7 @@ class DeviceViewModel(
     private var logFile: File? = null
     private var traceLogFile: File? = null
     private var logStore: DiagnosticLogStore? = null
+    private var logStorageFailureNotified = false
     private var sessionSummaryFile: File? = null
     private var logFileConfigured = false
     private var configuredWorkspacePath: String? = null
@@ -347,6 +348,7 @@ class DeviceViewModel(
             logFile = logStore?.currentCompactFile() ?: logFile
         } catch (error: Exception) {
             android.util.Log.w("NekoFlash", "Unable to append compact diagnostic log", error)
+            notifyLogStorageFailure(error)
         }
     }
 
@@ -356,7 +358,16 @@ class DeviceViewModel(
             traceLogFile = logStore?.currentTraceFile() ?: traceLogFile
         } catch (error: Exception) {
             android.util.Log.w("NekoFlash", "Unable to append protocol trace", error)
+            notifyLogStorageFailure(error)
         }
+    }
+
+    /** Show a real UI warning once; never claim diagnostic persistence succeeded. */
+    private fun notifyLogStorageFailure(error: Exception) {
+        if (logStorageFailureNotified) return
+        logStorageFailureNotified = true
+        lines.add("❌ Diagnostic storage error: ${error.javaClass.simpleName}. Check free space; saved logs may be incomplete.")
+        _logLines.postValue(lines.toList())
     }
 
     private fun persistSessionSummary(): File? = try {
@@ -1020,6 +1031,26 @@ class DeviceViewModel(
     }
 
 
+    /** A slot switch is complete only when the bootloader reports it back. */
+    fun setActiveSlotAndVerify(slot: String) {
+        require(slot == "a" || slot == "b") { "Invalid slot" }
+        startOperation(
+            text(R.string.notif_fastboot_command),
+            text(R.string.notif_executing, "set_active:$slot")
+        ) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
+            if (!proto.sendCommand("set_active:$slot")) failOperation("Slot switch failed: $slot")
+            val actual = proto.getVar("current-slot")?.trim()?.removePrefix("_")
+                ?.lowercase(Locale.US)
+            if (actual != slot) {
+                failOperation("Slot switch unverified: expected=$slot, device=${actual ?: "unavailable"}")
+            }
+            proto.currentDiagnostics()?.let { _fastbootDiagnostics.postValue(it) }
+            log("✅ Verified current-slot=$slot")
+        }
+    }
+
     fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
@@ -1222,6 +1253,16 @@ class DeviceViewModel(
         log(text(R.string.flash_queue_updated_log, item.partition, item.displayName))
     }
 
+    fun moveFlashQueueDraftItem(partition: String, direction: Int) {
+        val next = FlashOperationDraftPolicy.move(currentFlashOperationDraft(), partition, direction)
+        publishFlashOperationDraft(next, persist = true)
+    }
+
+    fun removeFlashQueueDraftItem(partition: String) {
+        val next = FlashOperationDraftPolicy.remove(currentFlashOperationDraft(), partition)
+        publishFlashOperationDraft(next, persist = true)
+    }
+
     fun clearFlashQueueDraft() {
         publishFlashOperationDraft(
             FlashOperationDraftPolicy.clear(currentFlashOperationDraft()),
@@ -1260,17 +1301,14 @@ class DeviceViewModel(
         val queue = items.filter { it.partition.isNotBlank() }
         if (queue.isEmpty()) { log(text(R.string.flash_queue_empty_log)); return }
 
-        val order = listOf("vbmeta", "boot", "init_boot", "vendor_boot", "recovery", "dtbo")
-        val sorted = queue.sortedBy { item ->
-            val idx = order.indexOf(item.partition.lowercase())
-            if (idx < 0) order.size else idx
-        }
+        // Never reorder operator-defined targets. Execution order must be visible order.
+        val ordered = queue
 
-        startOperation(text(R.string.notif_flash_img), "Flash queue: ${sorted.size} item(s) Do not disconnect the cable.") {
-            setOperationSteps(sorted.mapIndexed { index, item ->
+        startOperation(text(R.string.notif_flash_img), "Flash queue: ${ordered.size} item(s) Do not disconnect the cable.") {
+            setOperationSteps(ordered.mapIndexed { index, item ->
                 OperationStep(
                     index = index + 1,
-                    total = sorted.size,
+                    total = ordered.size,
                     title = "flash ${item.partition} ← ${item.file.name}",
                     subtitle = formatBytesShort(item.file.length()),
                     status = OperationStepStatus.PENDING
@@ -1281,10 +1319,10 @@ class DeviceViewModel(
                 markOperationStep(1, OperationStepStatus.FAILED, text(R.string.error_no_fastboot))
                 failOperation("No Fastboot connection")
             }
-            sorted.forEachIndexed { index, item ->
+            ordered.forEachIndexed { index, item ->
                 val stepNumber = index + 1
                 markOperationStep(stepNumber, OperationStepStatus.RUNNING, "fastboot flash ${item.partition}")
-                log("=== FLASH QUEUE ${stepNumber}/${sorted.size}: ${item.partition} ← ${item.file.name} ===")
+                log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.file.name} ===")
                 val result = proto.flashPartitionDetailed(item.partition, item.file)
                 val diagnostics = proto.currentDiagnostics()
                 if (diagnostics != null) _fastbootDiagnostics.postValue(diagnostics)
@@ -1406,6 +1444,39 @@ class DeviceViewModel(
             .trimToNull()
     }
 
+    /**
+     * A verified Recovery verdict finalizes the *same* pending Sideload GUI
+     * operation. A recent unrelated operation must never be overwritten.
+     * Unknown Recovery results remain unverified, never labelled SUCCESS.
+     */
+    private fun publishSideloadRecoveryVerdict(
+        message: String,
+        outcome: OperationOutcomeKind
+    ) {
+        val current = _operationProgress.value
+        val sideloadTitle = text(R.string.notif_adb_sideload)
+        if (_operationActive.value == true || (
+                current != null &&
+                    !(current.title == sideloadTitle &&
+                      current.outcome == OperationOutcomeKind.VERIFY_PENDING)
+            )
+        ) {
+            logFileOnly("Recovery verdict saved in diagnostics; a different operation owns the GUI state.")
+            return
+        }
+        _operationProgress.postValue(
+            OperationProgress(
+                title = sideloadTitle,
+                percent = if (outcome == OperationOutcomeKind.SUCCESS) 100 else -1,
+                detail = message,
+                finished = true,
+                success = outcome == OperationOutcomeKind.SUCCESS,
+                outcome = outcome
+            )
+        )
+        persistSessionSummary()
+    }
+
     private fun verifyPendingSideloadIfReady(proto: AdbProtocol) {
         val pending = readPendingSideloadVerification() ?: return
         if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY) return
@@ -1433,6 +1504,10 @@ class DeviceViewModel(
             RecoveryInstallVerifier.Verdict.SUCCESS -> {
                 clearPendingSideloadVerification()
                 log("✅ Recovery reports successful installation: ${verification.message}")
+                publishSideloadRecoveryVerdict(
+                    "Recovery confirmed installation: ${verification.message}",
+                    OperationOutcomeKind.SUCCESS
+                )
             }
             RecoveryInstallVerifier.Verdict.FAILED -> {
                 clearPendingSideloadVerification()
@@ -1441,6 +1516,10 @@ class DeviceViewModel(
                     verification.evidence?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                 }
                 log("❌ Recovery reports an install error: $detail")
+                publishSideloadRecoveryVerdict(
+                    "Recovery installation failed: $detail",
+                    OperationOutcomeKind.FAILED
+                )
             }
             RecoveryInstallVerifier.Verdict.UNKNOWN -> {
                 log("ℹ️ Transfer completed; Recovery did not provide a clear install result.")

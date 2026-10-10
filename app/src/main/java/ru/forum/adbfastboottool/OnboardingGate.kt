@@ -12,8 +12,8 @@ import androidx.core.content.edit
  * MainActivity also ends the session when its task is actually finished, so a
  * normal close/remove-from-recents launch returns through the welcome screen.
  *
- * Intent extras are never trusted as a bypass: required storage permission,
- * persisted acknowledgement and the current in-memory session must all pass.
+ * Intent extras are never trusted as a bypass: only the in-memory session
+ * opened by WelcomeActivity permits entry to MainActivity.
  */
 object OnboardingGate {
     private const val PREFS_NAME = "nekoflash_onboarding"
@@ -30,24 +30,17 @@ object OnboardingGate {
             prefs.getBoolean(KEY_RISK_ACCEPTED, false)
     }
     /**
-     * MainActivity is allowed only after the current launch session has passed
-     * WelcomeActivity and the mandatory storage permission is still valid.
+     * A cold process still enters through Welcome; permission/risk decisions
+     * cannot become an artificial app-entry barrier. USB write commands retain
+     * their own transport and file validation.
      */
-    fun canEnterMain(context: Context): Boolean =
-        sessionAuthorized &&
-            isCompleted(context) &&
-            PermissionGate.areAllRequiredGranted(context)
+    fun canEnterMain(context: Context): Boolean = sessionAuthorized
 
     fun complete(context: Context): Boolean {
-        if (!PermissionGate.areAllRequiredGranted(context)) return false
-        @Suppress("UseKtx")
-        val persisted = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-            .edit()
-            .putInt(KEY_SCHEMA_VERSION, CURRENT_SCHEMA_VERSION)
-            .putBoolean(KEY_RISK_ACCEPTED, true)
-            .commit()
-        if (persisted) sessionAuthorized = true
-        return persisted
+        // Only WelcomeActivity invokes this after the user taps Enter.
+        // No permanent consent or all-files access is demanded just to view UI.
+        sessionAuthorized = true
+        return true
     }
 
     /** Ends only the current app-entry session; the risk checkbox remains saved. */

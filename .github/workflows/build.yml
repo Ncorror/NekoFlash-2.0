@@ -46,6 +46,14 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
+      - name: REV5 / REV6 structural and source-guard tests
+        run: |
+          python3 tests/check_rev10.py
+
+      - name: Kotlin JVM queue and diagnostic regression tests
+        timeout-minutes: 15
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace --console=plain
+
       - name: Android lint
         timeout-minutes: 15
         run: |
