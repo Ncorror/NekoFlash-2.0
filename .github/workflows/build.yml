@@ -48,7 +48,7 @@ jobs:
 
       - name: REV5 / REV6 structural and source-guard tests
         run: |
-          python3 tests/check_rev7.py
+          python3 tests/check_rev8.py
 
       - name: Android lint
         timeout-minutes: 15

@@ -165,6 +165,7 @@ class DeviceViewModel(
     private var logFile: File? = null
     private var traceLogFile: File? = null
     private var logStore: DiagnosticLogStore? = null
+    private var logStorageFailureNotified = false
     private var sessionSummaryFile: File? = null
     private var logFileConfigured = false
     private var configuredWorkspacePath: String? = null
@@ -347,6 +348,7 @@ class DeviceViewModel(
             logFile = logStore?.currentCompactFile() ?: logFile
         } catch (error: Exception) {
             android.util.Log.w("NekoFlash", "Unable to append compact diagnostic log", error)
+            notifyLogStorageFailure(error)
         }
     }
 
@@ -356,7 +358,16 @@ class DeviceViewModel(
             traceLogFile = logStore?.currentTraceFile() ?: traceLogFile
         } catch (error: Exception) {
             android.util.Log.w("NekoFlash", "Unable to append protocol trace", error)
+            notifyLogStorageFailure(error)
         }
+    }
+
+    /** Show a real UI warning once; never claim diagnostic persistence succeeded. */
+    private fun notifyLogStorageFailure(error: Exception) {
+        if (logStorageFailureNotified) return
+        logStorageFailureNotified = true
+        lines.add("❌ Diagnostic storage error: ${error.javaClass.simpleName}. Check free space; saved logs may be incomplete.")
+        _logLines.postValue(lines.toList())
     }
 
     private fun persistSessionSummary(): File? = try {
