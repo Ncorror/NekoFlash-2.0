@@ -42,6 +42,7 @@ import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import androidx.core.view.WindowCompat
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -216,6 +217,9 @@ class MainActivity : AppCompatActivity() {
             redirectToWelcome(intent)
             return
         }
+        // Keep navigation above the OS gesture/three-button bar. The existing
+        // ConsoleDockController observes IME insets without consuming them.
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContentView(R.layout.activity_main)
 
         rvConsoleOutput = findViewById(R.id.rvConsoleOutput)
@@ -434,6 +438,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun setupButtons() {
         findViewById<Button>(R.id.btnScan).setOnClickListener { updateOtgStatus(); scanForDevices() }
+        findViewById<View>(R.id.usbPanel).setOnClickListener { showUsbPanel() }
+        findViewById<View>(R.id.btnTerminalOpen).setOnClickListener {
+            openConsole(requestCommandFocus = true)
+        }
         // Импорт файла из угла блока прошивки (в контексте Fastboot).
         findViewById<View>(R.id.btnBlockImportFastboot).setOnClickListener { startImportFilePicker() }
         // Режим перезагрузки в блоке прошивки — то же меню, что было на главной.
@@ -3281,6 +3289,67 @@ class MainActivity : AppCompatActivity() {
      * в deviceList. Если OTG отключён в системе, deviceList пуст даже при кабеле —
      * пользователь видит подсказку включить OTG.
      */
+    private fun showUsbPanel() {
+        // Read the live Android USB inventory; never infer actual Fastbootd/ADB
+        // mode from vendor IDs or select an arbitrary target on reconnect.
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
+        val density = resources.displayMetrics.density
+        fun dp(value: Int): Int = (value * density + 0.5f).toInt()
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(18), dp(18), dp(18), dp(18))
+        }
+        val title = TextView(this).apply {
+            text = getString(R.string.shell_usb_details_title)
+            textSize = 18f
+            setTextColor(getColor(R.color.text_primary))
+        }
+        root.addView(title)
+        val details = TextView(this).apply {
+            textSize = 12f
+            setTextColor(getColor(R.color.text_secondary))
+            setPadding(0, dp(12), 0, dp(12))
+            text = buildString {
+                append(getString(R.string.shell_usb_mode, connectionStatusPresentation().first))
+                append('\n')
+                append(getString(R.string.shell_usb_otg, tvOtgStatus?.text.orEmpty()))
+                append('\n')
+                val devices = try { usbManager.deviceList.values.toList() } catch (_: SecurityException) { emptyList() }
+                append(getString(R.string.shell_usb_devices_count, devices.size))
+                devices.forEachIndexed { index, device ->
+                    append("\n\n")
+                    append(getString(R.string.shell_usb_device_entry, index + 1, device.vendorId, device.productId))
+                    append("\n")
+                    append(getString(R.string.shell_usb_permission,
+                        if (usbManager.hasPermission(device)) getString(R.string.shell_usb_yes)
+                        else getString(R.string.shell_usb_no)))
+                    append("\n")
+                    append(getString(R.string.shell_usb_interfaces, device.interfaceCount))
+                }
+            }
+        }
+        root.addView(details)
+        val refreshButton = MaterialButton(this).apply {
+            text = getString(R.string.shell_usb_refresh)
+            setOnClickListener {
+                dialog.dismiss()
+                updateOtgStatus()
+                scanForDevices() // Reuses the original candidate/permission chooser.
+            }
+        }
+        root.addView(refreshButton)
+        val logsButton = MaterialButton(this).apply {
+            text = getString(R.string.shell_usb_diagnostics)
+            setOnClickListener {
+                dialog.dismiss()
+                showLogsMenu()
+            }
+        }
+        root.addView(logsButton)
+        dialog.setContentView(ScrollView(this).apply { addView(root) })
+        dialog.show()
+    }
+
     private fun updateOtgStatus() {
         val tv = tvOtgStatus ?: return
         if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST)) {
@@ -3577,6 +3646,7 @@ class MainActivity : AppCompatActivity() {
 
         val globalCancelButton = findViewById<Button>(R.id.btnCancel)
         globalCancelButton.isEnabled = canRequestCancel
+        globalCancelButton.visibility = if (active) View.VISIBLE else View.GONE
         globalCancelButton.alpha = if (canRequestCancel) 1f else 0.42f
         globalCancelButton.contentDescription = getString(
             if (operationCancelRequested) R.string.layout_operation_cancelling_action

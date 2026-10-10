@@ -382,4 +382,18 @@ Unlock</string>
     <string name="layout_sideload_no_file">ZIP file not selected</string>
     <string name="layout_sideload_selected_file">File: %1$s</string>
     <string name="layout_sideload_verdict_note">Install runs only in confirmed Sideload mode. The final result is determined by Recovery, not merely by file transfer.</string>
+    <string name="shell_usb_panel_desc">USB connection details</string>
+    <string name="shell_terminal_open_desc">Open terminal</string>
+    <string name="shell_terminal_icon">&gt;_</string>
+    <string name="shell_usb_details_title">USB connection</string>
+    <string name="shell_usb_mode">Mode: %1$s</string>
+    <string name="shell_usb_otg">%1$s</string>
+    <string name="shell_usb_devices_count">USB devices: %1$d</string>
+    <string name="shell_usb_device_entry">Device %1$d · VID: %2$04X / PID: %3$04X</string>
+    <string name="shell_usb_permission">USB permission: %1$s</string>
+    <string name="shell_usb_interfaces">Interfaces: %1$d</string>
+    <string name="shell_usb_yes">granted</string>
+    <string name="shell_usb_no">not granted</string>
+    <string name="shell_usb_refresh">Refresh / scan devices</string>
+    <string name="shell_usb_diagnostics">Logs and diagnostics</string>
 </resources>

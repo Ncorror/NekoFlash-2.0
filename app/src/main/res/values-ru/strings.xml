@@ -386,4 +386,18 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_sideload_no_file">ZIP-файл не выбран</string>
     <string name="layout_sideload_selected_file">Файл: %1$s</string>
     <string name="layout_sideload_verdict_note">Установка запускается только в подтверждённом режиме Sideload. Итог определяет Recovery, а не только передача файла.</string>
+    <string name="shell_usb_panel_desc">USB-подключение: подробности</string>
+    <string name="shell_terminal_open_desc">Открыть терминал</string>
+    <string name="shell_terminal_icon">&gt;_</string>
+    <string name="shell_usb_details_title">USB-подключение</string>
+    <string name="shell_usb_mode">Режим: %1$s</string>
+    <string name="shell_usb_otg">%1$s</string>
+    <string name="shell_usb_devices_count">USB-устройств: %1$d</string>
+    <string name="shell_usb_device_entry">Устройство %1$d · VID: %2$04X / PID: %3$04X</string>
+    <string name="shell_usb_permission">Доступ USB: %1$s</string>
+    <string name="shell_usb_interfaces">Интерфейсов: %1$d</string>
+    <string name="shell_usb_yes">разрешён</string>
+    <string name="shell_usb_no">не разрешён</string>
+    <string name="shell_usb_refresh">Обновить / поиск устройств</string>
+    <string name="shell_usb_diagnostics">Журналы и диагностика</string>
 </resources>
