@@ -24,8 +24,7 @@ import kotlinx.coroutines.launch
  * The original user-owned artwork remains an immutable centerCrop background.
  * Entry authorization is session-scoped:
  * every cold/full app restart returns here. Exported USB attach intents cannot bypass
- * the gate. Storage and risk acceptance are mandatory; notification
- * and battery permissions remain visible recommendations.
+ * the gate. A clear file-access action is available, but never blocks entry.
  */
 class WelcomeActivity : AppCompatActivity() {
 
@@ -100,20 +99,23 @@ class WelcomeActivity : AppCompatActivity() {
         finish()
     }
 
-    /** Updates compact permission chips and the mandatory storage/risk gate. */
+    /** Recheck access after returning from Android system settings. */
     private fun refreshGateState() {
-        val status = PermissionGate.status(this)
-        chip(tvStorageChip, getString(R.string.perm_storage), status.storage, required = false)
-        chip(tvNotificationsChip, getString(R.string.perm_notifications), status.notifications, required = false)
-        chip(tvBatteryChip, getString(R.string.perm_battery_opt), status.batteryOptIgnored, required = false)
-        checkbox.isEnabled = true
-        tvWelcomeStatus.text = getString(R.string.onboarding_ready_short)
-        tvWelcomeStatus.setCompoundDrawablesRelativeWithIntrinsicBounds(
-            R.drawable.ic_status_check_green, 0, 0, 0
+        val storageGranted = PermissionGate.hasStorage(this)
+        tvStorageChip.text = getString(
+            if (storageGranted) R.string.onboarding_storage_granted
+            else R.string.onboarding_storage_grant
         )
-        tvWelcomeStatus.setTextColor(getColor(R.color.log_success))
+        tvStorageChip.setCompoundDrawablesRelativeWithIntrinsicBounds(
+            if (storageGranted) R.drawable.ic_status_check_green
+            else R.drawable.ic_status_warning_amber, 0, 0, 0
+        )
+        tvStorageChip.setTextColor(getColor(R.color.text_primary))
+        tvStorageChip.alpha = 1f
+        tvWelcomeStatus.visibility = android.view.View.GONE
         btnPrimaryAction.text = getString(R.string.onboarding_enter_button)
-        btnPrimaryAction.alpha = 1.0f
+        btnPrimaryAction.isEnabled = true
+        btnPrimaryAction.alpha = 1f
     }
 
     private fun chip(view: TextView, label: String, granted: Boolean, required: Boolean) {

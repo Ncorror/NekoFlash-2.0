@@ -24,7 +24,7 @@ def run():
         # REV7 changes only queue ordering in DeviceViewModel; see check_rev7.py.
         'app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt',
         'app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt',
-        'app/src/main/java/ru/forum/adbfastboottool/TabController.kt',
+        # REV10 adjusts only inactive tab presentation; pin new blob in check_rev10.py.
         'app/src/main/cpp/native_usbfs.cpp',
         # REV7 Fastboot screen is pinned by check_rev7.py (transport guard unaffected).
         # REV7 Home informational-only screen is now guarded by check_rev7.py.

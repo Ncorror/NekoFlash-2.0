@@ -3639,16 +3639,16 @@ class MainActivity : AppCompatActivity() {
     private fun updateOtgStatus() {
         val tv = tvOtgStatus ?: return
         if (!packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST)) {
-            tv.text = getString(R.string.otg_status_unsupported)
+            tv.text = getString(R.string.shell_usb_compact_unsupported)
             tv.setTextColor("#E06C75".toColorInt())
             return
         }
         val hasDevices = try { usbManager.deviceList.isNotEmpty() } catch (_: Exception) { false }
         if (hasDevices) {
-            tv.text = getString(R.string.otg_status_active)
+            tv.text = getString(R.string.shell_usb_compact_active)
             tv.setTextColor("#69C779".toColorInt())
         } else {
-            tv.text = getString(R.string.otg_status_no_device)
+            tv.text = getString(R.string.shell_usb_compact_idle)
             tv.setTextColor("#F2B766".toColorInt())
         }
     }

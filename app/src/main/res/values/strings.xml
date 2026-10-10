@@ -153,7 +153,7 @@ Sideload</string>
     <string name="layout_adb_sideload_title">ADB SIDELOAD</string>
     <string name="layout_sideload_recovery_hint">Recovery → Apply update → Apply from ADB</string>
     <string name="layout_choose_zip_sideload">▶  Choose .zip for Sideload</string>
-    <string name="layout_console_title">TERMINAL &amp; LOGS</string>
+    <string name="layout_console_title">TERMINAL</string>
     <string name="console_logs_button">Logs</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
@@ -459,4 +459,10 @@ Unlock</string>
     <string name="flash_rev7_no_file_error">Select an image first.</string>
     <string name="mi_unlock_advanced_options">Additional parameters</string>
     <string name="mi_unlock_status_unverified">Bootloader state is not verified; reconnect in Fastboot and refresh diagnostics</string>
+    <string name="onboarding_storage_grant">File access · Grant ›</string>
+    <string name="onboarding_storage_granted">File access · Granted ✓</string>
+    <string name="onboarding_storage_action">Manage file access</string>
+    <string name="shell_usb_compact_idle">OTG · no device</string>
+    <string name="shell_usb_compact_active">OTG · connected</string>
+    <string name="shell_usb_compact_unsupported">OTG · unavailable</string>
 </resources>
