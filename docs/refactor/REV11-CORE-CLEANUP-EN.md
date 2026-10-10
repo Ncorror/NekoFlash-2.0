@@ -47,3 +47,9 @@ Status: active refactor. Original base: the tested NekoFlash 6.0.0-alpha11 (**no
 - Extended the localization contract test to require both languages, actual Kotlin references, and absence of the replaced English-only messages.
 - No behavior or permission changes to Fastboot commands, USB transports, package identifiers, or workspace paths.
 - **Remaining work:** other legacy string literals, notably terminal, USB recovery and flashing failure messages. Full localization still requires follow-up edits and bilingual device testing.
+
+## File-naming extraction
+
+Moved Android provider filename sanitization and collision-free workspace naming from `MainActivity` into the dedicated pure Kotlin `WorkspaceImportNaming.kt` component. Removed two one-off methods and the silent 160-character truncation; the real filesystem length constraint surfaces as an import error instead. Security checks still reject `.`, `..` and traversal. JVM tests cover existing-file preservation, longer names, and workspace confinement. The workspace remains `/sdcard/Download/NekoFlash`.
+
+This refactor does **not** mean direct SAF URI/FD firmware streaming is implemented; imports still copy data and that work remains outstanding.

@@ -1689,8 +1689,8 @@ class MainActivity : AppCompatActivity() {
     private fun importFirmwareFile(uri: Uri) {
         if (!ensureWorkspaceReady()) return
 
-        val displayName = sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
-        val target = uniqueTargetFile(displayName)
+        val displayName = WorkspaceImportNaming.sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
+        val target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
         val expectedSize = queryFileSize(uri)
         viewModel.log(getString(R.string.rev11_import_started, displayName, "${workspaceDisplayPath()}/${target.name}"))
         expectedSize?.let { viewModel.log(getString(R.string.rev11_import_expected_size, it)) }
@@ -1743,29 +1743,6 @@ class MainActivity : AppCompatActivity() {
             if (cursor.moveToFirst()) cursor.getString(0) else null
         }
     }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/')
-
-    private fun sanitizeImportedFileName(name: String): String {
-        val safe = name.trim()
-            .replace(Regex("[\\/:*?\"<>|\r\n]+"), "_")
-            .replace(Regex("\\s+"), "_")
-            .take(160)
-        return safe.ifBlank { "imported-${System.currentTimeMillis()}" }
-    }
-
-    private fun uniqueTargetFile(fileName: String): File {
-        var candidate = File(workspacePath, fileName)
-        if (!candidate.exists()) return candidate
-
-        val dot = fileName.lastIndexOf('.')
-        val base = if (dot > 0) fileName.substring(0, dot) else fileName
-        val ext = if (dot > 0) fileName.substring(dot) else ""
-        var index = 1
-        while (candidate.exists()) {
-            candidate = File(workspacePath, "$base-$index$ext")
-            index++
-        }
-        return candidate
-    }
 
     private fun formatFileSize(bytes: Long): String {
         val mb = bytes.toDouble() / 1024.0 / 1024.0
