@@ -16,7 +16,7 @@ import hashlib
 # guarded by LEGACY-SOURCE-SHA256.json in REV5.
 raw_vm = (root/'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt').read_bytes()
 expected_blob = '3b68a4739c8492c1521466e5f47f2adb96e7ee1a'
-assert hashlib.sha1(b'blob ' + str(len(raw_vm)).encode() + b'\\0' + raw_vm).hexdigest() == expected_blob, 'Unexpected change to DeviceViewModel'
+assert hashlib.sha1(b'blob ' + str(len(raw_vm)).encode() + b'\0' + raw_vm).hexdigest() == expected_blob, 'Unexpected change to DeviceViewModel'
 assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm
 assert 'fun moveFlashQueueDraftItem' in vm and 'fun removeFlashQueueDraftItem' in vm
