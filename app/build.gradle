@@ -66,6 +66,10 @@ android {
             proguardFiles(getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro')
         }
         debug {
+            // DEV builds coexist with the original signed NekoFlash package.
+            // Never require uninstalling the user's proven release version for UI smoke tests.
+            applicationIdSuffix = ".dev"
+            versionNameSuffix = "-rev6-dev"
             minifyEnabled = false
         }
     }
