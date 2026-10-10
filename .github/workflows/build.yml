@@ -50,6 +50,10 @@ jobs:
         run: |
           python3 tests/check_rev8.py
 
+      - name: Kotlin JVM queue and diagnostic regression tests
+        timeout-minutes: 15
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace --console=plain
+
       - name: Android lint
         timeout-minutes: 15
         run: |
