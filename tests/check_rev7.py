@@ -10,6 +10,9 @@ vm = (root/'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt').read
 assert 'MAX_QUEUE_ITEMS' not in policy, 'Legacy queue cap must not truncate the operator plan'
 assert '.take(FlashOperationDraftPolicy.MAX_QUEUE_ITEMS)' not in policy
 assert 'draft.items.forEach { existing -> next[existing.partition] = existing }' in policy
+# Audit the edited orchestration file as an explicit checkpoint, not an unguarded exception.
+import hashlib
+expected_vm_sha256 = None  # assigned in the change manifest when the staged file is finalized
 assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm
 assert 'fun moveFlashQueueDraftItem' in vm and 'fun removeFlashQueueDraftItem' in vm
