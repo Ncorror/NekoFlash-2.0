@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ "main", "feature/rev11-core-cleanup" ]
   pull_request:
-    branches: [ "main" ]
+    branches: [ "main", "feature/rev6-shell" ]
   workflow_dispatch:
 
 permissions:
