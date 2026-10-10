@@ -48,7 +48,7 @@ jobs:
 
       - name: REV5 / REV6 structural and source-guard tests
         run: |
-          python3 tests/check_rev10.py
+          python3 tests/check_rev11.py
 
       - name: Kotlin JVM queue and diagnostic regression tests
         timeout-minutes: 15

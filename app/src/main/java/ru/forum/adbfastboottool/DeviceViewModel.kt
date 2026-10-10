@@ -741,9 +741,11 @@ class DeviceViewModel(
     }
 
     private fun setOperationSteps(steps: List<OperationStep>) {
-        val safeSteps = steps.take(MAX_OPERATION_STEPS_IN_UI)
-        synchronized(operationStepLock) { operationStepSnapshot = safeSteps }
-        _operationSteps.postValue(safeSteps)
+        // Preserve the complete operation; the RecyclerView controls how many rows
+        // are rendered at once. Truncating the model silently loses real steps.
+        val completeSteps = steps.toList()
+        synchronized(operationStepLock) { operationStepSnapshot = completeSteps }
+        _operationSteps.postValue(completeSteps)
     }
 
     private fun markOperationStep(index: Int, status: OperationStepStatus, subtitle: String? = null) {
@@ -862,9 +864,9 @@ class DeviceViewModel(
                             "topology=$topology, incomplete=$incomplete, " +
                             "point-queries=${inventory.pointQueryCount}, status=${inventory.finalStatus}"
                     )
+                    // All non-informational warnings must be retained in diagnostics.
                     inventory.warnings
                         .filter { it.severity != FastbootPartitionInventory.WarningSeverity.INFO }
-                        .take(4)
                         .forEach { warning -> log("⚠️ Inventory ${warning.code}: ${warning.message}") }
                 } else {
                     _fastbootPartitionInventory.postValue(null)
@@ -1845,7 +1847,6 @@ class DeviceViewModel(
         private const val TRANSPORT_IDLE_POLL_MS = 10L
         private const val MI_UNLOCK_VERIFY_TIMEOUT_MS = 24L * 60L * 60L * 1000L
         private const val SIDELOAD_VERIFY_TIMEOUT_MS = 60L * 60L * 1000L
-        private const val MAX_OPERATION_STEPS_IN_UI = 240
         private const val MI_UNLOCK_VERIFY_PREFS = "mi_unlock_verify"
         private const val SIDELOAD_VERIFY_PREFS = "sideload_verify"
         private const val MI_UNLOCK_VERIFY_PRODUCT = "product"
