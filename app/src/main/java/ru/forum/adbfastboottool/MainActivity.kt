@@ -865,6 +865,9 @@ class MainActivity : AppCompatActivity() {
     private fun handleCommandInput() {
         val raw = etCommand.text.toString().trim()
         if (raw.isEmpty()) return
+        // Terminal commands never inherit a pending GUI Operation Center
+        // request (for example after a rejected GUI action with no USB).
+        autoShowGuiOperation = false
         etCommand.text.clear()
         addToHistory(raw)
 
