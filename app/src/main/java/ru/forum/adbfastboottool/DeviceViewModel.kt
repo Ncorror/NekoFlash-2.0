@@ -1637,7 +1637,10 @@ class DeviceViewModel(
                     if (source is FirmwareSource.SafDocument &&
                         result.kind == AdbProtocol.SideloadFailureKind.FILE
                     ) {
-                        log(text(R.string.rev12_sideload_saf_unsupported))
+                        // Keep raw provider errors in diagnostics, while the GUI
+                        // presents a complete localized message and Import fallback.
+                        logFileOnly("SAF direct read: ${result.message}")
+                        failOperation(text(R.string.rev12_sideload_saf_unsupported))
                     }
                     failOperation(text(R.string.rev12_sideload_failed, result.kind.name, result.message))
                 }

@@ -500,5 +500,5 @@ Unlock</string>
     <string name="rev12_sideload_cancelled">ADB Sideload cancelled.</string>
     <string name="rev12_sideload_mode_inactive">ADB Sideload is not active. Device mode: %1$s.</string>
     <string name="rev12_sideload_failed">ADB Sideload error (%1$s): %2$s.</string>
-    <string name="rev12_sideload_saf_unsupported">This document provider does not support random access. Use Import to copy the ZIP into the unchanged workspace.</string>
+    <string name="rev12_sideload_saf_unsupported">The document cannot be read directly or does not support random access. Use Import to copy the ZIP into the existing workspace.</string>
 </resources>

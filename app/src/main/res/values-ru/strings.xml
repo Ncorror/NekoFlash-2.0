@@ -504,5 +504,5 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev12_sideload_cancelled">ADB Sideload отменён.</string>
     <string name="rev12_sideload_mode_inactive">ADB Sideload не активен. Режим устройства: %1$s.</string>
     <string name="rev12_sideload_failed">Ошибка ADB Sideload (%1$s): %2$s.</string>
-    <string name="rev12_sideload_saf_unsupported">Этот провайдер документов не поддерживает произвольное чтение. Используй «Импорт», чтобы скопировать ZIP в прежнюю рабочую папку.</string>
+    <string name="rev12_sideload_saf_unsupported">Не удалось прочитать документ напрямую или провайдер не поддерживает произвольный доступ. Используй «Импорт», чтобы скопировать ZIP в прежнюю рабочую папку.</string>
 </resources>
