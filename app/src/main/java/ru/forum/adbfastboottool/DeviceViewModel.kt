@@ -1407,13 +1407,13 @@ class DeviceViewModel(
     private fun sideloadVerificationPrefs() =
         getApplication<Application>().getSharedPreferences(SIDELOAD_VERIFY_PREFS, Context.MODE_PRIVATE)
 
-    private fun persistPendingSideloadVerification(file: File, proto: AdbProtocol) {
+    private fun persistPendingSideloadVerification(source: FirmwareSource, proto: AdbProtocol) {
         val device = adbBannerProperty(proto.currentDiagnostics().remoteBanner, "ro.product.device")
         @Suppress("UseKtx")
         val saved = sideloadVerificationPrefs()
             .edit()
-            .putString(SIDELOAD_VERIFY_PACKAGE, file.name)
-            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, file.length())
+            .putString(SIDELOAD_VERIFY_PACKAGE, source.displayName)
+            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, source.sizeHint ?: -1L)
             .putString(SIDELOAD_VERIFY_DEVICE, device)
             .putLong(SIDELOAD_VERIFY_CREATED_AT, System.currentTimeMillis())
             .commit()
@@ -1603,7 +1603,9 @@ class DeviceViewModel(
         }
     }
 
-    fun runSideload(file: File) {
+    fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))
+
+    internal fun runSideload(source: FirmwareSource) {
         val proto = adbProtocol
         if (proto?.isConnected != true) {
             log(text(R.string.error_no_adb))
@@ -1611,28 +1613,33 @@ class DeviceViewModel(
         }
 
         clearPendingSideloadVerification()
-        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, file.name)) {
-            when (val result = proto.sideloadZip(file)) {
+        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, source.displayName)) {
+            when (val result = proto.sideloadZip(source, getApplication<Application>().contentResolver)) {
                 AdbProtocol.SideloadResult.TransferComplete -> {
-                    persistPendingSideloadVerification(file, proto)
+                    persistPendingSideloadVerification(source, proto)
                     verificationPending(
-                        "File transfer completed. Recovery decides whether the package is valid; the install result will be read after returning to Recovery if a log is available."
+                        text(R.string.rev12_sideload_verify_pending)
                     )
                 }
                 is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
-                    persistPendingSideloadVerification(file, proto)
+                    persistPendingSideloadVerification(source, proto)
                     verificationPending(
-                        "Recovery closed ADB before DONEDONE after ≈${result.percent}% transfer. This is not treated as a transport error; check the final install result on the Recovery screen or after returning to Recovery."
+                        text(R.string.rev12_sideload_disconnect_pending, result.percent)
                     )
                 }
                 AdbProtocol.SideloadResult.Cancelled -> {
-                    throw OperationAbort(OperationOutcome.Cancelled("ADB Sideload cancelled"))
+                    throw OperationAbort(OperationOutcome.Cancelled(text(R.string.rev12_sideload_cancelled)))
                 }
                 is AdbProtocol.SideloadResult.NotInSideloadMode -> {
-                    failOperation("ADB Sideload is not active. Current mode: ${result.mode.name}")
+                    failOperation(text(R.string.rev12_sideload_mode_inactive, result.mode.name))
                 }
                 is AdbProtocol.SideloadResult.Failed -> {
-                    failOperation("ADB Sideload [${result.kind.name}]: ${result.message}")
+                    if (source is FirmwareSource.SafDocument &&
+                        result.kind == AdbProtocol.SideloadFailureKind.FILE
+                    ) {
+                        log(text(R.string.rev12_sideload_saf_unsupported))
+                    }
+                    failOperation(text(R.string.rev12_sideload_failed, result.kind.name, result.message))
                 }
             }
         }

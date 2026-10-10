@@ -492,4 +492,13 @@ Unlock</string>
     <string name="rev11_fastboot_download_failed">Fastboot download and execution failed: %1$s.</string>
     <string name="rev11_fastboot_logical_failed">Fastboot logical partition command failed: %1$s.</string>
     <string name="rev11_fastboot_logical_info_failed">Could not read logical partition information: %1$s.</string>
+    <string name="rev12_sideload_no_uri">The Android file picker did not provide a ZIP document.</string>
+    <string name="rev12_sideload_unnamed">selected-package.zip</string>
+    <string name="rev12_sideload_source_selected">Selected document: %1$s. Reading directly, without copying to the workspace.</string>
+    <string name="rev12_sideload_verify_pending">ZIP transfer completed. Recovery must verify installation; do not treat transfer as installation success.</string>
+    <string name="rev12_sideload_disconnect_pending">Recovery disconnected after approximately %1$d%% transfer. Installation remains unverified; check Recovery logs.</string>
+    <string name="rev12_sideload_cancelled">ADB Sideload cancelled.</string>
+    <string name="rev12_sideload_mode_inactive">ADB Sideload is not active. Device mode: %1$s.</string>
+    <string name="rev12_sideload_failed">ADB Sideload error (%1$s): %2$s.</string>
+    <string name="rev12_sideload_saf_unsupported">This document provider does not support random access. Use Import to copy the ZIP into the unchanged workspace.</string>
 </resources>

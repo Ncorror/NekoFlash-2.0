@@ -108,5 +108,20 @@ for literal in (
 ):
     assert literal not in (main + vm), "English-only status returned: " + literal
 
+rev12_keys = (
+    "rev12_sideload_no_uri",
+    "rev12_sideload_unnamed",
+    "rev12_sideload_source_selected",
+    "rev12_sideload_verify_pending",
+    "rev12_sideload_disconnect_pending",
+    "rev12_sideload_cancelled",
+    "rev12_sideload_mode_inactive",
+    "rev12_sideload_failed",
+    "rev12_sideload_saf_unsupported",
+)
+for key in rev12_keys:
+    assert key in en and key in ru
+    assert "R.string." + key in (main + vm), key
+
 print(f"PASS I18N: {len(en)} paired strings, {len(plural_en)} plural keys, "
       "format-safe RU/EN, package and workspace paths unchanged")

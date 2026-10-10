@@ -496,4 +496,13 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev11_fastboot_download_failed">Ошибка загрузки и выполнения Fastboot: %1$s.</string>
     <string name="rev11_fastboot_logical_failed">Ошибка команды Fastboot для логического раздела: %1$s.</string>
     <string name="rev11_fastboot_logical_info_failed">Не удалось получить сведения о логическом разделе: %1$s.</string>
+    <string name="rev12_sideload_no_uri">Android не передал выбранный ZIP-документ.</string>
+    <string name="rev12_sideload_unnamed">selected-package.zip</string>
+    <string name="rev12_sideload_source_selected">Выбран документ: %1$s. Прямое чтение без копирования в рабочую папку.</string>
+    <string name="rev12_sideload_verify_pending">Передача ZIP завершена. Recovery должен подтвердить установку; окончание передачи не означает успех установки.</string>
+    <string name="rev12_sideload_disconnect_pending">Recovery отключился примерно после %1$d%% передачи. Результат установки не подтверждён; проверь журналы Recovery.</string>
+    <string name="rev12_sideload_cancelled">ADB Sideload отменён.</string>
+    <string name="rev12_sideload_mode_inactive">ADB Sideload не активен. Режим устройства: %1$s.</string>
+    <string name="rev12_sideload_failed">Ошибка ADB Sideload (%1$s): %2$s.</string>
+    <string name="rev12_sideload_saf_unsupported">Этот провайдер документов не поддерживает произвольное чтение. Используй «Импорт», чтобы скопировать ZIP в прежнюю рабочую папку.</string>
 </resources>

@@ -119,6 +119,7 @@ class MainActivity : AppCompatActivity() {
     private val folderName = "NekoFlash"
     private lateinit var workspacePath: File
     private lateinit var importFileLauncher: ActivityResultLauncher<Intent>
+    private lateinit var sideloadZipLauncher: ActivityResultLauncher<Intent>
     private lateinit var miLoginLauncher: ActivityResultLauncher<Intent>
     private var miAuth: MiAccountClient.AuthResult? = null
     private var miAuthExchangeJob: Job? = null
@@ -383,6 +384,7 @@ class MainActivity : AppCompatActivity() {
 
         registerUsbReceiver()
         registerImportLauncher()
+        registerDirectSideloadLauncher()
         registerMiLoginLauncher()
         setupButtons()
         setupFastbootWorkflowUi()
@@ -504,14 +506,8 @@ class MainActivity : AppCompatActivity() {
 
         // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
-            showFileSelector { file ->
-                // The approved REV3 screen shows the chosen ZIP without changing
-                // legacy Sideload transport, verification, or USB ownership.
-                findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
-                    getString(R.string.layout_sideload_selected_file, file.name)
-                autoShowGuiOperation = true
-                viewModel.runSideload(file)
-            }
+            // Direct SAF selection; no all-files workspace permission or copy.
+            startDirectSideloadFilePicker()
         }
         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
 
@@ -1584,6 +1580,57 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─── РАЗРЕШЕНИЯ И ФАЙЛЫ ──────────────────────────────────────────────────
+
+    private fun registerDirectSideloadLauncher() {
+        sideloadZipLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
+            val uri = result.data?.data ?: run {
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev12_sideload_no_uri))
+                return@registerForActivityResult
+            }
+            runCatching {
+                contentResolver.takePersistableUriPermission(
+                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+                )
+            }.onFailure { error ->
+                viewModel.logFileOnly(
+                    "SAF document permission is transient: ${error.javaClass.simpleName}"
+                )
+            }
+            val display = WorkspaceImportNaming.sanitizeImportedFileName(
+                queryDisplayName(uri) ?: getString(R.string.rev12_sideload_unnamed)
+            )
+            val source = FirmwareSource.SafDocument(uri, display, queryFileSize(uri))
+            findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
+                getString(R.string.layout_sideload_selected_file, display)
+            viewModel.log(getString(R.string.rev12_sideload_source_selected, display))
+            autoShowGuiOperation = true
+            viewModel.runSideload(source)
+        }
+    }
+
+    private fun startDirectSideloadFilePicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "*/*"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                "application/zip", "application/x-zip-compressed",
+                "application/octet-stream", "*/*"
+            ))
+            addFlags(
+                Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
+            )
+        }
+        try {
+            sideloadZipLauncher.launch(intent)
+        } catch (error: Exception) {
+            viewModel.log(
+                DiagnosticLogPolicy.Level.ERROR,
+                getString(R.string.rev11_picker_open_failed, error.message ?: error.javaClass.simpleName)
+            )
+        }
+    }
 
     private fun registerImportLauncher() {
         importFileLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
