@@ -2365,6 +2365,7 @@ class MainActivity : AppCompatActivity() {
      * Action-first Mi Unlock page: account state, Fastboot precondition and unlock action.
      */
     private fun runMiUnlockFromUi(auth: MiAccountClient.AuthResult) {
+        autoShowGuiOperation = true
         viewModel.runMiUnlock(
             auth = auth,
             onClearInfo = { _, _ -> },
@@ -2424,8 +2425,10 @@ class MainActivity : AppCompatActivity() {
             setPadding(dp(2), dp(2), dp(2), dp(6))
         }
 
-        val unlocked = isBootloaderUnlocked()
         val fastbootReady = isFastbootConnected()
+        val unlocked = fastbootReady && isBootloaderUnlocked()
+        val lockState = viewModel.fastbootDiagnostics.value?.unlocked?.trim()?.lowercase(Locale.US)
+        val lockStateVerified = fastbootReady && (lockState == "yes" || lockState == "no")
         val operationActive = viewModel.operationActive.value == true
 
         container.addView(title(getString(R.string.mi_unlock_page_title), "#E9782B"))
@@ -2448,11 +2451,24 @@ class MainActivity : AppCompatActivity() {
                     setOnClickListener { startMiLogin() }
                 })
             })
+            container.addView(title(getString(R.string.mi_unlock_bootloader_section)))
+            container.addView(card().apply {
+                addView(body(
+                    if (fastbootReady) unlockStatusSummary()
+                    else getString(R.string.mi_unlock_status_unverified),
+                    "#AEB8C5"
+                ))
+                addView(body(getString(R.string.mi_unlock_data_warning_short), "#F2B766"))
+            })
         } else {
             container.addView(card().apply {
                 addView(body(getString(R.string.mi_unlock_authorized, auth.userId), "#69C779"))
-                addView(body(getString(R.string.mi_unlock_region_zone, auth.region, auth.dataCenterZone, auth.zoneSource), "#AEB8C5"))
-                addView(android.widget.Button(this@MainActivity).apply {
+                val advanced = LinearLayout(this@MainActivity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    visibility = View.GONE
+                }
+                advanced.addView(body(getString(R.string.mi_unlock_region_zone, auth.region, auth.dataCenterZone, auth.zoneSource), "#AEB8C5"))
+                advanced.addView(android.widget.Button(this@MainActivity).apply {
                     text = getString(R.string.mi_unlock_change_zone_button)
                     isAllCaps = false
                     setTextColor("#F3F6FA".toColorInt())
@@ -2473,6 +2489,16 @@ class MainActivity : AppCompatActivity() {
                             .show()
                     }
                 })
+                addView(android.widget.Button(this@MainActivity).apply {
+                    text = getString(R.string.mi_unlock_advanced_options)
+                    isAllCaps = false
+                    setTextColor("#F3F6FA".toColorInt())
+                    setBackgroundColor("#192431".toColorInt())
+                    setOnClickListener {
+                        advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                    }
+                })
+                addView(advanced)
                 addView(android.widget.Button(this@MainActivity).apply {
                     text = getString(R.string.mi_unlock_sign_out_switch)
                     isAllCaps = false
@@ -2504,10 +2530,11 @@ class MainActivity : AppCompatActivity() {
                     addView(body(unlockStatusSummary(), if (fastbootReady) "#AEB8C5" else "#F2B766"))
                     addView(body(getString(R.string.mi_unlock_data_warning_short), "#F2B766"))
                     addView(android.widget.Button(this@MainActivity).apply {
-                        val canRunUnlock = fastbootReady && !operationActive
+                        val canRunUnlock = fastbootReady && lockStateVerified && !operationActive
                         text = when {
                             operationActive -> getString(R.string.mi_unlock_operation_running)
                             !fastbootReady -> getString(R.string.mi_unlock_connect_fastboot)
+                            !lockStateVerified -> getString(R.string.mi_unlock_status_unverified)
                             else -> getString(R.string.mi_unlock_action)
                         }
                         isAllCaps = false

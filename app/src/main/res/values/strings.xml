@@ -457,4 +457,6 @@ Unlock</string>
     <string name="flash_rev7_invalid_target">Invalid partition name. Use the exact partition identifier.</string>
     <string name="flash_rev7_slot_unknown">Cannot resolve other slot without current-slot. Select a concrete slot.</string>
     <string name="flash_rev7_no_file_error">Select an image first.</string>
+    <string name="mi_unlock_advanced_options">Additional parameters</string>
+    <string name="mi_unlock_status_unverified">Bootloader state is not verified; reconnect in Fastboot and refresh diagnostics</string>
 </resources>

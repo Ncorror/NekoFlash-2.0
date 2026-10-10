@@ -461,4 +461,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="flash_rev7_invalid_target">Неверное имя раздела. Укажите точный идентификатор.</string>
     <string name="flash_rev7_slot_unknown">Нельзя вычислить другой слот без current-slot. Выберите конкретный слот.</string>
     <string name="flash_rev7_no_file_error">Сначала выберите образ.</string>
+    <string name="mi_unlock_advanced_options">Дополнительные параметры</string>
+    <string name="mi_unlock_status_unverified">Состояние загрузчика не подтверждено; подключите Fastboot и обновите сведения</string>
 </resources>
