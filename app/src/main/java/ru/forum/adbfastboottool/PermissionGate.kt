@@ -7,10 +7,11 @@ import android.os.Environment
 import android.os.PowerManager
 
 /**
- * Единая точка проверки всех разрешений из Manifest.
+ * File/workflow permission status helper.
  *
- * Storage remains mandatory. Notifications and battery exemption are
- * recommended but must never deadlock entry into the application.
+ * Storage access is optional for entering the app and direct SAF flows.
+ * It is required only for workspace operations that directly access
+ * /sdcard/Download/NekoFlash. Notifications/battery status are recommendations.
  */
 object PermissionGate {
 
@@ -19,8 +20,6 @@ object PermissionGate {
         val notifications: Boolean,
         val batteryOptIgnored: Boolean
     ) {
-        /** Storage is the only mandatory permission for the current file workflow. */
-        val allRequiredGranted: Boolean get() = storage
     }
 
     fun status(context: Context): Status = Status(
@@ -28,8 +27,6 @@ object PermissionGate {
         notifications = hasNotifications(context),
         batteryOptIgnored = isBatteryOptIgnored(context)
     )
-
-    fun areAllRequiredGranted(context: Context): Boolean = status(context).allRequiredGranted
 
     fun hasStorage(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {

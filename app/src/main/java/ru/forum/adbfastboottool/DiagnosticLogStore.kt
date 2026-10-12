@@ -13,8 +13,7 @@ class DiagnosticLogStore(
     private val logsDir: File,
     private val stamp: String,
     private val compactSegmentBytes: Long = 2L * 1024L * 1024L,
-    private val traceSegmentBytes: Long = 8L * 1024L * 1024L,
-    private val maxSegmentsPerStream: Int = 5
+    private val traceSegmentBytes: Long = 8L * 1024L * 1024L
 ) {
     enum class Stream { COMPACT, TRACE }
 
@@ -30,7 +29,6 @@ class DiagnosticLogStore(
     init {
         require(compactSegmentBytes >= 64L * 1024L)
         require(traceSegmentBytes >= 64L * 1024L)
-        require(maxSegmentsPerStream >= 1)
         if (!logsDir.exists() && !logsDir.mkdirs()) {
             throw IllegalStateException("Cannot create logs directory: ${logsDir.absolutePath}")
         }

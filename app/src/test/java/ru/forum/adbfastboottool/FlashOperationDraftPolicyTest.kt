@@ -46,6 +46,25 @@ class FlashOperationDraftPolicyTest {
         assertEquals("CustomPartition", newDraft.items[1].partition)
     }
 
+    @Test fun draftDoesNotSilentlyTruncateMetadata() {
+        val longName = "X".repeat(420) + ".img"
+        val longUri = "file:///tmp/" + "a".repeat(5000)
+        val entry = FlashQueueDraftItem(
+            partition = "Custom.Partition:raw",
+            sourceUri = longUri,
+            displayName = longName,
+            expectedSizeBytes = 1L,
+            addedAtEpochMs = 1L
+        )
+        assertTrue(FlashOperationDraftPolicy.isPersistable(entry))
+        val restored = FlashOperationDraftCodec.decode(
+            FlashOperationDraftCodec.encode(FlashOperationDraft(listOf(entry)))
+        )
+        assertEquals(longName, restored.items.single().displayName)
+        assertEquals(longUri, restored.items.single().sourceUri)
+        assertEquals("Custom.Partition:raw", restored.items.single().partition)
+    }
+
     @Test fun codecDoesNotSilentlyDropEntriesAfterThirtyTwo() {
         val items = (0 until 65).map { item("partition_$it") }
         val encoded = FlashOperationDraftCodec.encode(FlashOperationDraft(items))

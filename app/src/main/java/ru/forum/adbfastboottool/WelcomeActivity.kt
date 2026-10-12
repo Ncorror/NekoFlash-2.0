@@ -1,18 +1,13 @@
 package ru.forum.adbfastboottool
 
-import android.content.ComponentName
-import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.widget.Button
-import android.widget.CheckBox
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -28,12 +23,8 @@ import kotlinx.coroutines.launch
  */
 class WelcomeActivity : AppCompatActivity() {
 
-    private lateinit var checkbox: CheckBox
     private lateinit var btnPrimaryAction: Button
     private lateinit var tvStorageChip: TextView
-    private lateinit var tvNotificationsChip: TextView
-    private lateinit var tvBatteryChip: TextView
-    private lateinit var tvWelcomeStatus: TextView
     private var pendingUsbAttach = false
 
     private val settingsLauncher =
@@ -45,7 +36,7 @@ class WelcomeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         pendingUsbAttach = intent.getBooleanExtra(EXTRA_PENDING_USB_ATTACH, false)
-        if (OnboardingGate.canEnterMain(this)) {
+        if (OnboardingGate.canEnterMain()) {
             launchMainAfterGate()
             return
         }
@@ -53,22 +44,11 @@ class WelcomeActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) { ThemePalette.extractAndCache(applicationContext) }
         setContentView(R.layout.activity_welcome)
 
-        checkbox = findViewById(R.id.checkboxAgree)
         btnPrimaryAction = findViewById(R.id.btnPrimaryAction)
         tvStorageChip = findViewById(R.id.tvStorageChip)
-        tvNotificationsChip = findViewById(R.id.tvNotificationsChip)
-        tvBatteryChip = findViewById(R.id.tvBatteryChip)
-        tvWelcomeStatus = findViewById(R.id.tvWelcomeStatus)
 
-        checkbox.isChecked = OnboardingGate.isCompleted(this)
-        checkbox.setOnCheckedChangeListener { _, _ -> refreshGateState() }
         btnPrimaryAction.setOnClickListener { handlePrimaryAction() }
         tvStorageChip.setOnClickListener { openStoragePermissionSettings() }
-        tvNotificationsChip.setOnClickListener { requestNotificationPermissionOrSettings() }
-        tvBatteryChip.setOnClickListener { openBatteryOptimizationSettings() }
-        findViewById<android.view.View>(R.id.riskRow).setOnClickListener {
-            if (checkbox.isEnabled) checkbox.isChecked = !checkbox.isChecked
-        }
 
         refreshGateState()
     }
@@ -81,13 +61,13 @@ class WelcomeActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (::checkbox.isInitialized) refreshGateState()
+        if (::tvStorageChip.isInitialized) refreshGateState()
     }
 
     private fun handlePrimaryAction() {
         // Entry is available without a mandatory risk checkbox or storage grant.
         // File-dependent workflows request their actual permission when needed.
-        OnboardingGate.complete(this)
+        OnboardingGate.complete()
         launchMainAfterGate()
     }
 
@@ -112,69 +92,9 @@ class WelcomeActivity : AppCompatActivity() {
         )
         tvStorageChip.setTextColor(getColor(R.color.text_primary))
         tvStorageChip.alpha = 1f
-        tvWelcomeStatus.visibility = android.view.View.GONE
         btnPrimaryAction.text = getString(R.string.onboarding_enter_button)
         btnPrimaryAction.isEnabled = true
         btnPrimaryAction.alpha = 1f
-    }
-
-    private fun chip(view: TextView, label: String, granted: Boolean, required: Boolean) {
-        val iconRes = when {
-            granted -> R.drawable.ic_status_check_green
-            required -> R.drawable.ic_status_warning_amber
-            else -> R.drawable.ic_status_optional_gray
-        }
-        view.text = label
-        view.alpha = if (granted) 1.0f else 0.88f
-        view.setCompoundDrawablesRelativeWithIntrinsicBounds(iconRes, 0, 0, 0)
-        view.setTextColor(
-            getColor(
-                when {
-                    granted -> R.color.text_primary
-                    required -> R.color.log_warning
-                    else -> R.color.text_secondary
-                }
-            )
-        )
-    }
-
-    /** Only storage blocks entry. Notifications and battery are recommendations. */
-    private fun requestNextRequiredPermission() {
-        if (!PermissionGate.hasStorage(this)) {
-            openStoragePermissionSettings()
-            return
-        }
-        refreshGateState()
-    }
-
-    private fun requestNotificationPermissionOrSettings() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU || PermissionGate.hasNotifications(this)) {
-            openNotificationSettings()
-            return
-        }
-
-        val prefs = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val requestCount = prefs.getInt(PREF_NOTIFICATION_REQUEST_COUNT, 0)
-        val permanentlyDenied = requestCount >= 2 &&
-            !shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
-        if (permanentlyDenied) {
-            openNotificationSettings()
-            Toast.makeText(this, getString(R.string.onboarding_notifications_open_settings), Toast.LENGTH_LONG).show()
-            return
-        }
-
-        prefs.edit { putInt(PREF_NOTIFICATION_REQUEST_COUNT, requestCount + 1) }
-        requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATIONS)
-    }
-
-
-    private fun openNotificationSettings() {
-        val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
-            putExtra(Settings.EXTRA_APP_PACKAGE, packageName)
-        }
-        if (runCatching { settingsLauncher.launch(intent) }.isFailure) {
-            openApplicationDetails(getString(R.string.perm_open_settings_manually))
-        }
     }
 
     private fun openStoragePermissionSettings() {
@@ -205,52 +125,6 @@ class WelcomeActivity : AppCompatActivity() {
         }
     }
 
-    @android.annotation.SuppressLint("BatteryLife")
-    private fun openBatteryOptimizationSettings() {
-        val appLabel = applicationInfo.loadLabel(packageManager).toString()
-        val candidates = buildList {
-            add(Intent().apply {
-                component = ComponentName(
-                    "com.miui.powerkeeper",
-                    "com.miui.powerkeeper.ui.HiddenAppsConfigActivity"
-                )
-                putExtra("package_name", packageName)
-                putExtra("package_label", appLabel)
-            })
-            add(Intent("miui.intent.action.POWER_HIDE_MODE_APP_LIST").apply {
-                putExtra("package_name", packageName)
-                putExtra("package_label", appLabel)
-            })
-            add(Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
-                data = "package:$packageName".toUri()
-            })
-            add(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-            add(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                data = "package:$packageName".toUri()
-            })
-        }
-
-        var launched = false
-        for (candidate in candidates) {
-            val resolvable = runCatching {
-                candidate.resolveActivity(packageManager) != null
-            }.getOrDefault(false)
-            if (!resolvable) continue
-
-            if (runCatching { settingsLauncher.launch(candidate) }.isSuccess) {
-                launched = true
-                break
-            }
-        }
-
-        Toast.makeText(
-            this,
-            if (launched) getString(R.string.onboarding_miui_battery_fallback_toast)
-            else getString(R.string.perm_open_settings_manually),
-            Toast.LENGTH_LONG
-        ).show()
-    }
-
     private fun openApplicationDetails(message: String) {
         try {
             settingsLauncher.launch(
@@ -271,30 +145,12 @@ class WelcomeActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        refreshGateState()
-
-        if (requestCode == REQ_NOTIFICATIONS &&
-            grantResults.firstOrNull() != PackageManager.PERMISSION_GRANTED &&
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-        ) {
-            val requestCount = getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-                .getInt(PREF_NOTIFICATION_REQUEST_COUNT, 0)
-            if (requestCount >= 2 &&
-                !shouldShowRequestPermissionRationale(android.Manifest.permission.POST_NOTIFICATIONS)
-            ) {
-                openNotificationSettings()
-                Toast.makeText(this, getString(R.string.onboarding_notifications_open_settings), Toast.LENGTH_LONG).show()
-            }
-        }
+        if (requestCode == REQ_STORAGE) refreshGateState()
     }
 
     companion object {
         const val EXTRA_PENDING_USB_ATTACH = "nekoflash_pending_usb_attach"
         const val EXTRA_STARTUP_SCAN_AFTER_WELCOME = "nekoflash_startup_scan_after_welcome"
-
-        private const val PREFS_NAME = "nekoflash_onboarding"
-        private const val PREF_NOTIFICATION_REQUEST_COUNT = "notification_request_count"
         private const val REQ_STORAGE = 200
-        private const val REQ_NOTIFICATIONS = 201
     }
 }

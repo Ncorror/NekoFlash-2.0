@@ -130,17 +130,28 @@ object NativeUsbfsBackend {
     fun transferBulkOutUrb(
         connection: UsbDeviceConnection,
         outEndpoint: UsbEndpoint,
-        payloadFile: File,
+        payloadFile: File? = null,
         blockBytes: Int,
         pipelineDepth: Int,
         stallTimeoutMs: Int,
         hardTimeoutMs: Int,
-        onProgress: ((ProgressSnapshot) -> Unit)? = null
+        onProgress: ((ProgressSnapshot) -> Unit)? = null,
+        payloadFd: Int = -1,
+        payloadSizeBytes: Long = -1L
     ): TransferResult {
         val preflight = preflightError(connection, outEndpoint)
         if (preflight != null) return failedPreflight(preflight)
-        if (!payloadFile.exists() || !payloadFile.isFile || !payloadFile.canRead()) {
-            return failedPreflight("Payload file is not readable: ${payloadFile.absolutePath}")
+        if (payloadFd < 0 &&
+            (payloadFile == null || !payloadFile.exists() || !payloadFile.isFile || !payloadFile.canRead())
+        ) {
+            return failedPreflight("Payload file is not readable")
+        }
+        if (payloadFd >= 0 && payloadFile != null) {
+            return failedPreflight("Ambiguous Native USBFS source: choose fd or file")
+        }
+        val payloadLength = if (payloadFd >= 0) payloadSizeBytes else payloadFile?.length() ?: -1L
+        if (payloadLength <= 0L) {
+            return failedPreflight("Invalid or empty Native USBFS source")
         }
         if (stallTimeoutMs <= 0 || hardTimeoutMs <= 0 || hardTimeoutMs < stallTimeoutMs) {
             return failedPreflight(
@@ -171,7 +182,7 @@ object NativeUsbfsBackend {
                                     ProgressSnapshot(
                                         confirmedBytes = state.confirmedBytes,
                                         submittedBytes = state.submittedBytes,
-                                        totalBytes = state.totalBytes.takeIf { it > 0L } ?: payloadFile.length(),
+                                        totalBytes = state.totalBytes.takeIf { it > 0L } ?: payloadLength,
                                         elapsedMs = elapsedMs,
                                         stage = state.stage
                                     )
@@ -201,8 +212,9 @@ object NativeUsbfsBackend {
             nativeBulkOutUrb(
                 connection.fileDescriptor,
                 outEndpoint.address,
-                payloadFile.absolutePath,
-                payloadFile.length(),
+                payloadFile?.absolutePath,
+                payloadFd,
+                payloadLength,
                 blockBytes,
                 pipelineDepth,
                 stallTimeoutMs,
@@ -248,7 +260,7 @@ object NativeUsbfsBackend {
                         ProgressSnapshot(
                             confirmedBytes = confirmed,
                             submittedBytes = submitted,
-                            totalBytes = payloadFile.length(),
+                            totalBytes = payloadLength,
                             elapsedMs = elapsedMs,
                             stage = stage
                         )
@@ -354,7 +366,8 @@ object NativeUsbfsBackend {
     private external fun nativeBulkOutUrb(
         fd: Int,
         endpointAddress: Int,
-        payloadPath: String,
+        payloadPath: String?,
+        payloadFd: Int,
         totalBytes: Long,
         blockBytes: Int,
         pipelineDepth: Int,

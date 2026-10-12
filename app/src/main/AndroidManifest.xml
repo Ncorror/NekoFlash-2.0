@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
-    <!-- Required by the explicit all-files workspace gate; NekoFlash is distributed outside Google Play. -->
+    <!-- Used only by legacy direct workspace operations in /sdcard/Download/NekoFlash. Direct SAF flows do not require it. -->
     <uses-permission
         android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
         tools:ignore="ScopedStorage" />

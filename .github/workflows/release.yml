@@ -173,6 +173,22 @@ jobs:
           test -x gradlew
           ls -l gradlew
 
+      - name: REV16 structural, source-guard and bilingual checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tests/check_rev16.py
+          python3 tests/check_i18n.py
+
+      - name: Kotlin JVM regression tests
+        timeout-minutes: 15
+        shell: bash
+        run: |
+          ./gradlew :app:testDebugUnitTest \
+            --no-daemon \
+            --stacktrace \
+            --console=plain
+
       - name: Android lint
         timeout-minutes: 15
         shell: bash

@@ -563,7 +563,7 @@
                 android:orientation="horizontal"
                 android:visibility="visible">
 
-                <EditText
+                <ru.forum.adbfastboottool.PtyInputEditText
                     android:id="@+id/etCommand"
                     android:layout_width="0dp"
                     android:layout_height="38dp"

@@ -24,15 +24,20 @@ assert grant.attrib[a+'layout_width'] == 'match_parent'
 assert grant.attrib[a+'clickable'] == 'true'
 assert grant.attrib[a+'singleLine'] == 'true'
 assert grant.attrib[a+'text'] == '@string/onboarding_storage_grant'
-for key in ('tvNotificationsChip','tvBatteryChip','riskRow','tvWelcomeStatus'):
-    assert by_id(wel,key).attrib[a+'visibility'] == 'gone', key
+legacy_ids = {'tvNotificationsChip','tvBatteryChip','riskRow','tvWelcomeStatus','checkboxAgree'}
+all_welcome_ids = {x.attrib.get(a+'id') for x in wel.iter()}
+for key in legacy_ids:
+    assert '@+id/'+key not in all_welcome_ids, 'Dead Welcome control returned: '+key
 
 welcome_code = (root/'app/src/main/java/ru/forum/adbfastboottool/WelcomeActivity.kt').read_text()
 assert 'tvStorageChip.setOnClickListener { openStoragePermissionSettings() }' in welcome_code
 assert 'Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION' in welcome_code
 assert 'PermissionGate.hasStorage(this)' in welcome_code
-assert 'if (::checkbox.isInitialized) refreshGateState()' in welcome_code
+assert 'if (::tvStorageChip.isInitialized) refreshGateState()' in welcome_code
 assert 'R.string.onboarding_storage_granted' in welcome_code
+assert 'checkboxAgree' not in welcome_code
+assert 'requestNotificationPermissionOrSettings' not in welcome_code
+assert 'openBatteryOptimizationSettings' not in welcome_code
 
 terminal = by_id(main,'btnTerminalOpen')
 assert terminal.tag.endswith('TextView'), 'MaterialButton min insets wrapped the terminal icon'
