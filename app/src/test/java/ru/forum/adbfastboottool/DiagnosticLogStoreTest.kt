@@ -13,8 +13,7 @@ class DiagnosticLogStoreTest {
                 logsDir = folder,
                 stamp = "rev8-test",
                 compactSegmentBytes = 64L * 1024L,
-                traceSegmentBytes = 64L * 1024L,
-                maxSegmentsPerStream = 2
+                traceSegmentBytes = 64L * 1024L
             )
             repeat(9) { index ->
                 store.appendCompact("event$index:" + "x".repeat(70_000))

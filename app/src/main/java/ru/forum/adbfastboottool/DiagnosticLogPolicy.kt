@@ -39,7 +39,7 @@ object DiagnosticLogPolicy {
                 lower.startsWith("-> flash") || lower.startsWith("<- okay") -> Category.FASTBOOT
             lower.contains("adb") || lower.contains("sideload") || lower.contains("shell_v2") -> Category.ADB
             lower.contains("usb") || lower.contains("otg") || lower.contains("endpoint") -> Category.USB
-            lower.contains("operation") || lower.contains("operation") || lower.contains("wake lock") -> Category.OPERATION
+            lower.contains("operation") || lower.contains("wake lock") -> Category.OPERATION
             lower.contains("file") || lower.contains("sha-256") || lower.contains("checksum") ||
                 lower.contains("folder") || lower.contains("report") || lower.contains("zip") -> Category.FILE
             text.startsWith("===") || text.startsWith("[") -> Category.SYSTEM

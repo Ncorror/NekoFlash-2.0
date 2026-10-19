@@ -119,60 +119,6 @@
             android:text="@string/onboarding_storage_grant"
             android:textColor="@color/text_primary"
             android:textSize="14sp" />
-        <!-- Kept as hidden IDs for unchanged optional system-permission flows. -->
-        <TextView android:id="@+id/tvNotificationsChip"
-            android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-        <TextView android:id="@+id/tvBatteryChip"
-            android:layout_width="0dp" android:layout_height="0dp" android:visibility="gone" />
-
-        <LinearLayout
-            android:id="@+id/riskRow"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/welcome_risk_row_height"
-            android:layout_marginTop="6dp"
-            android:background="@drawable/bg_welcome_status_row"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center_vertical"
-            android:orientation="horizontal"
-            android:paddingStart="9dp"
-            android:paddingEnd="9dp">
-
-            <CheckBox
-                android:id="@+id/checkboxAgree"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:buttonTint="@color/accent"
-                android:enabled="false"
-                android:gravity="center" />
-
-            <TextView
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:fontFamily="sans-serif-medium"
-                android:maxLines="1"
-                android:text="@string/onboarding_agree_text_short"
-                android:textColor="@color/text_primary"
-                android:textSize="11.5sp" />
-        </LinearLayout>
-
-        <TextView
-            android:id="@+id/tvWelcomeStatus"
-            android:visibility="gone"
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/welcome_status_height"
-            android:layout_marginTop="4dp"
-            app:drawableStartCompat="@drawable/ic_status_optional_gray"
-            android:drawablePadding="7dp"
-            android:fontFamily="sans-serif-medium"
-            android:gravity="center_vertical"
-            android:maxLines="1"
-            android:text="@string/onboarding_need_storage_short"
-            android:textColor="@color/text_secondary"
-            android:textSize="11sp" />
-
         <Button
             android:id="@+id/btnPrimaryAction"
             android:layout_width="match_parent"

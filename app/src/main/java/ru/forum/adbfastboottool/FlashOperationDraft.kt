@@ -21,9 +21,7 @@ data class FlashOperationDraft(
 }
 
 object FlashOperationDraftPolicy {
-    private const val MAX_URI_LENGTH = 4096
-    private const val MAX_DISPLAY_NAME_LENGTH = 256
-    private val PARTITION_PATTERN = Regex("^[A-Za-z0-9._-]{1,64}$")
+    private val PARTITION_PATTERN = Regex("^[A-Za-z0-9._:-]+$")
 
     fun createItem(
         partition: String,
@@ -40,7 +38,7 @@ object FlashOperationDraftPolicy {
         return FlashQueueDraftItem(
             partition = normalizedPartition,
             sourceUri = canonical.toURI().toASCIIString(),
-            displayName = canonical.name.take(MAX_DISPLAY_NAME_LENGTH),
+            displayName = canonical.name,
             expectedSizeBytes = canonical.length(),
             addedAtEpochMs = addedAtEpochMs
         )
@@ -85,8 +83,8 @@ object FlashOperationDraftPolicy {
 
     fun isPersistable(item: FlashQueueDraftItem): Boolean =
         normalizePartition(item.partition) == item.partition &&
-            item.sourceUri.isNotBlank() && item.sourceUri.length <= MAX_URI_LENGTH &&
-            item.displayName.isNotBlank() && item.displayName.length <= MAX_DISPLAY_NAME_LENGTH &&
+            item.sourceUri.isNotBlank() &&
+            item.displayName.isNotBlank() &&
             item.expectedSizeBytes > 0L &&
             item.addedAtEpochMs >= 0L
 
