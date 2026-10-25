@@ -21,6 +21,23 @@ android {
 
     // AGP 8.x по умолчанию НЕ генерирует BuildConfig — включаем явно,
     // т.к. код использует BuildConfig.VERSION_NAME / VERSION_CODE / DEBUG.
+    testOptions {
+        unitTests.includeAndroidResources = true
+        unitTests.all {
+            jvmArgs += [
+                '--add-opens=java.base/java.lang=ALL-UNNAMED',
+                '--add-opens=java.base/java.util=ALL-UNNAMED',
+                '--add-opens=java.base/java.io=ALL-UNNAMED',
+                '--add-opens=java.base/java.net=ALL-UNNAMED',
+                '--add-opens=java.base/java.security=ALL-UNNAMED',
+                '--add-opens=java.base/java.text=ALL-UNNAMED',
+                '--add-opens=java.base/jdk.internal.access=ALL-UNNAMED',
+                '--add-opens=java.desktop/java.awt.font=ALL-UNNAMED',
+                '--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED'
+            ]
+        }
+    }
+
     buildFeatures {
         buildConfig = true
     }
@@ -101,6 +118,7 @@ kotlin {
 
 dependencies {
     testImplementation('junit:junit:4.13.2')
+    testImplementation('org.robolectric:robolectric:4.17')
     implementation('androidx.core:core-ktx:1.17.0')
     implementation('androidx.appcompat:appcompat:1.7.1')
     implementation('androidx.activity:activity-ktx:1.13.0')

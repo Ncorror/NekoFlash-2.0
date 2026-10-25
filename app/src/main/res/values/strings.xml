@@ -520,4 +520,16 @@ Unlock</string>
     <string name="rev19_fastboot_serial_mismatch">Fastboot -s %1$s: selected device serial is %2$s. Select the matching device; the command was not sent.</string>
     <string name="rev19_sideload_identity_unconfirmed">Sideload result is unconfirmed: the device serial number does not match or is unavailable.</string>
     <string name="rev19_sideload_attempt_unconfirmed">Transfer completed; no verifiable result for this attempt. Check the Recovery screen. For automatic verification, connect to Recovery before entering Sideload.</string>
+    <string name="rev20_service_preparing">Preparing USB operation</string>
+    <string name="rev20_foreground_failed">Could not start foreground execution: %1$s. The operation was not sent.</string>
+    <string name="rev20_service_busy">The execution service is still finishing another operation.</string>
+    <string name="rev20_service_start_timeout">The execution service did not confirm startup. The operation was not sent.</string>
+    <string name="rev20_operation_interrupted">Interrupted — check device</string>
+    <string name="rev20_notification_open">Open</string>
+    <string name="rev20_interrupted_detail">The previous execution was interrupted. No command was repeated. Check the device before continuing. Last recorded state: %1$s</string>
+    <string name="rev20_state_unreadable">Could not read the previous operation state. Its result is unknown; check the device.</string>
+    <string name="rev20_draft_save_failed">Could not save the flash queue: %1$s</string>
+    <string name="rev20_state_save_failed">Could not save operation state: %1$s</string>
+    <string name="rev20_service_lost">The execution service stopped unexpectedly. USB cleanup was requested; check the device result.</string>
+    <string name="rev20_cancelling_cleanup">Cancellation requested. Waiting for USB completion and cleanup.</string>
 </resources>

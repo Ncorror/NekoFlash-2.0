@@ -524,4 +524,16 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev19_fastboot_serial_mismatch">Fastboot -s %1$s: серийный номер выбранного устройства — %2$s. Выбери нужное устройство; команда не отправлена.</string>
     <string name="rev19_sideload_identity_unconfirmed">Результат Sideload не подтверждён: серийный номер устройства не совпадает или недоступен.</string>
     <string name="rev19_sideload_attempt_unconfirmed">Передача завершена; результат этой попытки не подтверждён. Проверь экран Recovery. Для автоматической проверки сначала подключись к Recovery, затем включи Sideload.</string>
+    <string name="rev20_service_preparing">Подготовка USB-операции</string>
+    <string name="rev20_foreground_failed">Не удалось запустить фоновое выполнение: %1$s. Операция не отправлена.</string>
+    <string name="rev20_service_busy">Сервис ещё завершает предыдущую операцию.</string>
+    <string name="rev20_service_start_timeout">Сервис не подтвердил запуск. Операция не отправлена.</string>
+    <string name="rev20_operation_interrupted">Прервано — проверь устройство</string>
+    <string name="rev20_notification_open">Открыть</string>
+    <string name="rev20_interrupted_detail">Предыдущее выполнение было прервано. Команды не повторялись. Проверь устройство перед продолжением. Последнее сохранённое состояние: %1$s</string>
+    <string name="rev20_state_unreadable">Не удалось прочитать состояние предыдущей операции. Её результат неизвестен — проверь устройство.</string>
+    <string name="rev20_draft_save_failed">Не удалось сохранить очередь прошивки: %1$s</string>
+    <string name="rev20_state_save_failed">Не удалось сохранить состояние операции: %1$s</string>
+    <string name="rev20_service_lost">Сервис выполнения неожиданно остановлен. Запрошено завершение USB-операции; проверь результат на устройстве.</string>
+    <string name="rev20_cancelling_cleanup">Отмена запрошена. Ожидаем завершения USB-запросов и освобождения ресурсов.</string>
 </resources>
