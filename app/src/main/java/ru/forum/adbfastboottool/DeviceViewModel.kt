@@ -83,6 +83,15 @@ class DeviceViewModel(
     private val _operationActive   = MutableLiveData(false)
     val operationActive: LiveData<Boolean> = _operationActive
 
+    /** Share the launch lock so workspace cleanup cannot race a new USB job. */
+    fun runWorkspaceMaintenanceIfIdle(action: () -> Unit): Boolean = synchronized(operationLaunchLock) {
+        if (operationJob?.isCompleted == false || connectionJob?.isCompleted == false ||
+            NativeUsbfsBackend.hasActiveTransfer || NativeUsbfsBackend.backendState().nativeTransferActive
+        ) return@synchronized false
+        action()
+        true
+    }
+
     private val _operationSteps = MutableLiveData<List<OperationStep>>(emptyList())
     val operationSteps: LiveData<List<OperationStep>> = _operationSteps
 
@@ -128,7 +137,7 @@ class DeviceViewModel(
     val flashOperationDraft: LiveData<FlashOperationDraft> = _flashOperationDraft
 
     /** Transient execution object. It is never placed in SavedStateHandle. */
-    data class FlashQueueItem(val partition: String, val file: File)
+    data class FlashQueueItem(val partition: String, val file: File, val expectedSizeBytes: Long = file.length())
 
     private data class PendingUnlockVerification(
         val product: String,
@@ -1314,10 +1323,10 @@ class DeviceViewModel(
         for (item in draft.items) {
             val file = FlashOperationDraftPolicy.resolve(item)
             if (file == null) {
-                log("❌ ${item.partition} ← ${item.displayName}: file is unavailable")
+                log("❌ " + text(R.string.rev18_queue_source_changed, item.partition, item.displayName))
                 return
             }
-            executionItems += FlashQueueItem(item.partition, file)
+            executionItems += FlashQueueItem(item.partition, file, item.expectedSizeBytes)
         }
         runFlashQueue(executionItems)
     }
@@ -1354,6 +1363,11 @@ class DeviceViewModel(
             }
             ordered.forEachIndexed { index, item ->
                 val stepNumber = index + 1
+                if (!item.file.isFile || !item.file.canRead() || item.file.length() != item.expectedSizeBytes) {
+                    val reason = text(R.string.rev18_queue_source_changed, item.partition, item.file.name)
+                    markOperationStep(stepNumber, OperationStepStatus.FAILED, reason)
+                    failOperation(reason)
+                }
                 markOperationStep(stepNumber, OperationStepStatus.RUNNING, "fastboot flash ${item.partition}")
                 log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.file.name} ===")
                 val result = proto.flashPartitionDetailed(item.partition, item.file)

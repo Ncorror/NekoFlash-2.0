@@ -56,15 +56,15 @@ class DiagnosticLogStore(
     @Synchronized
     fun writeSessionSummary(json: String): File {
         val file = File(logsDir, "session-summary-$stamp.json")
-        val temp = File(logsDir, ".${file.name}.tmp")
-        temp.writeText(json, Charsets.UTF_8)
-        if (file.exists() && !file.delete()) {
+        val temp = FilePublication.temporarySibling(file)
+        try {
+            temp.outputStream().use { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+                out.fd.sync()
+            }
+            FilePublication.replace(temp, file)
+        } finally {
             temp.delete()
-            throw IllegalStateException("Cannot replace ${file.absolutePath}")
-        }
-        if (!temp.renameTo(file)) {
-            temp.delete()
-            throw IllegalStateException("Cannot publish ${file.absolutePath}")
         }
         return file
     }

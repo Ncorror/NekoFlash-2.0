@@ -73,4 +73,14 @@ class FlashOperationDraftPolicyTest {
         assertEquals(items.map { it.partition }, restored.items.map { it.partition })
         assertTrue(restored.items.all { it.displayName.endsWith(".img") })
     }
+    @Test fun changedSourceSizeRequiresReselection() {
+        val file = java.nio.file.Files.createTempFile("queue", ".img").toFile()
+        try {
+            file.writeText("original")
+            val entry = item("boot").copy(sourceUri = file.toURI().toString(), expectedSizeBytes = file.length())
+            assertEquals(file.canonicalFile, FlashOperationDraftPolicy.resolve(entry))
+            file.appendText("changed")
+            org.junit.Assert.assertNull(FlashOperationDraftPolicy.resolve(entry))
+        } finally { file.delete() }
+    }
 }

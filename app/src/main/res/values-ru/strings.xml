@@ -516,4 +516,9 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev15_shell_not_open">Интерактивный ADB shell не открыт.</string>
     <string name="rev15_shell_already_closed">Интерактивный ADB shell уже закрыт.</string>
     <string name="rev16_sparse_option_not_implemented">Автоматическое разделение Fastboot sparse (-S) пока не реализовано. Команда не отправлена. Используй совместимый заранее разделённый sparse-образ или набор chunk-файлов.</string>
+
+    <string name="rev18_queue_source_changed">Источник недоступен или изменился размер: %1$s ← %2$s. Выбери образ заново.</string>
+    <string name="rev18_history_previous">Предыдущая команда</string>
+    <string name="rev18_history_next">Следующая команда</string>
+    <string name="rev18_workspace_busy">Дождись завершения USB-операции перед удалением её файлов.</string>
 </resources>

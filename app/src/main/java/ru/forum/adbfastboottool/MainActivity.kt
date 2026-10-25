@@ -47,6 +47,7 @@ import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
+import androidx.core.widget.doAfterTextChanged
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
@@ -72,6 +73,8 @@ import java.util.Locale
  * ADB/Fastboot transport без тестовых и host-side authorization прослоек.
  */
 class MainActivity : AppCompatActivity() {
+
+    private var selectedFastbootSection = 0
 
     private enum class MiAuthExchangeState { IDLE, LOADING, SUCCESS, ERROR }
 
@@ -219,6 +222,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         applySavedLanguage()
         super.onCreate(savedInstanceState)
+        selectedFastbootSection = savedInstanceState?.getInt("fastboot_section", 0) ?: 0
 
         // Never trust exported Intent extras as an onboarding bypass. This
         // check also covers ACTION_USB_DEVICE_ATTACHED, activity recreation,
@@ -447,6 +451,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
+        outState.putInt("fastboot_section", selectedFastbootSection)
         outState.putString(STATE_SELECTED_WINDOW, selectedWindow)
         outState.putBoolean(STATE_HIDE_STORED_OPERATION_PROGRESS, operationStoredProgressHidden)
         outState.putString(STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT, operationHiddenProgressFingerprint)
@@ -1835,45 +1840,45 @@ class MainActivity : AppCompatActivity() {
 
     private fun importFirmwareFile(uri: Uri) {
         if (!ensureWorkspaceReady()) return
-
         val displayName = WorkspaceImportNaming.sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
-        val target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
+        var target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
         val expectedSize = queryFileSize(uri)
         viewModel.log(getString(R.string.rev11_import_started, displayName, "${workspaceDisplayPath()}/${target.name}"))
         expectedSize?.let { viewModel.log(getString(R.string.rev11_import_expected_size, it)) }
-
         lifecycleScope.launch(Dispatchers.IO) {
-            target.parentFile?.listFiles()
-                ?.filter { it.name.startsWith(".${target.name}.part-") }
-                ?.forEach { stale -> runCatching { stale.delete() } }
-            val temp = File(target.parentFile, ".${target.name}.part-${System.currentTimeMillis()}")
+            var temp: File? = null
             try {
+                val staged = FilePublication.temporarySibling(target)
+                temp = staged
                 val copied = contentResolver.openInputStream(uri)?.use { input ->
-                    temp.outputStream().buffered(1024 * 1024).use { output ->
-                        input.buffered(1024 * 1024).copyTo(output, 1024 * 1024)
+                    staged.outputStream().use { output ->
+                        val bytes = input.copyTo(output, 1024 * 1024)
+                        output.fd.sync()
+                        bytes
                     }
                 } ?: throw IllegalStateException("could not open input stream")
                 if (expectedSize != null && expectedSize >= 0L && copied != expectedSize) {
                     throw IllegalStateException("source size changed: expected $expectedSize, copied $copied")
                 }
-                if (copied <= 0L || temp.length() != copied) {
+                if (copied <= 0L || staged.length() != copied) {
                     throw IllegalStateException("imported file is empty or incomplete")
                 }
-                if (target.exists() && !target.delete()) {
-                    throw IllegalStateException("could not prepare the destination path")
-                }
-                if (!temp.renameTo(target)) {
-                    throw IllegalStateException("could not finish the import atomically")
+                while (true) {
+                    try {
+                        FilePublication.publishNew(staged, target)
+                        break
+                    } catch (_: java.nio.file.FileAlreadyExistsException) {
+                        target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
+                    }
                 }
                 viewModel.log("✅ " + getString(R.string.rev11_import_finished, "${workspaceDisplayPath()}/${target.name}", formatFileSize(target.length())))
             } catch (e: Exception) {
-                temp.delete()
-                target.delete()
                 viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_import_failed, e.message ?: e.javaClass.simpleName))
+            } finally {
+                temp?.delete()
             }
         }
     }
-
 
     private fun queryFileSize(uri: Uri): Long? = runCatching {
         contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
@@ -1966,7 +1971,7 @@ class MainActivity : AppCompatActivity() {
         }
         val files = workspacePath
             .listFiles()
-            ?.filter { it.isFile && it.canRead() && it.length() > 0L }
+            ?.filter { it.isFile && it.canRead() && it.length() > 0L && !it.name.startsWith(".nekoflash-") }
             ?.sortedByDescending { it.lastModified() }
             ?.toTypedArray()
 
@@ -2001,7 +2006,7 @@ class MainActivity : AppCompatActivity() {
             "🔄  " + getString(R.string.layout_reboot_system) to "reboot",
             "⚙\uFE0F  " + getString(R.string.layout_reboot_bootloader) to "reboot-bootloader",
             "🛠\uFE0F  " + getString(R.string.layout_reboot_recovery) to "reboot-recovery",
-            "⚡  " + getString(R.string.layout_reboot_fastbootd) to "reboot:fastboot"
+            "⚡  " + getString(R.string.layout_reboot_fastbootd) to "reboot-fastboot"
         )
         val container = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
@@ -2652,7 +2657,7 @@ class MainActivity : AppCompatActivity() {
         fun sectionTitle(text: String) = android.widget.TextView(this).apply {
             this.text = text
             setTextColor("#E9782B".toColorInt())
-            textSize = 12f
+            textSize = 13f
             typeface = android.graphics.Typeface.MONOSPACE
             setPadding(dp(6), dp(18), dp(6), dp(8))
             letterSpacing = 0.1f
@@ -2669,17 +2674,23 @@ class MainActivity : AppCompatActivity() {
         fun row(text: String, sub: String? = null, onClick: () -> Unit) = android.widget.LinearLayout(this).apply {
             orientation = android.widget.LinearLayout.VERTICAL
             isClickable = true
+            isFocusable = true
+            minimumHeight = dp(56)
+            contentDescription = listOfNotNull(text, sub).joinToString(". ")
+            val ripple = android.util.TypedValue()
+            theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+            if (ripple.resourceId != 0) setBackgroundResource(ripple.resourceId)
             setPadding(dp(20), dp(14), dp(20), dp(14))
             addView(android.widget.TextView(this@MainActivity).apply {
                 this.text = text
                 setTextColor("#F3F6FA".toColorInt())
-                textSize = 15f
+                textSize = 16f
                 typeface = android.graphics.Typeface.MONOSPACE
             })
             if (sub != null) addView(android.widget.TextView(this@MainActivity).apply {
                 this.text = sub
                 setTextColor("#AEB8C5".toColorInt())
-                textSize = 12f
+                textSize = 13f
                 typeface = android.graphics.Typeface.MONOSPACE
             })
             setOnClickListener { onClick() }
@@ -2709,19 +2720,28 @@ class MainActivity : AppCompatActivity() {
     } catch (e: Exception) { "—" }
 
     private fun confirmClearWorkspace() {
+        if (!ensureWorkspaceReady()) return
         MaterialAlertDialogBuilder(this)
             .setTitle(getString(R.string.settings_clear_workspace))
             .setMessage(getString(R.string.settings_clear_workspace_confirm, workspacePath.absolutePath))
             .setNegativeButton(getString(R.string.cancel_upper), null)
             .setPositiveButton(getString(R.string.settings_clear_workspace_do)) { _, _ ->
                 var count = 0
-                try {
-                    workspacePath.listFiles()?.forEach { if (it.isFile && it.delete()) count++ }
-                } catch (error: Exception) {
-                    android.util.Log.w("NekoFlash", "Unable to enumerate or delete workspace files", error)
-                    viewModel.log("⚠️ Workspace folder was partially cleared: ${error.javaClass.simpleName}")
+                val cleared = viewModel.runWorkspaceMaintenanceIfIdle {
+                    try {
+                        workspacePath.listFiles()?.forEach {
+                            if (it.isFile && !it.name.startsWith(".nekoflash-") && it.delete()) count++
+                        }
+                    } catch (error: Exception) {
+                        android.util.Log.w("NekoFlash", "Unable to enumerate or delete workspace files", error)
+                        viewModel.log("⚠️ Workspace folder was partially cleared: ${error.javaClass.simpleName}")
+                    }
                 }
-                viewModel.log(resources.getQuantityString(R.plurals.settings_clear_workspace_done, count, count))
+                if (cleared) {
+                    viewModel.log(resources.getQuantityString(R.plurals.settings_clear_workspace_done, count, count))
+                } else {
+                    Toast.makeText(this, R.string.rev18_workspace_busy, Toast.LENGTH_LONG).show()
+                }
             }
             .show()
     }
@@ -2754,11 +2774,20 @@ class MainActivity : AppCompatActivity() {
             findViewById<View>(R.id.btnFastbootSectionMass),
             findViewById<View>(R.id.btnFastbootSectionTools)
         )
-        controls.forEachIndexed { index, button ->
-            button.setOnClickListener {
-                pages.forEachIndexed { n, page -> page.visibility = if (n == index) View.VISIBLE else View.GONE }
+        fun selectSection(index: Int) {
+            selectedFastbootSection = index.coerceIn(pages.indices)
+            pages.forEachIndexed { n, page -> page.visibility = if (n == selectedFastbootSection) View.VISIBLE else View.GONE }
+            controls.forEachIndexed { n, view ->
+                val button = view as MaterialButton
+                val selected = n == selectedFastbootSection
+                button.isSelected = selected
+                button.setTextColor(getColor(if (selected) R.color.accent else R.color.text_secondary))
+                button.strokeWidth = dp(1)
+                button.strokeColor = ColorStateList.valueOf(getColor(if (selected) R.color.accent else R.color.stroke))
             }
         }
+        controls.forEachIndexed { index, button -> button.setOnClickListener { selectSection(index) } }
+        selectSection(selectedFastbootSection)
 
         val namedPartitions = listOf(
             "boot", "init_boot", "recovery", "vendor_boot", "dtbo",
@@ -2766,7 +2795,7 @@ class MainActivity : AppCompatActivity() {
         )
         val labels = namedPartitions + getString(R.string.flash_rev7_partition_manual)
 
-        fun partitionSelector(spinnerId: Int, manualId: Int): () -> String? {
+        fun partitionSelector(spinnerId: Int, manualId: Int, onChanged: () -> Unit = {}): () -> String? {
             val spinner = findViewById<Spinner>(spinnerId)
             val manual = findViewById<EditText>(manualId)
             spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
@@ -2774,8 +2803,10 @@ class MainActivity : AppCompatActivity() {
                 override fun onNothingSelected(parent: AdapterView<*>?) = Unit
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                     manual.visibility = if (position == namedPartitions.size) View.VISIBLE else View.GONE
+                    onChanged()
                 }
             }
+            manual.doAfterTextChanged { onChanged() }
             return {
                 val chosen = if (spinner.selectedItemPosition == namedPartitions.size) {
                     manual.text.toString().trim()
@@ -2789,7 +2820,8 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition)
+        var onQuickPartitionChanged: () -> Unit = {}
+        val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition) { onQuickPartitionChanged() }
         val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition)
         val slotSpinner = findViewById<Spinner>(R.id.spinQuickSlot)
         val slotNames = listOf(
@@ -2802,7 +2834,14 @@ class MainActivity : AppCompatActivity() {
         slotSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, slotNames)
         val targetLabel = findViewById<TextView>(R.id.tvQuickTarget)
         fun updateTargetLabel() {
-            val partition = getQuickPartition() ?: return
+            val selected = findViewById<Spinner>(R.id.spinQuickPartition).selectedItemPosition
+            val partition = if (selected == namedPartitions.size) {
+                findViewById<EditText>(R.id.edQuickManualPartition).text.toString().trim()
+            } else namedPartitions.getOrNull(selected).orEmpty()
+            if (!PARTITION_NAME_PATTERN.matches(partition)) {
+                targetLabel.setText(R.string.flash_rev7_target_unselected)
+                return
+            }
             val slot = if (quickFlashPartitionAlreadySuffixed(partition)) {
                 getString(R.string.flash_rev7_slot_current)
             } else {
@@ -2810,6 +2849,8 @@ class MainActivity : AppCompatActivity() {
             }
             targetLabel.text = getString(R.string.flash_rev7_target_display, partition, slot)
         }
+        onQuickPartitionChanged = { updateTargetLabel() }
+        updateTargetLabel()
         slotSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -2867,7 +2908,7 @@ class MainActivity : AppCompatActivity() {
                 row.addView(TextView(this).apply {
                     text = getString(R.string.flash_rev7_row_title, item.partition, item.displayName)
                     setTextColor(getColor(R.color.text_primary))
-                    textSize = 12f
+                    textSize = 14f
                     typeface = android.graphics.Typeface.MONOSPACE
                 })
                 val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -2875,10 +2916,12 @@ class MainActivity : AppCompatActivity() {
                     actions.addView(MaterialButton(this).apply {
                         text = getString(label)
                         isAllCaps = false
-                        textSize = 10f
+                        textSize = 12f
+                        minHeight = dp(48)
+                        contentDescription = getString(label) + ": " + item.partition
                         isEnabled = enabled
                         setOnClickListener { onClick() }
-                    }, LinearLayout.LayoutParams(0, dp(42), 1f))
+                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
                 }
                 action(R.string.flash_rev7_row_up, index > 0) {
                     viewModel.moveFlashQueueDraftItem(item.partition, -1)
@@ -3710,7 +3753,7 @@ class MainActivity : AppCompatActivity() {
         }
         root.addView(title)
         val details = TextView(this).apply {
-            textSize = 12f
+            textSize = 14f
             setTextColor(getColor(R.color.text_secondary))
             setPadding(0, dp(12), 0, dp(12))
             text = buildString {

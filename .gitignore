@@ -37,3 +37,7 @@ __pycache__/
 keystore.properties
 release-signing.env
 .github-token
+
+# Local Kotlin and native compilation state
+.kotlin/
+.cxx/

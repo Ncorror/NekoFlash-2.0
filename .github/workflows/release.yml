@@ -177,7 +177,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/check_rev17.py
+          python3 tests/check_rev18.py
           python3 tests/check_i18n.py
 
       - name: Kotlin JVM regression tests

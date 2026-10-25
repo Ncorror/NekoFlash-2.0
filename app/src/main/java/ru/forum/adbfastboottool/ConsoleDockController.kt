@@ -85,6 +85,10 @@ internal class ConsoleDockController(
 
         bindWindowInsets()
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            val headerHeight = activity.findViewById<View>(R.id.usbHeader).height
+            if (headerHeight > 0 && behavior.expandedOffset != headerHeight) {
+                behavior.expandedOffset = headerHeight
+            }
             updateVisibleBodyHeight()
         }
 

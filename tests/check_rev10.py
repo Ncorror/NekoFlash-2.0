@@ -43,11 +43,12 @@ terminal = by_id(main,'btnTerminalOpen')
 assert terminal.tag.endswith('TextView'), 'MaterialButton min insets wrapped the terminal icon'
 assert terminal.attrib[a+'singleLine'] == 'true'
 assert terminal.attrib[a+'gravity'] == 'center'
-assert by_id(main,'bottomNavigation').attrib[a+'layout_height'] == '62dp'
+assert by_id(main,'bottomNavigation').attrib[a+'layout_height'] == 'wrap_content'
+assert by_id(main,'bottomNavigation').attrib[a+'minHeight'] == '62dp'
 title = [x for x in by_id(main,'consoleHeader') if x.attrib.get(a+'text') == '@string/layout_console_title']
 assert len(title) == 1 and title[0].attrib.get(a+'layout_weight') == '1'
 for key in ('btnHistoryUp','btnHistoryDown'):
-    assert by_id(main,key).attrib[a+'layout_width'] == '36dp'
+    assert by_id(main,key).attrib[a+'layout_width'] == '48dp'
 
 quick_title = by_id(quick,'tvQuickHeading')
 assert quick_title.attrib[a+'visibility'] == 'gone', 'Duplicate heading on small screens'
@@ -56,7 +57,7 @@ tab = tab_path.read_text()
 assert 'button.alpha = 1.0f' in tab
 assert 'if (selected) R.color.accent else R.color.text_secondary' in tab
 raw_tab = tab_path.read_bytes()
-assert hashlib.sha1(b'blob '+str(len(raw_tab)).encode()+b'\0'+raw_tab).hexdigest() == '361a03b255080465d65365df44509c788e7e466f'
+assert hashlib.sha1(b'blob '+str(len(raw_tab)).encode()+b'\0'+raw_tab).hexdigest() == '8fa8b34e44d21316fc39c258d2bac0c28e1bccc4'
 
 for locale in ('values','values-ru'):
     names = {item.attrib['name']:item.text for item in ET.parse(res/locale/'strings.xml').getroot().findall('string')}

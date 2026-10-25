@@ -26,17 +26,17 @@
     <LinearLayout
         android:id="@+id/usbHeader"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/usb_panel_height"
+        android:layout_height="wrap_content"
         android:background="@color/bg_header"
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingStart="10dp"
-        android:paddingEnd="10dp">
+        android:paddingEnd="10dp" android:minHeight="68dp">
 
         <LinearLayout
             android:id="@+id/usbPanel"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:background="@drawable/bg_otg_strip"
             android:contentDescription="@string/shell_usb_panel_desc"
@@ -45,7 +45,7 @@
             android:gravity="center_vertical"
             android:orientation="vertical"
             android:paddingStart="12dp"
-            android:paddingEnd="10dp">
+            android:paddingEnd="10dp" android:minHeight="68dp">
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="match_parent"
@@ -278,24 +278,24 @@
     <LinearLayout
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
-        android:layout_height="62dp"
+        android:layout_height="wrap_content"
         android:background="@color/bg_header"
-        android:orientation="horizontal">
+        android:orientation="horizontal" android:minHeight="62dp">
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/tabHome"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:minHeight="62dp"
             android:text="@string/layout_icon_home"
             android:textSize="11.5sp"
             android:lineSpacingExtra="0dp"
             android:gravity="center"
-            android:maxLines="2"
+            android:maxLines="3"
             android:paddingHorizontal="2dp"
             app:textAllCaps="false"
             android:textColor="@color/accent"
@@ -307,17 +307,17 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/tabFastboot"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:minHeight="62dp"
             android:text="@string/layout_icon_fastboot"
             android:textSize="11.5sp"
             android:lineSpacingExtra="0dp"
             android:gravity="center"
-            android:maxLines="2"
+            android:maxLines="3"
             android:paddingHorizontal="2dp"
             app:textAllCaps="false"
             android:textColor="@color/text_secondary"
@@ -329,17 +329,17 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/tabAdb"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:minHeight="62dp"
             android:text="@string/layout_icon_adb"
             android:textSize="11.5sp"
             android:lineSpacingExtra="0dp"
             android:gravity="center"
-            android:maxLines="2"
+            android:maxLines="3"
             android:paddingHorizontal="2dp"
             app:textAllCaps="false"
             android:textColor="@color/text_secondary"
@@ -351,17 +351,17 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/tabUnlock"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:minHeight="62dp"
             android:text="@string/layout_icon_unlock_tab"
             android:textSize="11.5sp"
             android:lineSpacingExtra="0dp"
             android:gravity="center"
-            android:maxLines="2"
+            android:maxLines="3"
             android:paddingHorizontal="2dp"
             app:textAllCaps="false"
             android:textColor="@color/text_secondary"
@@ -373,17 +373,17 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/tabSettings"
             android:layout_width="0dp"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:layout_weight="1"
             android:insetTop="0dp"
             android:insetBottom="0dp"
             android:minWidth="0dp"
-            android:minHeight="0dp"
+            android:minHeight="62dp"
             android:text="@string/layout_icon_settings_tab"
             android:textSize="11.5sp"
             android:lineSpacingExtra="0dp"
             android:gravity="center"
-            android:maxLines="2"
+            android:maxLines="3"
             android:paddingHorizontal="2dp"
             app:textAllCaps="false"
             android:textColor="@color/text_secondary"
@@ -428,14 +428,14 @@
         <LinearLayout
             android:id="@+id/consoleHeader"
             android:layout_width="match_parent"
-            android:layout_height="50dp"
+            android:layout_height="wrap_content"
             android:background="@drawable/bg_console_header"
             android:gravity="center_vertical"
             android:paddingStart="14dp"
             android:paddingEnd="12dp"
             android:orientation="horizontal"
             android:clickable="true"
-            android:focusable="true">
+            android:focusable="true" android:minHeight="56dp">
 
             <!-- Стрелка состояния (▼ развёрнуто / ▲ свёрнуто) -->
             <TextView
@@ -506,8 +506,8 @@
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnHistoryUp"
                 android:visibility="gone"
-                android:layout_width="36dp"
-                android:layout_height="34dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:minWidth="0dp"
@@ -519,13 +519,13 @@
                 android:textSize="16sp"
                 android:textColor="@color/text_muted"
                 app:backgroundTint="@color/bg_card"
-                app:cornerRadius="9dp" />
+                app:cornerRadius="9dp" android:contentDescription="@string/rev18_history_previous" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnHistoryDown"
                 android:visibility="gone"
-                android:layout_width="36dp"
-                android:layout_height="34dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:insetTop="0dp"
                 android:insetBottom="0dp"
                 android:minWidth="0dp"
@@ -538,7 +538,7 @@
                 android:textColor="@color/text_muted"
                 android:layout_marginStart="4dp"
                 app:backgroundTint="@color/bg_card"
-                app:cornerRadius="9dp" />
+                app:cornerRadius="9dp" android:contentDescription="@string/rev18_history_next" />
 
             <!-- Единая консоль: переключатели «Логи»/«Терминал» удалены. -->
         </LinearLayout>
@@ -555,18 +555,18 @@
             <LinearLayout
                 android:id="@+id/consoleInputBar"
                 android:layout_width="match_parent"
-                android:layout_height="48dp"
+                android:layout_height="wrap_content"
                 android:layout_alignParentBottom="true"
                 android:background="@color/bg_header"
                 android:gravity="center_vertical"
                 android:paddingHorizontal="8dp"
                 android:orientation="horizontal"
-                android:visibility="visible">
+                android:visibility="visible" android:minHeight="56dp">
 
                 <ru.forum.adbfastboottool.PtyInputEditText
                     android:id="@+id/etCommand"
                     android:layout_width="0dp"
-                    android:layout_height="38dp"
+                    android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:background="@drawable/bg_console_input"
                     android:fontFamily="monospace"
@@ -578,7 +578,7 @@
                     android:inputType="textNoSuggestions"
                     android:importantForAutofill="no"
                     android:maxLines="1"
-                    android:paddingHorizontal="10dp" />
+                    android:paddingHorizontal="10dp" android:minHeight="48dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnSend"

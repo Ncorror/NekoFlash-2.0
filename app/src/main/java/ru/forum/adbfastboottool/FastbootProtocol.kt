@@ -1135,9 +1135,10 @@ class FastbootProtocol(
             onLog("❌ ERROR: could not create folder: ${parent.absolutePath}")
             return false
         }
-        val partFile = File(outputFile.parentFile ?: File("."), outputFile.name + ".part")
-        if (partFile.exists() && !partFile.delete()) {
-            onLog("❌ ERROR: could not delete temporary file: ${partFile.absolutePath}")
+        val partFile = try {
+            FilePublication.temporarySibling(outputFile)
+        } catch (error: Exception) {
+            onLog("❌ ERROR: cannot create temporary fetch file: ${error.message}")
             return false
         }
 
@@ -1153,9 +1154,9 @@ class FastbootProtocol(
                 if (partitionSize != null && partitionSize > 0L && maxFetch != null) {
                     var offset = 0L
                     while (offset < partitionSize && !cancelled) {
-                        val chunkSize = minOf(maxFetch, partitionSize - offset)
+                        val chunkSize = minOf(maxFetch, partitionSize - offset, FastbootDownloadSizePolicy.WIRE_MAX_BYTES)
                         val command = "fetch:$normalized:$offset:$chunkSize"
-                        val fetched = fetchChunk(command, out, offset, partitionSize) ?: return false
+                        val fetched = fetchChunk(command, out, offset, partitionSize, chunkSize) ?: return false
                         if (fetched <= 0L) {
                             onLog("❌ ERROR fetch: device returned a zero-length chunk")
                             return false
@@ -1164,21 +1165,20 @@ class FastbootProtocol(
                     }
                 } else {
                     val command = "fetch:$normalized"
-                    val fetched = fetchChunk(command, out, 0L, partitionSize ?: -1L)
+                    val fetched = fetchChunk(command, out, 0L, partitionSize ?: -1L, partitionSize?.takeIf { it > 0L })
                     if (fetched == null) return false
                 }
+                out.fd.sync()
             }
             if (cancelled) {
                 onLog("⚠️ fetch cancelled by user")
                 false
             } else {
-                if (outputFile.exists() && !outputFile.delete()) {
-                    onLog("❌ ERROR: could not replace file: ${outputFile.absolutePath}")
-                    false
-                } else if (!partFile.renameTo(outputFile)) {
-                    onLog("❌ ERROR: could not rename .part to the final file")
+                if (partitionSize != null && partitionSize > 0L && partFile.length() != partitionSize) {
+                    onLog("❌ ERROR fetch: size mismatch (${partFile.length()}/$partitionSize bytes)")
                     false
                 } else {
+                    FilePublication.replace(partFile, outputFile)
                     onLog("✅ Fastboot fetch completed: ${outputFile.absolutePath} (${outputFile.length()} bytes)")
                     true
                 }
@@ -1187,6 +1187,12 @@ class FastbootProtocol(
             onLog("❌ ERROR fastboot fetch: ${e.message ?: e.javaClass.simpleName}")
             false
         } finally {
+            if (sessionState != SessionState.IDLE && sessionState != SessionState.CLOSED && sessionState != SessionState.BROKEN) {
+                markSessionBroken("Incomplete Fastboot fetch; reconnect before another command")
+            }
+            if (partFile.exists() && partFile.length() > 0L) {
+                onLog("ℹ️ Incomplete fetch retained: ${partFile.absolutePath}")
+            }
             if (partFile.exists() && partFile.length() == 0L) partFile.delete()
         }
     }
@@ -2406,7 +2412,7 @@ class FastbootProtocol(
     }
 
     private fun normalizePartitionName(partition: String): String? {
-        val normalized = partition.trim().lowercase()
+        val normalized = partition.trim()
         if (normalized.isBlank() || !normalized.matches(Regex("[A-Za-z0-9._:-]+"))) {
             onLog("❌ ERROR: invalid partition name: $partition")
             return null
@@ -2422,7 +2428,7 @@ class FastbootProtocol(
             clean.startsWith("update-super:")
     }
 
-    private fun fetchChunk(command: String, out: java.io.OutputStream, alreadyFetched: Long, totalSize: Long): Long? {
+    private fun fetchChunk(command: String, out: java.io.OutputStream, alreadyFetched: Long, totalSize: Long, expectedChunkBytes: Long?): Long? {
         if (!writeCommand(command, 5000)) {
             onLog("ERROR: Failed to send command $command")
             return null
@@ -2433,9 +2439,9 @@ class FastbootProtocol(
             "FAIL" -> { onLog("❌ ERROR fetch: ${dataPacket.payload}"); return null }
             else -> { onLog("❌ ERROR fetch: expected DATA, got ${dataPacket.raw}"); return null }
         }
-        val dataSize = parseFastbootDataSize(dataPacket.payload)
-        if (dataSize == null || dataSize < 0L) {
-            onLog("❌ ERROR fetch: invalid DATA size: ${dataPacket.payload}")
+        val dataSize = FastbootFetchPolicy.dataSize(dataPacket.payload, expectedChunkBytes)
+        if (dataSize == null) {
+            markSessionBroken("Invalid fetch DATA size '${dataPacket.payload}', expected=$expectedChunkBytes")
             return null
         }
         if (!readRawDataTo(out, dataSize, alreadyFetched, totalSize)) return null

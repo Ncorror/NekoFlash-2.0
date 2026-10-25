@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "feature/rev11-core-cleanup" ]
+    branches: [ "main", "feature/rev11-core-cleanup", "work/rev18-audit-ui-20261024" ]
   pull_request:
-    branches: [ "main", "feature/rev6-shell" ]
+    branches: [ "main", "feature/rev6-shell", "feature/rev11-core-cleanup" ]
   workflow_dispatch:
 
 permissions:
@@ -46,9 +46,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV5 / REV6 structural and source-guard tests
+      - name: REV18 structural and source-guard tests
         run: |
-          python3 tests/check_rev17.py
+          python3 tests/check_rev18.py
           python3 tests/check_i18n.py
 
       - name: Kotlin JVM queue and diagnostic regression tests
@@ -378,5 +378,7 @@ jobs:
             apk-signature.txt
             app/build/reports/lint-results-*.html
             app/build/reports/lint-results-*.xml
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 30

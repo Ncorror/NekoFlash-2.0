@@ -78,7 +78,7 @@ object FlashOperationDraftPolicy {
     fun resolve(item: FlashQueueDraftItem): File? = runCatching {
         val uri = URI(item.sourceUri)
         if (!uri.scheme.equals("file", ignoreCase = true) || uri.authority != null) return null
-        File(uri).canonicalFile.takeIf { it.exists() && it.isFile && it.canRead() && it.length() > 0L }
+        File(uri).canonicalFile.takeIf { it.exists() && it.isFile && it.canRead() && item.expectedSizeBytes > 0L && it.length() == item.expectedSizeBytes }
     }.getOrNull()
 
     fun isPersistable(item: FlashQueueDraftItem): Boolean =
