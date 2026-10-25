@@ -6,11 +6,14 @@ import java.nio.file.StandardCopyOption
 
 /** Publish a completed sibling file without deleting the previous result first. */
 internal object FilePublication {
+    private fun parentOf(target: File): File =
+        requireNotNull(target.absoluteFile.parentFile) { "Destination must have a parent directory" }
+
     fun temporarySibling(target: File): File =
-        Files.createTempFile(target.absoluteFile.parentFile.toPath(), ".nekoflash-", ".part").toFile()
+        Files.createTempFile(parentOf(target).toPath(), ".nekoflash-", ".part").toFile()
 
     fun replace(completed: File, target: File) {
-        require(completed.canonicalFile.parentFile == target.absoluteFile.parentFile.canonicalFile)
+        require(completed.canonicalFile.parentFile == parentOf(target).canonicalFile)
         // Unsupported atomic replacement fails without deleting the previous good file.
         Files.move(completed.toPath(), target.toPath(),
             StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
