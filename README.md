@@ -303,6 +303,11 @@ ADB, Fastboot, flashing, sideload and diagnostics operate locally between the ho
 
 Internet/network access is used by the optional Xiaomi / Mi Unlock flow. See [PRIVACY.md](PRIVACY.md) for the data-handling details.
 
+## Developers
+
+- [Ncorror](https://github.com/Ncorror)
+- [IQ-HARRY7](https://github.com/IQ-HARRY7)
+
 ## Documentation
 
 The public documentation is intentionally small:
