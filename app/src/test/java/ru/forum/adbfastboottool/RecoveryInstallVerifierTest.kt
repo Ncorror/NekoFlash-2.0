@@ -20,7 +20,10 @@ class RecoveryInstallVerifierTest {
         assertEquals(UNKNOWN, verdict("Install from ADB complete (status: 0)."))
     }
     @Test fun aospCurrentSessionSuccess() {
-        assertEquals(SUCCESS, verdict("Starting ADB sideload\nInstalling update\nInstall from ADB complete (status: 0)."))
+        assertEquals(SUCCESS, verdict("[  100.100000] Now send the package you want to apply\n[  101.000000] Installing update\n[  130.000000] Install from ADB complete (status: 0)."))
+    }
+    @Test fun aospMenuCompletionWithoutNumericStatus() {
+        assertEquals(SUCCESS, verdict("Now send the package you want to apply\nInstall from ADB complete."))
     }
     @Test fun aospCurrentSessionFailure() {
         assertEquals(FAILED, verdict("Starting ADB sideload\nInstall from ADB complete (status: 1)."))

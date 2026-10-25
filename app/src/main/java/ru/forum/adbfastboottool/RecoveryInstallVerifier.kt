@@ -38,11 +38,14 @@ object RecoveryInstallVerifier {
 
     /** Called only for bytes appended after a verified same-boot log boundary. */
     fun evaluateCurrentAttempt(appended: String): Result {
+        // AOSP logger prefixes lines with monotonic timestamps; the byte/hash
+        // checkpoint, not these timestamps, proves freshness.
+        val log = appended.replace(Regex("""(?m)^\[\s*\d+\.\d+\]\s?"""), "")
         fun unknown() = Result(Verdict.UNKNOWN, "No single completed Sideload session for this attempt")
         val operations = Regex("""(?im)^\s*I:operation_start:\s*['"]([^'"]+)['"]\s*$""")
-            .findAll(appended).toList()
-        val sideloadStarts = Regex("""(?im)^\s*Starting (?:ADB )?sideload[^\n]*""")
-            .findAll(appended).toList()
+            .findAll(log).toList()
+        val sideloadStarts = Regex("""(?im)^\s*(?:Starting (?:ADB )?sideload|Now send the package you want to apply)[^\n]*""")
+            .findAll(log).toList()
         val start = if (operations.isNotEmpty()) {
             // Multiple operations, including a later non-Sideload install, are ambiguous.
             if (operations.size != 1 || !operations[0].groupValues[1].equals("Sideload", true) ||
@@ -52,7 +55,7 @@ object RecoveryInstallVerifier {
             if (sideloadStarts.size != 1) return unknown()
             sideloadStarts[0].range.first
         }
-        val session = appended.substring(start)
+        val session = log.substring(start)
         val packageStarts = Regex("""(?im)^\s*Installing (?:zip file|update|package)[^\n]*""")
             .findAll(session).count()
         if (packageStarts > 1) return unknown()
@@ -65,8 +68,9 @@ object RecoveryInstallVerifier {
 
         val events = mutableListOf<Event>()
 
-        Regex("(?i)Install from ADB complete \\(status:\\s*(-?\\d+)\\)").findAll(text).forEach { match ->
-            val status = match.groupValues[1].toIntOrNull() ?: return@forEach
+        Regex("""(?im)^\s*Install from ADB complete(?:\s*\(status:\s*(-?\d+)\))?\.?\s*$""")
+            .findAll(text).forEach { match ->
+            val status = if (match.groupValues[1].isEmpty()) 0 else match.groupValues[1].toIntOrNull() ?: return@forEach
             val verdict = if (status == 0) Verdict.SUCCESS else Verdict.FAILED
             events += Event(
                 index = match.range.first,
@@ -175,6 +179,7 @@ object RecoveryInstallVerifier {
     }
 
     private val sideloadSessionPatterns = listOf(
+        Regex("""(?im)^\s*Now send the package you want to apply"""),
         Regex("""(?im)^\s*Starting ADB sideload"""),
         Regex("""(?im)^\s*Starting sideload"""),
         Regex("""(?im)^\s*I:operation_start:\s*['"]Sideload['"]\s*$"""),

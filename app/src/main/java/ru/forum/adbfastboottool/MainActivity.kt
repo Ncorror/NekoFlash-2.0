@@ -1107,6 +1107,11 @@ class MainActivity : AppCompatActivity() {
 
         while (i < tokens.size) {
             val token = tokens[i]
+            if (token == "--") {
+                commandTokens += tokens.drop(i + 1)
+                wireTokens += lexicalTokens.drop(i + 1).map { it.literal }
+                break
+            }
             val lower = token.lowercase(Locale.US)
             when {
                 lower == "--slot" -> {
