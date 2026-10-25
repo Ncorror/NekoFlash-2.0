@@ -65,6 +65,7 @@ class TabController(private val activity: Activity) {
         tabButtons.forEach { (key, buttonId) ->
             val button = activity.findViewById<MaterialButton>(buttonId)
             val selected = key == targetTab
+            button.isSelected = selected
             button.alpha = 1.0f
             button.setTextColor(
                 ContextCompat.getColor(

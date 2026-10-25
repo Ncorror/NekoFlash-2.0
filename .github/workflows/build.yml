@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "feature/rev11-core-cleanup" ]
+    branches: [ "main", "feature/rev11-core-cleanup", "work/rev18-audit-ui-20261024" ]
   pull_request:
-    branches: [ "main", "feature/rev6-shell" ]
+    branches: [ "main", "feature/rev6-shell", "feature/rev11-core-cleanup" ]
   workflow_dispatch:
 
 permissions:
@@ -46,9 +46,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV5 / REV6 structural and source-guard tests
+      - name: REV18 structural and source-guard tests
         run: |
-          python3 tests/check_rev17.py
+          python3 tests/check_rev18.py
           python3 tests/check_i18n.py
 
       - name: Kotlin JVM queue and diagnostic regression tests
@@ -74,6 +74,24 @@ jobs:
             --stacktrace \
             --warning-mode all \
             --console=plain 2>&1 | tee debug_build_log.txt
+
+      - name: Summarize test and lint reports
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from collections import Counter
+          from xml.etree import ElementTree as ET
+          results = list(Path('app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'))
+          assert results, 'JUnit reports missing'
+          totals = Counter()
+          for report in results:
+              suite = ET.parse(report).getroot()
+              totals.update({key: int(suite.get(key, '0')) for key in ('tests', 'failures', 'errors', 'skipped')})
+          print('JUnit summary:', dict(totals))
+          lint = ET.parse('app/build/reports/lint-results-debug.xml').getroot()
+          print('Lint severities:', dict(Counter(issue.get('severity') for issue in lint.findall('issue'))))
+          print('Lint issue types:', dict(Counter(issue.get('id') for issue in lint.findall('issue'))))
+          PY
 
       - name: Prepare Debug artifact
         run: |
@@ -378,5 +396,7 @@ jobs:
             apk-signature.txt
             app/build/reports/lint-results-*.html
             app/build/reports/lint-results-*.xml
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 30

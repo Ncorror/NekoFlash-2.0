@@ -14,11 +14,11 @@ source = (base/'FirmwareSource.kt').read_text()
 vm = (base/'DeviceViewModel.kt').read_text()
 main = (base/'MainActivity.kt').read_text()
 
-# REV12/REV15 ADB source is pinned here. REV15 only adds a raw PTY-byte ingress;
-# Sideload transport expectations below remain unchanged.
+# REV18 reviewed receive-file, listing and unique-block progress fixes.
+# Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-assert git_blob == '9f7870029686672c6d3412b0ace1385d5bf882bd', 'Unreviewed AdbProtocol change'
+assert git_blob == '3d53692ac1b37322c588980d29907af684853aa7', 'Unreviewed AdbProtocol change'
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb

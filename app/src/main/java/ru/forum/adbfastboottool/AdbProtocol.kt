@@ -490,6 +490,7 @@ class AdbProtocol(
             }
 
             val remoteId = openResp.arg0
+            val coverage = SideloadCoverage(fileSize, SIDELOAD_BLOCK_SIZE)
             var servedBytes = 0L
             var lastLoggedBucket = -1
             var result: SideloadResult? = null
@@ -626,7 +627,8 @@ class AdbProtocol(
                             result = readStreamAck()
                             if (result != null) continue@sideloadLoop
 
-                            servedBytes += payload.size.toLong()
+                            coverage.acknowledge(blockNum)
+                            servedBytes = coverage.bytes
                             val approximateProgress = ((servedBytes * 100L) / fileSize)
                                 .toInt()
                                 .coerceIn(0, 99)
@@ -704,7 +706,7 @@ class AdbProtocol(
             onLog("❌ adb push: local file is unavailable: ${localFile.absolutePath}")
             return false
         }
-        val cleanRemote = remotePath.trim()
+        val cleanRemote = remotePath
         if (!isValidRemotePath(cleanRemote)) {
             onLog("❌ adb push: invalid remote path")
             return false
@@ -761,7 +763,7 @@ class AdbProtocol(
             onLog("❌ adb push: local folder is unavailable: ${localDir.absolutePath}")
             return false
         }
-        val cleanRemote = remotePath.trim()
+        val cleanRemote = remotePath
         if (!isValidRemotePath(cleanRemote)) {
             onLog("❌ adb push: invalid remote path")
             return false
@@ -810,7 +812,7 @@ class AdbProtocol(
         if (!isConnected) return false
         cancelled = false
 
-        val cleanRemote = remotePath.trim()
+        val cleanRemote = remotePath
         if (!isValidRemotePath(cleanRemote)) {
             onLog("❌ adb pull: invalid remote path")
             return false
@@ -830,7 +832,7 @@ class AdbProtocol(
     }
 
     private fun pullFileSingle(remotePath: String, localFile: File, expectedSize: Long?): Boolean {
-        val cleanRemote = remotePath.trim()
+        val cleanRemote = remotePath
         val parent = localFile.parentFile
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
             onLog("❌ adb pull: could not create folder: ${parent.absolutePath}")
@@ -843,7 +845,13 @@ class AdbProtocol(
         }
 
         val stream = openAdbStream("sync:") ?: return false
-        val tempFile = File(localFile.absolutePath + ".part")
+        val tempFile = try {
+            FilePublication.temporarySibling(localFile)
+        } catch (error: Exception) {
+            closeAdbStream(stream)
+            onLog("❌ adb pull: cannot create temporary file: ${error.message}")
+            return false
+        }
         var receivedBytes = 0L
         try {
             val pathBytes = cleanRemote.toByteArray(Charsets.UTF_8)
@@ -874,15 +882,12 @@ class AdbProtocol(
                             }
                         }
                         "DONE" -> {
+                            if (!AdbSyncSizePolicy.matchesLegacyStat(expectedSize, receivedBytes)) {
+                                onLog("❌ adb pull: incomplete or changed file ($receivedBytes bytes, STAT=$expectedSize)")
+                                return false
+                            }
                             raf.fd.sync()
-                            if (localFile.exists() && !localFile.delete()) {
-                                onLog("❌ adb pull: could not replace file: ${localFile.absolutePath}")
-                                return false
-                            }
-                            if (!tempFile.renameTo(localFile)) {
-                                onLog("❌ adb pull: could not save file: ${localFile.absolutePath}")
-                                return false
-                            }
+                            FilePublication.replace(tempFile, localFile)
                             onLog("✅ adb pull completed: ${localFile.absolutePath} ($receivedBytes bytes)")
                             return true
                         }
@@ -930,21 +935,31 @@ class AdbProtocol(
         }
 
         onLog("-> adb pull -r $remoteDir ${localDir.absolutePath}")
-        val listCommand = "cd ${shellQuote(remoteDir)} && echo AFT_DIRS_BEGIN && find . -type d -print && echo AFT_FILES_BEGIN && find . -type f -print"
+        val listCommand = "cd ${shellQuote(remoteDir)} && printf 'AFT_DIRS_BEGIN\\0' && find . -type d -print0 && printf 'AFT_FILES_BEGIN\\0' && find . -type f -print0 && printf 'AFT_DONE\\0'"
         val listResult = runShellCommandForResult(listCommand, logOutput = false)
         if (!listResult.success) {
             onLog("❌ adb pull: could not list files in the remote directory")
             return false
         }
 
-        val sections = parseFindSections(listResult.stdout)
+        val sections = try {
+            AdbPullPathPolicy.parseListing(listResult.stdout).also { (dirs, files) ->
+                (dirs + files).forEach { AdbPullPathPolicy.destination(localDir, it) }
+            }
+        } catch (error: Exception) {
+            onLog("❌ adb pull: unsafe or incomplete directory listing: ${error.message}")
+            return false
+        }
         val dirs = sections.first
         val files = sections.second
         onLog("ℹ️ Remote directory: ${dirs.size} folders, ${files.size} files")
 
         dirs.forEach { relative ->
             if (cancelled) return false
-            val localSubDir = if (relative == ".") localDir else File(localDir, normalizeRelativeRemotePath(relative))
+            val localSubDir = try { AdbPullPathPolicy.destination(localDir, relative) } catch (error: Exception) {
+                onLog("❌ adb pull: destination changed: ${error.message}")
+                return false
+            }
             if (!localSubDir.exists() && !localSubDir.mkdirs()) {
                 onLog("❌ adb pull: could not create local folder: ${localSubDir.absolutePath}")
                 return false
@@ -954,10 +969,12 @@ class AdbProtocol(
         var pulled = 0
         files.forEach { relative ->
             if (cancelled) return false
-            val cleanRelative = normalizeRelativeRemotePath(relative)
-            if (cleanRelative.isBlank()) return@forEach
+            val cleanRelative = AdbPullPathPolicy.normalize(relative)
             val remoteFile = joinRemotePath(remoteDir.trimEnd('/'), cleanRelative)
-            val localTarget = File(localDir, cleanRelative)
+            val localTarget = try { AdbPullPathPolicy.destination(localDir, relative) } catch (error: Exception) {
+                onLog("❌ adb pull: destination changed: ${error.message}")
+                return false
+            }
             val stat = statRemotePath(remoteFile, logMissing = false)
             onLog("ℹ️ adb pull file ${pulled + 1}/${files.size}: $cleanRelative")
             if (!pullFileSingle(remoteFile, localTarget, stat?.size?.takeIf { it >= 0L })) return false
@@ -1712,13 +1729,13 @@ class AdbProtocol(
             return runShellCommandForResult(command, logOutput = logOutput, forceLegacy = true)
         }
 
-        val stdout = StringBuilder()
-        val stderr = StringBuilder()
+        val stdout = java.io.ByteArrayOutputStream()
+        val stderr = java.io.ByteArrayOutputStream()
         var exitCode: Int? = null
         try {
             // Непосредственно как в shell protocol: закрываем stdin для one-shot команд.
             if (!writeShellPacket(stream, SHELL_ID_CLOSE_STDIN, EMPTY_PAYLOAD)) {
-                return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
+                return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
             }
 
             while (!cancelled && !stream.closed) {
@@ -1726,16 +1743,14 @@ class AdbProtocol(
                 when (header.id) {
                     SHELL_ID_STDOUT -> {
                         val data = readAdbStreamExact(stream, header.length)
-                            ?: return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
-                        val text = data.toShellText()
-                        stdout.append(text)
+                            ?: return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
+                        stdout.write(data)
                         if (logOutput) logShellOutput(data, isStderr = false)
                     }
                     SHELL_ID_STDERR -> {
                         val data = readAdbStreamExact(stream, header.length)
-                            ?: return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
-                        val text = data.toShellText()
-                        stderr.append(text)
+                            ?: return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
+                        stderr.write(data)
                         if (logOutput) logShellOutput(data, isStderr = true)
                     }
                     SHELL_ID_EXIT -> {
@@ -1745,12 +1760,12 @@ class AdbProtocol(
                     }
                     SHELL_ID_STDIN, SHELL_ID_CLOSE_STDIN -> {
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
-                            return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
+                            return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
                         }
                     }
                     else -> {
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
-                            return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
+                            return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
                         }
                         if (logOutput) onLog("⚠️ shell_v2: unknown packet id=${header.id}, length=${header.length}")
                     }
@@ -1758,30 +1773,29 @@ class AdbProtocol(
             }
         } catch (e: Exception) {
             if (logOutput) onLog("❌ adb shell/v2 error: ${e.message ?: e.javaClass.simpleName}")
-            return ShellResult(stdout.toString(), stderr.toString(), exitCode, false)
+            return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
         } finally {
             closeAdbStream(stream)
         }
 
         if (exitCode == null && logOutput) onLog("⚠️ shell_v2 finished without an exit packet")
-        return ShellResult(stdout.toString(), stderr.toString(), exitCode, exitCode == 0)
+        return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, exitCode == 0)
     }
 
     private fun runLegacyShellForResult(command: String, logOutput: Boolean): ShellResult {
         if (logOutput) onLog("-> adb shell: $command")
         val stream = openAdbStream("shell:$command", logOpen = false)
             ?: return ShellResult("", "", null, false)
-        val stdout = StringBuilder()
+        val stdout = java.io.ByteArrayOutputStream()
         try {
             while (!cancelled && !stream.closed) {
                 val header = readHeader(timeoutMs = 30_000) ?: break
                 when (header.command) {
                     A_WRTE -> {
                         stream.remoteId = header.arg0
-                        val data = readData(header.dataLength) ?: return ShellResult(stdout.toString(), "", null, false)
+                        val data = readData(header.dataLength) ?: return ShellResult(stdout.toString("UTF-8"), "", null, false)
                         sendMessageInternal(A_OKAY, stream.localId, stream.remoteId, EMPTY_PAYLOAD)
-                        val text = data.toShellText()
-                        stdout.append(text)
+                        stdout.write(data)
                         if (logOutput) logShellOutput(data, isStderr = false)
                     }
                     A_OKAY -> {
@@ -1791,7 +1805,7 @@ class AdbProtocol(
                     A_CLSE -> {
                         if (header.dataLength > 0) readData(header.dataLength)
                         stream.closed = true
-                        return ShellResult(stdout.toString(), "", null, true)
+                        return ShellResult(stdout.toString("UTF-8"), "", null, true)
                     }
                     else -> {
                         if (header.dataLength > 0) readData(header.dataLength)
@@ -1801,11 +1815,11 @@ class AdbProtocol(
             }
         } catch (e: Exception) {
             if (logOutput) onLog("❌ adb shell legacy error: ${e.message ?: e.javaClass.simpleName}")
-            return ShellResult(stdout.toString(), "", null, false)
+            return ShellResult(stdout.toString("UTF-8"), "", null, false)
         } finally {
             closeAdbStream(stream)
         }
-        return ShellResult(stdout.toString(), "", null, !cancelled)
+        return ShellResult(stdout.toString("UTF-8"), "", null, !cancelled)
     }
 
     private class InteractiveShellSession {
@@ -2159,7 +2173,7 @@ class AdbProtocol(
     }
 
     private fun statRemotePath(remotePath: String, logMissing: Boolean = true): SyncStat? {
-        val cleanRemote = remotePath.trim()
+        val cleanRemote = remotePath
         if (!isValidRemotePath(cleanRemote)) return null
         val stream = openAdbStream("sync:", logOpen = false) ?: return null
         try {
@@ -2228,36 +2242,9 @@ class AdbProtocol(
         return true
     }
 
-    private fun parseFindSections(output: String): Pair<List<String>, List<String>> {
-        val dirs = mutableListOf<String>()
-        val files = mutableListOf<String>()
-        var section = ""
-        output.lines().forEach { raw ->
-            val line = raw.trimEnd('\r')
-            when (line) {
-                "AFT_DIRS_BEGIN" -> section = "dirs"
-                "AFT_FILES_BEGIN" -> section = "files"
-                else -> {
-                    if (line.isBlank()) return@forEach
-                    when (section) {
-                        "dirs" -> dirs.add(line)
-                        "files" -> files.add(line)
-                    }
-                }
-            }
-        }
-        return dirs.distinct() to files.distinct()
-    }
-
-    private fun normalizeRelativeRemotePath(path: String): String {
-        return path.replace('\\', '/')
-            .removePrefix("./")
-            .trim('/')
-    }
-
     private fun joinRemotePath(base: String, child: String): String {
         val left = base.trimEnd('/')
-        val right = child.replace('\\', '/').trimStart('/')
+        val right = child.trimStart('/')
         return when {
             left.isBlank() -> "/$right"
             right.isBlank() -> left
