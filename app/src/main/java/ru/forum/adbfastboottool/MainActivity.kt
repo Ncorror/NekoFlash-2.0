@@ -985,8 +985,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun handleFastbootTerminalCommand(cmd: String) {
         viewModel.log("> fastboot $cmd")
-        when (val action = parseFastbootCommand(cmd)) {
-            null -> return
+        val request = parseFastbootCommand(cmd) ?: return
+        val expectedSerial = request.serial
+        when (val action = request.action) {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
             is TerminalAction.RawFastboot -> {
@@ -1001,14 +1002,14 @@ class MainActivity : AppCompatActivity() {
                 } else {
                     // Raw/OEM passthrough остаётся разрешённым; terminal FAIL/OKAY
                     // показывается в Console без блокирующего progress-dialog.
-                    viewModel.runFastbootCommand(action.command, heavy = false)
+                    viewModel.runFastbootCommand(action.command, heavy = false, expectedSerial = expectedSerial)
                 }
             }
-            is TerminalAction.FastbootFlash -> viewModel.runFlash(action.partition, action.file, action.slot)
-            is TerminalAction.FastbootPartitionCommand -> viewModel.runFastbootPartitionCommand(action.wirePrefix, action.partition, action.slot)
-            is TerminalAction.FastbootDownloadAndRun -> viewModel.runFastbootDownloadAndRun(action.file, action.commandAfterDownload)
-            is TerminalAction.FastbootLogicalInfo -> viewModel.inspectFastbootLogicalPartition(action.partition)
-            is TerminalAction.FastbootFetch -> viewModel.runFastbootFetch(action.partition, action.outputFile, action.slot)
+            is TerminalAction.FastbootFlash -> viewModel.runFlash(action.partition, action.file, action.slot, expectedSerial)
+            is TerminalAction.FastbootPartitionCommand -> viewModel.runFastbootPartitionCommand(action.wirePrefix, action.partition, action.slot, expectedSerial)
+            is TerminalAction.FastbootDownloadAndRun -> viewModel.runFastbootDownloadAndRun(action.file, action.commandAfterDownload, expectedSerial)
+            is TerminalAction.FastbootLogicalInfo -> viewModel.inspectFastbootLogicalPartition(action.partition, expectedSerial)
+            is TerminalAction.FastbootFetch -> viewModel.runFastbootFetch(action.partition, action.outputFile, action.slot, expectedSerial)
             is TerminalAction.AdbService,
             is TerminalAction.AdbShell,
             is TerminalAction.AdbPush,
@@ -1064,9 +1065,13 @@ class MainActivity : AppCompatActivity() {
 
     private data class FastbootTerminalOptions(
         val tokens: List<String>,
+        val wireCommand: String,
         val slot: String? = null,
-        val setActive: String? = null
+        val setActive: String? = null,
+        val serial: String? = null
     )
+
+    private data class FastbootTerminalRequest(val action: TerminalAction, val serial: String?)
 
     private fun normalizeFastbootSlot(raw: String): String? {
         val slot = raw.trim().removePrefix("_").lowercase(Locale.US)
@@ -1081,10 +1086,13 @@ class MainActivity : AppCompatActivity() {
         return null
     }
 
-    private fun parseFastbootTerminalOptions(tokens: List<String>): FastbootTerminalOptions? {
+    private fun parseFastbootTerminalOptions(lexicalTokens: List<FastbootCommandLine.Token>): FastbootTerminalOptions? {
+        val tokens = lexicalTokens.map { it.value }
         val commandTokens = mutableListOf<String>()
+        val wireTokens = mutableListOf<String>()
         var slot: String? = null
         var setActive: String? = null
+        var serial: String? = null
         var i = 0
 
         fun nextOptionValue(option: String): String? {
@@ -1138,25 +1146,45 @@ class MainActivity : AppCompatActivity() {
                     viewModel.log(getString(R.string.rev16_sparse_option_not_implemented))
                     return null
                 }
-                lower == "-s" -> {
-                    nextOptionValue("-s") ?: return null
-                    viewModel.log("ℹ️ -s SERIAL is not used: NekoFlash works with the selected OTG device.")
+                token == "-s" || token.startsWith("-s") && token.length > 2 -> {
+                    val value = if (token == "-s") nextOptionValue("-s") ?: return null else token.substring(2)
+                    serial = try {
+                        FastbootSerialSelection.select(serial, value)
+                    } catch (error: IllegalArgumentException) {
+                        viewModel.log("❌ ${error.message}")
+                        return null
+                    }
                 }
-                else -> commandTokens += token
+                else -> {
+                    commandTokens += token
+                    wireTokens += lexicalTokens[i].literal
+                }
             }
             i += 1
         }
 
-        return FastbootTerminalOptions(commandTokens, slot, setActive)
+        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial)
     }
 
-    private fun parseFastbootCommand(cmd: String): TerminalAction? {
+    private fun parseFastbootCommand(cmd: String): FastbootTerminalRequest? {
         val clean = cmd.trim()
         if (clean.isBlank()) return null
-        val rawTokens = tokenizeCommandLine(clean)
+        val rawTokens = try {
+            FastbootCommandLine.tokenize(clean)
+        } catch (error: IllegalArgumentException) {
+            viewModel.log("❌ ${error.message}")
+            return null
+        }
         if (rawTokens.isEmpty()) return null
 
         val parsedOptions = parseFastbootTerminalOptions(rawTokens) ?: return null
+        val action = parseFastbootAction(parsedOptions) ?: return null
+        return FastbootTerminalRequest(action, parsedOptions.serial)
+    }
+
+    private fun parseFastbootAction(parsedOptions: FastbootTerminalOptions): TerminalAction? {
+        // Forward only command tokens: host selectors must never reach OEM/raw commands.
+        val clean = parsedOptions.wireCommand
         if (parsedOptions.setActive != null && parsedOptions.tokens.isEmpty()) {
             return TerminalAction.RawFastboot("set_active:${parsedOptions.setActive}")
         }

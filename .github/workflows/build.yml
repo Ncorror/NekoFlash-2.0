@@ -2,9 +2,9 @@ name: Build Android APK
 
 on:
   push:
-    branches: [ "main", "feature/rev11-core-cleanup", "work/rev18-audit-ui-20261024" ]
+    branches: [ "main", "feature/rev11-core-cleanup", "work/rev*" ]
   pull_request:
-    branches: [ "main", "feature/rev6-shell", "feature/rev11-core-cleanup" ]
+    branches: [ "main", "feature/rev6-shell", "feature/rev11-core-cleanup", "work/rev*" ]
   workflow_dispatch:
 
 permissions:
@@ -46,10 +46,15 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV18 structural and source-guard tests
+      - name: REV19 structural and source-guard tests
         run: |
-          python3 tests/check_rev18.py
+          python3 tests/check_rev19.py
           python3 tests/check_i18n.py
+
+      - name: Native transfer deadline regression tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/native_transfer_deadline_test.cpp -o /tmp/native-deadline-test
+          /tmp/native-deadline-test
 
       - name: Kotlin JVM queue and diagnostic regression tests
         timeout-minutes: 15

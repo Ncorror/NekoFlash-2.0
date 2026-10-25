@@ -18,7 +18,7 @@ main = (base/'MainActivity.kt').read_text()
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-assert git_blob == '3d53692ac1b37322c588980d29907af684853aa7', 'Unreviewed AdbProtocol change'
+assert git_blob == '5c4b2144a594044e06577b4014a55126e6742e9b', 'Unreviewed AdbProtocol change'
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb
@@ -39,6 +39,6 @@ assert 'R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' 
 assert 'private val folderName = "NekoFlash"' in main
 assert 'fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))' in vm
 assert 'proto.sideloadZip(source, getApplication<Application>().contentResolver)' in vm
-assert 'persistPendingSideloadVerification(source, proto)' in vm
+assert 'persistPendingSideloadVerification(source)' in vm
 assert (root/'app/src/test/java/ru/forum/adbfastboottool/FirmwareSourceTest.kt').is_file()
 print('PASS REV12: seekable SAF direct Sideload, fallback import, verified recovery, paths unchanged')

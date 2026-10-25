@@ -521,4 +521,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev18_history_previous">Предыдущая команда</string>
     <string name="rev18_history_next">Следующая команда</string>
     <string name="rev18_workspace_busy">Дождись завершения USB-операции перед удалением её файлов.</string>
+    <string name="rev19_fastboot_serial_mismatch">Fastboot -s %1$s: серийный номер выбранного устройства — %2$s. Выбери нужное устройство; команда не отправлена.</string>
+    <string name="rev19_sideload_identity_unconfirmed">Результат Sideload не подтверждён: серийный номер устройства не совпадает или недоступен.</string>
+    <string name="rev19_sideload_attempt_unconfirmed">Передача завершена; результат этой попытки не подтверждён. Проверь экран Recovery. Для автоматической проверки сначала подключись к Recovery, затем включи Sideload.</string>
 </resources>

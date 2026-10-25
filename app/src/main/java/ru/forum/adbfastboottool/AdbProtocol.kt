@@ -101,12 +101,6 @@ class AdbProtocol(
     private val MAX_RECOVERY_INSTALL_LOG_CHARS = 512 * 1024
     private val SIDELOAD_CLOSE_VERIFY_PENDING_PERCENT = 95
 
-    private val RECOVERY_INSTALL_LOG_PATHS = listOf(
-        "/cache/recovery/last_install",
-        "/tmp/recovery.log",
-        "/cache/recovery/last_log",
-        "/tmp/install.log"
-    )
 
     private fun clearPendingInboundPayload() {
         pendingInboundChecksum = null
@@ -1673,29 +1667,57 @@ class AdbProtocol(
         return CapturedShellResult(result.stdout, result.stderr, result.exitCode, result.success)
     }
 
-    fun inspectRecoveryInstallResult(): RecoveryInstallVerifier.Result {
+    /** Read-only checkpoint. A changing/unreadable log gives no usable boundary. */
+    fun captureRecoveryLogBoundary(): RecoveryLogBoundary? {
+        if (!isConnected || peerMode != PeerMode.RECOVERY) return null
+        val result = captureShellCommand("""
+            boot=${'$'}(cat /proc/sys/kernel/random/boot_id) || exit 1
+            before=${'$'}(wc -c < /tmp/recovery.log) || exit 1
+            digest=${'$'}(sha256sum /tmp/recovery.log) || exit 1
+            after=${'$'}(wc -c < /tmp/recovery.log) || exit 1
+            [ "${'$'}before" = "${'$'}after" ] || exit 1
+            printf '%s\n%s\n%s\n' "${'$'}boot" "${'$'}before" "${'$'}digest"
+        """.trimIndent())
+        val lines = result.stdout.trim().lines()
+        if (!result.success || lines.size != 3) return null
+        return RecoveryLogBoundary.parse(lines[0], lines[1], lines[2])
+    }
+
+    fun inspectRecoveryInstallResult(boundary: RecoveryLogBoundary?): RecoveryInstallVerifier.Result {
+        fun unknown(message: String) = RecoveryInstallVerifier.Result(RecoveryInstallVerifier.Verdict.UNKNOWN, message)
         if (!isConnected || peerMode != PeerMode.RECOVERY) {
-            return RecoveryInstallVerifier.Result(
-                verdict = RecoveryInstallVerifier.Verdict.UNKNOWN,
-                message = "ADB Recovery is not ready to verify the install result yet"
-            )
+            return unknown("ADB Recovery is not ready to verify the install result yet")
         }
-
-        val sources = mutableListOf<RecoveryInstallVerifier.LogSource>()
-        RECOVERY_INSTALL_LOG_PATHS.forEach { path ->
-            val quoted = shellQuote(path)
-            val primary = captureShellCommand("if [ -r $quoted ]; then tail -n 1200 $quoted; fi")
-            val text = primary.stdout.trim().ifBlank {
-                captureShellCommand("if [ -r $quoted ]; then cat $quoted; fi").stdout.trim()
-            }
-            if (text.isNotBlank()) {
-                val boundedText = text.takeLast(MAX_RECOVERY_INSTALL_LOG_CHARS)
-                onLog("ℹ️ Recovery log received: $path (${boundedText.length} characters)")
-                sources += RecoveryInstallVerifier.LogSource(path, boundedText)
-            }
+        if (boundary == null) {
+            return unknown("No Recovery log boundary for this attempt; check the result on the device")
         }
-
-        return RecoveryInstallVerifier.evaluate(sources)
+        // Verify the unchanged prefix and boot before reading only the new bytes.
+        // Archived last_log / last_install can never prove the current attempt.
+        val result = captureShellCommand("""
+            cat /proc/sys/kernel/random/boot_id || exit 1
+            head -c ${boundary.byteCount} /tmp/recovery.log | sha256sum
+            tail -c +${boundary.byteCount + 1L} /tmp/recovery.log | head -c ${MAX_RECOVERY_INSTALL_LOG_CHARS + 1}
+        """.trimIndent())
+        val lines = result.stdout.split('\n', limit = 3)
+        if (!result.success || lines.size < 3 ||
+            !boundary.matches(lines[0].trim(), lines[1].trim().substringBefore(' '))) {
+            return unknown("Recovery boot or log changed; this attempt cannot be verified")
+        }
+        val appended = lines[2]
+        if (appended.toByteArray(Charsets.UTF_8).size > MAX_RECOVERY_INSTALL_LOG_CHARS) {
+            return unknown("New Recovery log exceeds the verification window; result remains unconfirmed")
+        }
+        // Detect rotation/truncation during the read as well as before it.
+        val after = captureShellCommand("""
+            cat /proc/sys/kernel/random/boot_id || exit 1
+            head -c ${boundary.byteCount} /tmp/recovery.log | sha256sum
+        """.trimIndent())
+        val afterLines = after.stdout.trim().lines()
+        if (!after.success || afterLines.size != 2 ||
+            !boundary.matches(afterLines[0].trim(), afterLines[1].trim().substringBefore(' '))) {
+            return unknown("Recovery log changed while reading the result")
+        }
+        return RecoveryInstallVerifier.evaluateCurrentAttempt(appended)
     }
 
     private data class ShellResult(
