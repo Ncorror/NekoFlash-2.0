@@ -153,7 +153,7 @@ object NativeUsbfsBackend {
         if (payloadLength <= 0L) {
             return failedPreflight("Invalid or empty Native USBFS source")
         }
-        if (stallTimeoutMs <= 0 || hardTimeoutMs <= 0 || hardTimeoutMs < stallTimeoutMs) {
+        if (stallTimeoutMs <= 0 || hardTimeoutMs < 0 || (hardTimeoutMs > 0 && hardTimeoutMs < stallTimeoutMs)) {
             return failedPreflight(
                 "Invalid Native USBFS deadlines: stall=${stallTimeoutMs}ms hard=${hardTimeoutMs}ms"
             )

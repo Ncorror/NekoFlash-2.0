@@ -19,6 +19,7 @@ import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
@@ -148,11 +149,23 @@ class DeviceViewModel(
     )
 
     private data class PendingSideloadVerification(
+        val attemptId: String,
         val packageName: String,
         val packageSize: Long,
-        val device: String?,
+        val serial: String?,
+        val createdAtMs: Long,
+        val boundary: RecoveryLogBoundary?,
+        val transferFinished: Boolean
+    )
+
+    private data class PreparedRecoveryLog(
+        val serial: String,
+        val boundary: RecoveryLogBoundary,
         val createdAtMs: Long
     )
+
+    @Volatile private var preparedRecoveryLog: PreparedRecoveryLog? = null
+    @Volatile private var sideloadGuiAttemptId: String? = null
 
     private fun text(resId: Int, vararg args: Any): String =
         getApplication<Application>().getString(resId, *args)
@@ -621,6 +634,15 @@ class DeviceViewModel(
                 _fastbootPartitionInventory.postValue(null)
                 _adbPeerMode.postValue(proto.peerMode)
                 verifyPendingSideloadIfReady(proto)
+                if (proto.peerMode == AdbProtocol.PeerMode.RECOVERY) {
+                    val serial = currentUsbSerial()
+                    val boundary = if (serial != null) proto.captureRecoveryLogBoundary() else null
+                    preparedRecoveryLog = if (serial != null && boundary != null) {
+                        PreparedRecoveryLog(serial, boundary, System.currentTimeMillis())
+                    } else null
+                } else if (proto.peerMode != AdbProtocol.PeerMode.SIDELOAD) {
+                    preparedRecoveryLog = null
+                }
                 _connectionState.postValue(ConnectionState.ADB)
                 diagnosticSessionTracker.recordConnection("ADB", connectedDeviceInfo)
                 persistSessionSummary()
@@ -1028,11 +1050,12 @@ class DeviceViewModel(
         mainHandler.post(block)
     }
 
-    fun runFastbootCommand(cmd: String, heavy: Boolean = true) {
+    fun runFastbootCommand(cmd: String, heavy: Boolean = true, expectedSerial: String? = null) {
         startOperation(
             text(R.string.notif_fastboot_command),
             text(R.string.notif_executing, cmd),
-            heavy = heavy
+            heavy = heavy,
+            expectedFastbootSerial = expectedSerial
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
@@ -1062,8 +1085,8 @@ class DeviceViewModel(
         }
     }
 
-    fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
+    fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String, expectedSerial: String? = null) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload), expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.downloadAndRun(file, commandAfterDownload)) {
                 failOperation(text(R.string.rev11_fastboot_download_failed, commandAfterDownload))
@@ -1079,8 +1102,8 @@ class DeviceViewModel(
         }
     }
 
-    fun inspectFastbootLogicalPartition(partition: String) {
-        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false) {
+    fun inspectFastbootLogicalPartition(partition: String, expectedSerial: String? = null) {
+        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false, expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (proto.inspectLogicalPartition(partition) == null) {
                 failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
@@ -1088,8 +1111,8 @@ class DeviceViewModel(
         }
     }
 
-    fun runFastbootFetch(partition: String, outputFile: File, slot: String? = null) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition")) {
+    fun runFastbootFetch(partition: String, outputFile: File, slot: String? = null, expectedSerial: String? = null) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition"), expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
                 ?: failOperation("Could not apply Fastboot slot for $partition")
@@ -1099,9 +1122,9 @@ class DeviceViewModel(
         }
     }
 
-    fun runFastbootPartitionCommand(wirePrefix: String, partition: String, slot: String? = null) {
+    fun runFastbootPartitionCommand(wirePrefix: String, partition: String, slot: String? = null, expectedSerial: String? = null) {
         val label = "$wirePrefix $partition" + slot?.let { " --slot=$it" }.orEmpty()
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false, expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
@@ -1231,14 +1254,15 @@ class DeviceViewModel(
         }
     }
 
-    fun runFlash(partition: String, file: File, slot: String? = null) =
-        runFlash(partition, FirmwareSource.WorkspaceFile(file), slot)
+    fun runFlash(partition: String, file: File, slot: String? = null, expectedSerial: String? = null) =
+        runFlash(partition, FirmwareSource.WorkspaceFile(file), slot, expectedSerial)
 
-    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null) {
+    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null, expectedSerial: String? = null) {
         val label = partition + slot?.let { " --slot=$it" }.orEmpty()
         startOperation(
             text(R.string.notif_flash_img),
-            text(R.string.notif_flashing_partition, source.displayName, label)
+            text(R.string.notif_flashing_partition, source.displayName, label),
+            expectedFastbootSerial = expectedSerial
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
@@ -1449,37 +1473,74 @@ class DeviceViewModel(
         unlockVerificationPrefs().edit { clear() }
     }
 
+    private fun currentUsbSerial(): String? =
+        runCatching { connectedUsbTarget?.device?.serialNumber }.getOrNull()?.takeIf { it.isNotBlank() }
+
     private fun sideloadVerificationPrefs() =
         getApplication<Application>().getSharedPreferences(SIDELOAD_VERIFY_PREFS, Context.MODE_PRIVATE)
 
-    private fun persistPendingSideloadVerification(source: FirmwareSource, proto: AdbProtocol) {
-        val device = adbBannerProperty(proto.currentDiagnostics().remoteBanner, "ro.product.device")
+    private fun persistPendingSideloadVerification(source: FirmwareSource): PendingSideloadVerification {
+        val serial = currentUsbSerial()
+        val now = System.currentTimeMillis()
+        val prepared = preparedRecoveryLog
+        preparedRecoveryLog = null // A boundary belongs to one accepted attempt only.
+        val boundary = prepared?.takeIf {
+            it.serial == serial && now - it.createdAtMs in 0L..SIDELOAD_VERIFY_TIMEOUT_MS
+        }?.boundary
+        val attempt = PendingSideloadVerification(
+            UUID.randomUUID().toString(), source.displayName, source.sizeHint ?: -1L,
+            serial, now, boundary, false
+        )
+        sideloadGuiAttemptId = attempt.attemptId
         @Suppress("UseKtx")
-        val saved = sideloadVerificationPrefs()
-            .edit()
-            .putString(SIDELOAD_VERIFY_PACKAGE, source.displayName)
-            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, source.sizeHint ?: -1L)
-            .putString(SIDELOAD_VERIFY_DEVICE, device)
-            .putLong(SIDELOAD_VERIFY_CREATED_AT, System.currentTimeMillis())
+        val saved = sideloadVerificationPrefs().edit().clear()
+            .putString(SIDELOAD_VERIFY_ATTEMPT_ID, attempt.attemptId)
+            .putString(SIDELOAD_VERIFY_PACKAGE, attempt.packageName)
+            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, attempt.packageSize)
+            .putString(SIDELOAD_VERIFY_SERIAL, serial)
+            .putLong(SIDELOAD_VERIFY_CREATED_AT, now)
+            .putString(SIDELOAD_VERIFY_BOOT_ID, boundary?.bootId)
+            .putLong(SIDELOAD_VERIFY_LOG_BYTES, boundary?.byteCount ?: -1L)
+            .putString(SIDELOAD_VERIFY_LOG_HASH, boundary?.sha256)
+            .putBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false)
             .commit()
-        if (!saved) {
-            log("⚠️ Could not save ADB Sideload result marker.")
-        }
+        if (!saved) log("⚠️ Could not save ADB Sideload attempt marker.")
+        return attempt
+    }
+
+    private fun markSideloadTransferFinished(attemptId: String) {
+        val prefs = sideloadVerificationPrefs()
+        if (prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null) != attemptId) return
+        @Suppress("UseKtx")
+        val saved = prefs.edit().putBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, true).commit()
+        if (!saved) log("⚠️ Could not persist Sideload transfer completion.")
     }
 
     private fun readPendingSideloadVerification(): PendingSideloadVerification? {
         val prefs = sideloadVerificationPrefs()
+        // Pre-REV19 markers have no attempt ID or unique device identity and cannot be upgraded into proof.
+        val attemptId = prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null).trimToNull() ?: return null
         val packageName = prefs.getString(SIDELOAD_VERIFY_PACKAGE, null).trimToNull() ?: return null
         return PendingSideloadVerification(
+            attemptId = attemptId,
             packageName = packageName,
             packageSize = prefs.getLong(SIDELOAD_VERIFY_PACKAGE_SIZE, -1L),
-            device = prefs.getString(SIDELOAD_VERIFY_DEVICE, null).trimToNull(),
-            createdAtMs = prefs.getLong(SIDELOAD_VERIFY_CREATED_AT, 0L)
+            serial = prefs.getString(SIDELOAD_VERIFY_SERIAL, null).trimToNull(),
+            createdAtMs = prefs.getLong(SIDELOAD_VERIFY_CREATED_AT, 0L),
+            boundary = RecoveryLogBoundary.parse(
+                prefs.getString(SIDELOAD_VERIFY_BOOT_ID, null),
+                prefs.getLong(SIDELOAD_VERIFY_LOG_BYTES, -1L).toString(),
+                prefs.getString(SIDELOAD_VERIFY_LOG_HASH, null)
+            ),
+            transferFinished = prefs.getBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false)
         )
     }
 
-    private fun clearPendingSideloadVerification() {
-        sideloadVerificationPrefs().edit { clear() }
+    private fun clearPendingSideloadVerification(attemptId: String) {
+        val prefs = sideloadVerificationPrefs()
+        if (prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null) == attemptId) {
+            prefs.edit { clear() }
+        }
     }
 
     private fun adbBannerProperty(banner: String, key: String): String? {
@@ -1497,12 +1558,13 @@ class DeviceViewModel(
      * Unknown Recovery results remain unverified, never labelled SUCCESS.
      */
     private fun publishSideloadRecoveryVerdict(
+        attemptId: String,
         message: String,
         outcome: OperationOutcomeKind
     ) {
         val current = _operationProgress.value
         val sideloadTitle = text(R.string.notif_adb_sideload)
-        if (_operationActive.value == true || (
+        if (sideloadGuiAttemptId != attemptId || _operationActive.value == true || (
                 current != null &&
                     !(current.title == sideloadTitle &&
                       current.outcome == OperationOutcomeKind.VERIFY_PENDING)
@@ -1526,50 +1588,53 @@ class DeviceViewModel(
 
     private fun verifyPendingSideloadIfReady(proto: AdbProtocol) {
         val pending = readPendingSideloadVerification() ?: return
-        if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY) return
+        if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY || !pending.transferFinished) return
 
         val ageMs = System.currentTimeMillis() - pending.createdAtMs
         if (pending.createdAtMs <= 0L || ageMs < 0L || ageMs > SIDELOAD_VERIFY_TIMEOUT_MS) {
-            clearPendingSideloadVerification()
+            clearPendingSideloadVerification(pending.attemptId)
             log("⚠️ ADB Sideload result wait timed out; check the install result on the Recovery screen.")
             return
         }
 
-        val currentDevice = adbBannerProperty(proto.currentDiagnostics().remoteBanner, "ro.product.device")
-        if (pending.device != null) {
-            if (currentDevice == null) return
-            if (!pending.device.equals(currentDevice, ignoreCase = true)) return
+        if (pending.serial == null || pending.serial != currentUsbSerial()) {
+            log(text(R.string.rev19_sideload_identity_unconfirmed))
+            return
         }
 
         log("=== ADB SIDELOAD RESULT ===")
         log("Package: ${pending.packageName} (${pending.packageSize} bytes)")
-        val verification = proto.inspectRecoveryInstallResult()
+        val verification = proto.inspectRecoveryInstallResult(pending.boundary)
+        if (readPendingSideloadVerification()?.attemptId != pending.attemptId) return
         verification.source?.let { log("Recovery source: $it") }
         verification.evidence?.takeIf { it.isNotBlank() }?.let { log("Recovery evidence: $it") }
 
         when (verification.verdict) {
             RecoveryInstallVerifier.Verdict.SUCCESS -> {
-                clearPendingSideloadVerification()
+                clearPendingSideloadVerification(pending.attemptId)
                 log("✅ Recovery reports successful installation: ${verification.message}")
                 publishSideloadRecoveryVerdict(
+                    pending.attemptId,
                     "Recovery confirmed installation: ${verification.message}",
                     OperationOutcomeKind.SUCCESS
                 )
             }
             RecoveryInstallVerifier.Verdict.FAILED -> {
-                clearPendingSideloadVerification()
+                clearPendingSideloadVerification(pending.attemptId)
                 val detail = buildString {
                     append(verification.message)
                     verification.evidence?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                 }
                 log("❌ Recovery reports an install error: $detail")
                 publishSideloadRecoveryVerdict(
+                    pending.attemptId,
                     "Recovery installation failed: $detail",
                     OperationOutcomeKind.FAILED
                 )
             }
             RecoveryInstallVerifier.Verdict.UNKNOWN -> {
-                log("ℹ️ Transfer completed; Recovery did not provide a clear install result.")
+                log(text(R.string.rev19_sideload_attempt_unconfirmed))
+                logFileOnly("Sideload ${pending.attemptId}: ${verification.message}")
             }
         }
     }
@@ -1651,44 +1716,43 @@ class DeviceViewModel(
     fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))
 
     internal fun runSideload(source: FirmwareSource) {
-        val proto = adbProtocol
-        if (proto?.isConnected != true) {
-            log(text(R.string.error_no_adb))
-            return
-        }
-
-        clearPendingSideloadVerification()
         startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, source.displayName)) {
-            when (val result = proto.sideloadZip(source, getApplication<Application>().contentResolver)) {
-                AdbProtocol.SideloadResult.TransferComplete -> {
-                    persistPendingSideloadVerification(source, proto)
-                    verificationPending(
-                        text(R.string.rev12_sideload_verify_pending)
-                    )
-                }
-                is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
-                    persistPendingSideloadVerification(source, proto)
-                    verificationPending(
-                        text(R.string.rev12_sideload_disconnect_pending, result.percent)
-                    )
-                }
-                AdbProtocol.SideloadResult.Cancelled -> {
-                    throw OperationAbort(OperationOutcome.Cancelled(text(R.string.rev12_sideload_cancelled)))
-                }
-                is AdbProtocol.SideloadResult.NotInSideloadMode -> {
-                    failOperation(text(R.string.rev12_sideload_mode_inactive, result.mode.name))
-                }
-                is AdbProtocol.SideloadResult.Failed -> {
-                    if (source is FirmwareSource.SafDocument &&
-                        result.kind == AdbProtocol.SideloadFailureKind.FILE
-                    ) {
-                        // Keep raw provider errors in diagnostics, while the GUI
-                        // presents a complete localized message and Import fallback.
-                        logFileOnly("SAF direct read: ${result.message}")
-                        failOperation(text(R.string.rev12_sideload_saf_unsupported))
+            val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
+            if (proto.peerMode != AdbProtocol.PeerMode.SIDELOAD) {
+                failOperation(text(R.string.rev12_sideload_mode_inactive, proto.peerMode.name))
+            }
+            // Admission comes first: a rejected second click cannot clear an active marker.
+            val attempt = persistPendingSideloadVerification(source)
+            var awaitingVerdict = false
+            try {
+                when (val result = proto.sideloadZip(source, getApplication<Application>().contentResolver)) {
+                    AdbProtocol.SideloadResult.TransferComplete -> {
+                        markSideloadTransferFinished(attempt.attemptId)
+                        awaitingVerdict = true
+                        verificationPending(text(R.string.rev12_sideload_verify_pending))
                     }
-                    failOperation(text(R.string.rev12_sideload_failed, result.kind.name, result.message))
+                    is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
+                        markSideloadTransferFinished(attempt.attemptId)
+                        awaitingVerdict = true
+                        verificationPending(text(R.string.rev12_sideload_disconnect_pending, result.percent))
+                    }
+                    AdbProtocol.SideloadResult.Cancelled -> {
+                        throw OperationAbort(OperationOutcome.Cancelled(text(R.string.rev12_sideload_cancelled)))
+                    }
+                    is AdbProtocol.SideloadResult.NotInSideloadMode -> {
+                        failOperation(text(R.string.rev12_sideload_mode_inactive, result.mode.name))
+                    }
+                    is AdbProtocol.SideloadResult.Failed -> {
+                        if (source is FirmwareSource.SafDocument && result.kind == AdbProtocol.SideloadFailureKind.FILE) {
+                            logFileOnly("SAF direct read: ${result.message}")
+                            failOperation(text(R.string.rev12_sideload_saf_unsupported))
+                        }
+                        failOperation(text(R.string.rev12_sideload_failed, result.kind.name, result.message))
+                    }
                 }
+            } finally {
+                if (!awaitingVerdict) clearPendingSideloadVerification(attempt.attemptId)
             }
         }
     }
@@ -1703,6 +1767,7 @@ class DeviceViewModel(
         text: String,
         heavy: Boolean = true,
         prepareFastbootSession: Boolean = true,
+        expectedFastbootSerial: String? = null,
         block: suspend OperationContext.() -> Unit
     ) {
         synchronized(operationLaunchLock) {
@@ -1726,6 +1791,7 @@ class DeviceViewModel(
             }
 
             val gen = operationGeneration.incrementAndGet()
+            sideloadGuiAttemptId = null
 
             if (heavy) {
                 releaseOperationWakeLock(logRelease = false)
@@ -1749,6 +1815,17 @@ class DeviceViewModel(
                             )
                         )
                     }
+                    if (expectedFastbootSerial != null) {
+                        if (fastboot?.isConnected != true) context.failOperation(text(R.string.error_no_fastboot))
+                        val actual = FastbootSerialSelection.actual(currentUsbSerial()) { fastboot.getVar("serialno") }
+                        if (!FastbootSerialSelection.matches(expectedFastbootSerial, actual)) {
+                            context.failOperation(text(
+                                R.string.rev19_fastboot_serial_mismatch,
+                                expectedFastbootSerial, actual ?: text(R.string.device_bool_unknown)
+                            ))
+                        }
+                    }
+                    coroutineContext.ensureActive()
                     context.block()
                 } catch (abort: OperationAbort) {
                     outcome = abort.outcome
@@ -1911,7 +1988,12 @@ class DeviceViewModel(
         private const val MI_UNLOCK_VERIFY_CREATED_AT = "created_at"
         private const val SIDELOAD_VERIFY_PACKAGE = "package_name"
         private const val SIDELOAD_VERIFY_PACKAGE_SIZE = "package_size"
-        private const val SIDELOAD_VERIFY_DEVICE = "device"
+        private const val SIDELOAD_VERIFY_ATTEMPT_ID = "attempt_id"
+        private const val SIDELOAD_VERIFY_SERIAL = "serial"
+        private const val SIDELOAD_VERIFY_BOOT_ID = "boot_id"
+        private const val SIDELOAD_VERIFY_LOG_BYTES = "log_bytes"
+        private const val SIDELOAD_VERIFY_LOG_HASH = "log_hash"
+        private const val SIDELOAD_VERIFY_TRANSFER_FINISHED = "transfer_finished"
         private const val SIDELOAD_VERIFY_CREATED_AT = "created_at"
     }
 }

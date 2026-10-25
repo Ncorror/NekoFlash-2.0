@@ -517,4 +517,7 @@ Unlock</string>
     <string name="rev18_history_previous">Previous command</string>
     <string name="rev18_history_next">Next command</string>
     <string name="rev18_workspace_busy">Wait for the USB operation to finish before clearing its files.</string>
+    <string name="rev19_fastboot_serial_mismatch">Fastboot -s %1$s: selected device serial is %2$s. Select the matching device; the command was not sent.</string>
+    <string name="rev19_sideload_identity_unconfirmed">Sideload result is unconfirmed: the device serial number does not match or is unavailable.</string>
+    <string name="rev19_sideload_attempt_unconfirmed">Transfer completed; no verifiable result for this attempt. Check the Recovery screen. For automatic verification, connect to Recovery before entering Sideload.</string>
 </resources>

@@ -173,12 +173,17 @@ jobs:
           test -x gradlew
           ls -l gradlew
 
-      - name: REV16 structural, source-guard and bilingual checks
+      - name: REV19 structural, source-guard and bilingual checks
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/check_rev18.py
+          python3 tests/check_rev19.py
           python3 tests/check_i18n.py
+
+      - name: Native transfer deadline regression tests
+        run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/native_transfer_deadline_test.cpp -o /tmp/native-deadline-test
+          /tmp/native-deadline-test
 
       - name: Kotlin JVM regression tests
         timeout-minutes: 15

@@ -1563,7 +1563,7 @@ class FastbootProtocol(
             "Transfer $label: ${formatBytes(totalBytes)}. " +
                 "transport=${profileLabel}, depth=$pipelineDepth, block=${formatBytes(blockBytes.toLong())}, " +
                 "stall-timeout=${formatDuration(NATIVE_USBFS_URB_TIMEOUT_MS.toLong())}, " +
-                "hard-timeout=${formatDuration(NATIVE_USBFS_HARD_TIMEOUT_MS.toLong())}."
+                "hard-timeout=disabled (progress-based stall detection)."
         )
         onLogVerbose(
             "[fastboot-data] mode=NativeUsbfs endpoint=${endpointDescriptor(activeOut)} " +
@@ -2533,7 +2533,8 @@ class FastbootProtocol(
         private const val NATIVE_USBFS_PROFILE_LABEL = "Native USBFS pipeline 2×256 KiB"
 
         private const val NATIVE_USBFS_URB_TIMEOUT_MS = 30_000
-        private const val NATIVE_USBFS_HARD_TIMEOUT_MS = 90_000
+        // 0 disables the fixed total deadline; URB completion stalls still time out.
+        private const val NATIVE_USBFS_HARD_TIMEOUT_MS = 0
         // Не whitelist: используется только для мягкого предупреждения в терминальном режиме.
         val TYPICAL_FLASH_PARTITIONS = setOf(
             "boot", "init_boot", "vendor_boot", "recovery", "dtbo", "vbmeta", "vbmeta_system",

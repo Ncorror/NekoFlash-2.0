@@ -25,39 +25,52 @@ object RecoveryInstallVerifier {
         val index: Int,
         val verdict: Verdict,
         val message: String,
-        val evidence: String
+        val evidence: String,
+        val authoritative: Boolean = false
     )
 
-    fun evaluate(sources: List<LogSource>): Result {
-        if (sources.isEmpty()) {
-            return Result(
-                verdict = Verdict.UNKNOWN,
-                message = "Recovery log is unavailable: install result is not confirmed"
-            )
-        }
+    /** Historical files alone never establish which attempt produced a result. */
+    fun evaluate(sources: List<LogSource>): Result = Result(
+        Verdict.UNKNOWN,
+        "Recovery logs are not bound to the current Sideload attempt",
+        source = sources.firstOrNull()?.path
+    )
 
-        // Текущий /tmp/recovery.log имеет приоритет; last_install/last_log используются
-        // только как fallback, потому что они могут содержать предыдущую попытку.
-        val ordered = sources.sortedBy { sourcePriority(it.path) }
-        ordered.forEach { source ->
-            evaluateSource(source)?.let { return it }
+    /** Called only for bytes appended after a verified same-boot log boundary. */
+    fun evaluateCurrentAttempt(appended: String): Result {
+        // AOSP logger prefixes lines with monotonic timestamps; the byte/hash
+        // checkpoint, not these timestamps, proves freshness.
+        val log = appended.replace(Regex("""(?m)^\[\s*\d+\.\d+\]\s?"""), "")
+        fun unknown() = Result(Verdict.UNKNOWN, "No single completed Sideload session for this attempt")
+        val operations = Regex("""(?im)^\s*I:operation_start:\s*['"]([^'"]+)['"]\s*$""")
+            .findAll(log).toList()
+        val sideloadStarts = Regex("""(?im)^\s*(?:Starting (?:ADB )?sideload|Now send the package you want to apply)[^\n]*""")
+            .findAll(log).toList()
+        val start = if (operations.isNotEmpty()) {
+            // Multiple operations, including a later non-Sideload install, are ambiguous.
+            if (operations.size != 1 || !operations[0].groupValues[1].equals("Sideload", true) ||
+                sideloadStarts.size > 1) return unknown()
+            operations[0].range.first
+        } else {
+            if (sideloadStarts.size != 1) return unknown()
+            sideloadStarts[0].range.first
         }
-
-        return Result(
-            verdict = Verdict.UNKNOWN,
-            message = "Recovery log received, but no explicit result for the last install was found",
-            source = ordered.firstOrNull()?.path
-        )
+        val session = log.substring(start)
+        val packageStarts = Regex("""(?im)^\s*Installing (?:zip file|update|package)[^\n]*""")
+            .findAll(session).count()
+        if (packageStarts > 1) return unknown()
+        return evaluateSource(LogSource("/tmp/recovery.log (current attempt)", session)) ?: unknown()
     }
 
     private fun evaluateSource(source: LogSource): Result? {
-        val text = latestSessionSlice(source.text)
+        val text = source.text
         if (text.isBlank()) return null
 
         val events = mutableListOf<Event>()
 
-        Regex("(?i)Install from ADB complete \\(status:\\s*(-?\\d+)\\)").findAll(text).forEach { match ->
-            val status = match.groupValues[1].toIntOrNull() ?: return@forEach
+        Regex("""(?im)^\s*Install from ADB complete(?:\s*\(status:\s*(-?\d+)\))?\.?\s*$""")
+            .findAll(text).forEach { match ->
+            val status = if (match.groupValues[1].isEmpty()) 0 else match.groupValues[1].toIntOrNull() ?: return@forEach
             val verdict = if (status == 0) Verdict.SUCCESS else Verdict.FAILED
             events += Event(
                 index = match.range.first,
@@ -67,7 +80,8 @@ object RecoveryInstallVerifier {
                 } else {
                     "Recovery finished installation with an error: status=$status"
                 },
-                evidence = lineAt(text, match.range.first)
+                evidence = lineAt(text, match.range.first),
+                authoritative = true
             )
         }
 
@@ -86,15 +100,6 @@ object RecoveryInstallVerifier {
         // TWRP/OrangeFox record the final action status separately from DONEDONE.
         // Accept it only inside the current recognized Sideload session.
         if (isSideloadSession(text)) {
-            Regex("(?i)Finished installing OrangeFox!").findAll(text).forEach { match ->
-                events += Event(
-                    index = match.range.first,
-                    verdict = Verdict.SUCCESS,
-                    message = "Recovery reports successful OrangeFox installation",
-                    evidence = lineAt(text, match.range.first)
-                )
-            }
-
             Regex("""(?im)^\s*I:operation_end\s*-\s*status=(-?\d+)\s*$""")
                 .findAll(text)
                 .forEach { match ->
@@ -107,7 +112,8 @@ object RecoveryInstallVerifier {
                         } else {
                             "Recovery finished Sideload with an error: operation_end status=$status"
                         },
-                        evidence = contextualEvidence(text, match.range.first)
+                        evidence = contextualEvidence(text, match.range.first),
+                        authoritative = true
                     )
                 }
         }
@@ -123,18 +129,9 @@ object RecoveryInstallVerifier {
             }
         }
 
-        successPatterns.forEach { regex ->
-            regex.findAll(text).forEach { match ->
-                events += Event(
-                    index = match.range.first,
-                    verdict = Verdict.SUCCESS,
-                    message = "Recovery reports successful installation",
-                    evidence = lineAt(text, match.range.first)
-                )
-            }
-        }
-
-        val lastEvent = events.maxByOrNull { it.index } ?: return null
+        // A final Recovery status outranks intermediate updater/script output.
+        val lastEvent = events.filter { it.authoritative }.maxByOrNull { it.index }
+            ?: events.maxByOrNull { it.index } ?: return null
         return Result(
             verdict = lastEvent.verdict,
             message = lastEvent.message,
@@ -145,26 +142,6 @@ object RecoveryInstallVerifier {
 
     private fun isSideloadSession(text: String): Boolean =
         sideloadSessionPatterns.any { it.containsMatchIn(text) }
-
-    private fun latestSessionSlice(text: String): String {
-        if (text.isBlank()) return text
-        val start = sessionStartPatterns
-            .flatMap { regex -> regex.findAll(text).map { it.range.first }.toList() }
-            .maxOrNull()
-            ?: return text
-        return text.substring(start)
-    }
-
-    private fun sourcePriority(path: String): Int {
-        val lower = path.lowercase()
-        return when {
-            lower.endsWith("/recovery.log") -> 0
-            lower.endsWith("/last_install") -> 1
-            lower.endsWith("/last_log") -> 2
-            lower.endsWith("/install.log") -> 3
-            else -> 4
-        }
-    }
 
     private fun failureMessage(value: String): String {
         val normalized = value.lowercase()
@@ -202,17 +179,13 @@ object RecoveryInstallVerifier {
     }
 
     private val sideloadSessionPatterns = listOf(
+        Regex("""(?im)^\s*Now send the package you want to apply"""),
         Regex("""(?im)^\s*Starting ADB sideload"""),
         Regex("""(?im)^\s*Starting sideload"""),
         Regex("""(?im)^\s*I:operation_start:\s*['"]Sideload['"]\s*$"""),
         Regex("""(?im)^\s*Starting ADB Sideload"""),
         Regex("""(?im)^\s*Installing zip file"""),
         Regex("""(?im)^\s*Installing ZIP file""")
-    )
-
-    private val sessionStartPatterns = sideloadSessionPatterns + listOf(
-        Regex("""(?im)^\s*Installing update"""),
-        Regex("""(?im)^\s*Installing package""")
     )
 
     private val failurePatterns = listOf(
@@ -222,12 +195,6 @@ object RecoveryInstallVerifier {
         Regex("(?i)failed[^\\n]{0,160}product\\.img"),
         Regex("(?i)product\\.img[^\\n]{0,160}failed"),
         Regex("(?i)script aborted[^\\n]*")
-    )
-
-    private val successPatterns = listOf(
-        Regex("(?i)Install completed successfully"),
-        Regex("(?i)installation successful"),
-        Regex("(?i)script succeeded[^\\n]*")
     )
 
 }

@@ -22,17 +22,18 @@ def git_blob(path):
     data = path.read_bytes()
     return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 
-assert git_blob(fastboot_file) == '789073c7777516a4da2e9b3e77a7ab1b4bcef5ae'
-assert git_blob(native_file) == '886b274e20e6e356bc806250314914a9c2c24de0'
-assert git_blob(backend_file) == '5bb8a48827800dd8ea1fc601194b3566b7da91c6'
+assert git_blob(fastboot_file) == '6a5ede76cbcafff752917c907138a9b733fa3d85'
+assert git_blob(native_file) == 'fa4d1fc97e39c7ef598037281bae39fba0c48d97'
+assert git_blob(backend_file) == '9cb1de4aebdf9a680f2a468c739d2324e4f59dfd'
 
-# FastbootProtocol was re-audited for REV18 fetch integrity and literal targets.
+# REV19 re-audits serial binding and the optional native total deadline.
+# REV18 fetch integrity and literal targets remain covered.
 # File APIs remain valid for terminal, Mass Flash and Mi Unlock.
 assert 'fun flashPartitionDetailed(partition: String, file: File): FlashResult' in fastboot
 assert 'flashPartitionDetailedInternal(partition, file, file.name, file.length(), null)' in fastboot
 assert 'transferDownloadPayload(file, "flash:$normalizedPartition")' in fastboot
-assert 'fun runFlash(partition: String, file: File, slot: String? = null)' in vm
-assert 'fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String)' in vm
+assert 'fun runFlash(partition: String, file: File, slot: String? = null, expectedSerial: String? = null)' in vm
+assert 'fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String, expectedSerial: String? = null)' in vm
 
 # Direct SAF requires native support and a read-only seekable descriptor, not a
 # silent fallback to a different USB DATA transport or a workspace copy.
