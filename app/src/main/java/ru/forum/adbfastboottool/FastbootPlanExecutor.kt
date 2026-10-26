@@ -5,6 +5,7 @@ import java.io.File
 /** A narrow adapter to the existing protocol, also usable by deterministic offline tests. */
 internal interface FastbootPlanPort {
     fun getVar(name: String): String?
+    fun downloadLimitBytes(): Long? = FastbootGetVarAllParser.parseSizeValue(getVar("max-download-size"))
     fun targets(partition: String, slot: String?): List<String>
     fun command(command: String): Boolean
     fun flash(partition: String, file: File)
@@ -32,9 +33,7 @@ internal class FastbootPlanExecutor(
         val prepared = steps.flatMap { step -> checkCancelled(); prepare(step) }
         val payloads = prepared.mapNotNull { it.payload }.distinct()
         if (payloads.isNotEmpty()) {
-            val max = port.getVar("max-download-size")?.takeIf { it.isNotBlank() }?.let {
-                runCatching { FastbootHostSyntax.hexSize(it) }.getOrNull()
-            }
+            val max = port.downloadLimitBytes()
             for (file in payloads) {
                 require(file.isFile && file.canRead()) { "Payload is unavailable: ${file.name}" }
                 val rejection = FastbootDownloadSizePolicy.validate(file.length(), max)

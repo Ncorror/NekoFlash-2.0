@@ -1142,6 +1142,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             try {
                 val port = object : FastbootPlanPort {
                     override fun getVar(name: String) = proto.getVar(name)
+                    override fun downloadLimitBytes() = proto.hostDownloadLimitBytes()
                     override fun targets(partition: String, slot: String?) = proto.resolveSlotPartitionTargets(partition, slot)
                         ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
                     override fun command(command: String) = proto.runTerminalCommand(command)

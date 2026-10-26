@@ -2495,6 +2495,9 @@ class FastbootProtocol(
         return try { token.toLong(16) } catch (_: NumberFormatException) { parseFastbootSize(token) }
     }
 
+    /** Host plans must use the same cached value and numeric convention as the DATA preflight. */
+    internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock { effectiveMaxDownloadSizeBytes() }
+
     private fun effectiveMaxDownloadSizeBytes(): Long? {
         cachedDiagnostics?.maxDownloadSizeBytes?.takeIf { it > 0L }?.let { return it }
         if (sessionState != SessionState.IDLE) return null

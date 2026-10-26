@@ -19,6 +19,8 @@ assert plan.count('startOperation(') == 1
 assert 'expectedFastbootSerial = expectedSerial' in plan
 assert 'context.ensureActive()' in plan and 'directory.deleteRecursively()' in plan
 assert 'proto.flashPartitionDetailed(partition, file)' in plan
+assert 'override fun downloadLimitBytes() = proto.hostDownloadLimitBytes()' in plan
+assert 'internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock { effectiveMaxDownloadSizeBytes() }' in (java / 'FastbootProtocol.kt').read_text()
 assert executor.index('val prepared =') < executor.index('prepared.forEachIndexed')
 assert 'FastbootDownloadSizePolicy.validate(' in executor
 assert 'listOf("userdata", "cache", "metadata")' in executor

@@ -54,4 +54,22 @@ class FastbootFilesystemFormatterTest {
         }
         assertTrue(temporary.root.listFiles()!!.isEmpty())
     }
+    @Test fun cancellationWhileGeneratorRunsTerminatesItBeforeRemovingImages() {
+        val pid = File(temporary.root, "generator.pid")
+        val script = File(temporary.root, "slow-mkfs").also {
+            it.writeText("#!/bin/sh\necho \$\$ > '${pid.path}'\nexec /bin/sleep 30\n")
+            check(it.setExecutable(true))
+        }
+        var checks = 0
+        val start = System.nanoTime()
+        assertThrows(InterruptedException::class.java) {
+            FastbootFilesystemFormatter(mapOf("ext4" to script))
+                .generate(FilesystemSpec("ext4", 32L * 1024 * 1024), temporary.root) {
+                    if (++checks >= 2) throw InterruptedException()
+                }
+        }
+        assertTrue((System.nanoTime() - start) / 1_000_000 < 5000)
+        assertFalse(ProcessHandle.of(pid.readText().trim().toLong()).map { it.isAlive }.orElse(false))
+        assertTrue(temporary.root.listFiles()!!.none { it.name.startsWith("filesystem-") || it.name.startsWith("mkfs-") })
+    }
 }

@@ -79,6 +79,12 @@ class FastbootPlanExecutorTest {
         assertThrows(IllegalArgumentException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe())) }
         assertTrue(mutations().isEmpty())
     }
+    @Test fun decimalDownloadLimitIsNotMisreadAsHexadecimalPartitionSize() {
+        // 100-byte fixture exceeds 75 decimal, but would fit if incorrectly read as 0x75.
+        variables["max-download-size"] = "75"
+        assertThrows(IllegalArgumentException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe())) }
+        assertTrue(mutations().isEmpty())
+    }
     @Test fun stopOnFailureDoesNotFlashOrRunTheTailOfThePlan() {
         fail = "erase:userdata"
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot"))) }
