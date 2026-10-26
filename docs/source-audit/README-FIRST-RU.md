@@ -1,3 +1,5 @@
+> Актуальная точка продолжения: [REV21 — host-команды Fastboot](REV21-FASTBOOT-HOST-2026-10-26-RU.md), [Draft PR #7](https://github.com/Ncorror/NekoFlash-2.0/pull/7). Код проверен в CI: 179 тестов, lint и четыре ABI. Ниже сохранена историческая заметка REV5; её статус «не собрано» относится только к тому этапу.
+
 # NekoFlash 2.0 REV5 — точка продолжения
 
 **Основа:** ORIGINAL `NekoFlash-main-legacy.zip` (SHA256 указан в `LEGACY-SOURCE-SHA256.json`). НЕ NekoFlash Pro.
