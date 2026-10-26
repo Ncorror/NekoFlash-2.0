@@ -24,6 +24,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.UUID
 import java.io.File
+import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -179,6 +180,41 @@ class ForegroundServiceLifecycleTest {
             assertEquals(0, notification.flags and Notification.FLAG_ONGOING_EVENT)
             assertNotEquals(0, notification.flags and Notification.FLAG_AUTO_CANCEL)
             assertTrue(shadowOf(service).isStoppedBySelf)
+        } finally { controller.destroy() }
+    }
+
+    @Test fun nextRequestTimeoutStopsCompletedPreviousService() {
+        val session = DeviceSessionStore.get(app)
+        session.runFastbootCommand("getvar:product")
+        val firstStart = requireNotNull(shadowOf(app).nextStartedService)
+        val controller = Robolectric.buildService(FlashOperationService::class.java).create()
+        val service = controller.get()
+        try {
+            service.onStartCommand(firstStart, 0, 1)
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            // Let the worker finish without draining its main-thread callback.
+            while (!session.runWorkspaceMaintenanceIfIdle {}) {
+                check(System.nanoTime() < deadline) { "First operation did not complete" }
+                Thread.sleep(10)
+            }
+            session.runFastbootCommand("getvar:serialno")
+            val pendingStart = requireNotNull(shadowOf(app).nextStartedService)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertFalse(shadowOf(service).isStoppedBySelf)
+            // The second intent never arrives: old completion has deferred
+            // shutdown, so the second request's timeout must now finish it.
+            shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(11))
+            assertFalse(session.operationActive.value!!)
+            assertEquals(DeviceViewModel.OperationOutcomeKind.FAILED, session.operationProgress.value!!.outcome)
+            val record = requireNotNull(OperationRecoveryStore(File(app.filesDir, "execution-state")).readOperation())
+            assertEquals(pendingStart.getStringExtra("operation_id"), record.id)
+            assertEquals(PersistedOperationPhase.FAILED, record.phase)
+            assertTrue(shadowOf(service).isStoppedBySelf)
+            FlashOperationService.complete(requireNotNull(firstStart.getStringExtra("operation_id")))
+            shadowOf(Looper.getMainLooper()).idle()
+            val notification = requireNotNull(shadowOf(app.getSystemService(NotificationManager::class.java))
+                .getNotification(1401))
+            assertEquals(record.detail, notification.extras.getString(Notification.EXTRA_TEXT))
         } finally { controller.destroy() }
     }
 

@@ -75,8 +75,13 @@ class FlashOperationService : Service() {
 
     private fun operationFinished(id: String) {
         val task = activeOperation
-        if (task?.id != id || !registry.isEmpty()) return
         val state = session.lastPersistedOperation(id)
+        if (!registry.isEmpty() || task?.job?.isCompleted == false) return
+        // A previous completion may have deferred shutdown while the next
+        // request was pending. If that request never reaches onStartCommand,
+        // its failure still owns the latest persisted result and must stop the
+        // now-idle service. A stale callback must not replace a newer result.
+        if (task?.id != id && state == null) return
         // Drop foreground ownership first, so the result is dismissible rather
         // than inheriting the system's foreground-service notification flags.
         if (foregroundStarted) stopForeground(if (state != null) STOP_FOREGROUND_DETACH else STOP_FOREGROUND_REMOVE)
@@ -89,7 +94,7 @@ class FlashOperationService : Service() {
                 PersistedOperationPhase.INTERRUPTED -> R.string.rev20_operation_interrupted
                 else -> R.string.layout_operation_center_failed
             }
-            notifySafely(buildNotification("${task.title} · ${getString(status)}", state.detail, state.percent, ongoing = false))
+            notifySafely(buildNotification("${state.title} · ${getString(status)}", state.detail, state.percent, ongoing = false))
         }
         activeOperation = null
         stopSelfResult(latestStartId)
