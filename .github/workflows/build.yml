@@ -46,9 +46,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV21 structural and source-guard tests
+      - name: REV22 structural and source-guard tests
         run: |
-          python3 tests/check_rev21.py
+          python3 tests/check_rev22.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
@@ -59,7 +59,13 @@ jobs:
       - name: Install filesystem integration-test tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y e2fsprogs f2fs-tools
+          sudo apt-get install -y e2fsprogs f2fs-tools autoconf automake libtool pkg-config
+
+      - name: Build pinned Android filesystem generators
+        timeout-minutes: 20
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
+          python3 scripts/build_filesystem_tools.py --ndk "$ANDROID_HOME/ndk/27.2.12479018"
 
       - name: Kotlin JVM queue and diagnostic regression tests
         timeout-minutes: 15
@@ -84,6 +90,19 @@ jobs:
             --stacktrace \
             --warning-mode all \
             --console=plain 2>&1 | tee debug_build_log.txt
+
+      - name: Verify APK filesystem executables and build instrumentation APK
+        run: |
+          python3 tests/check_filesystem_apk.py app/build/outputs/apk/debug/app-debug.apk
+          ./gradlew :app:assembleDebugAndroidTest --no-daemon --console=plain
+
+      - name: Upload instrumentation APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-${{ github.sha }}-android-test
+          path: app/build/outputs/apk/androidTest/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Summarize test and lint reports
         run: |
@@ -129,6 +148,9 @@ jobs:
 
           cp "$DEBUG_APK" \
             "artifacts/debug/NekoFlash-${VERSION_NAME}-debug.apk"
+
+          cp build/filesystem-tools/filesystem-tools-source.tar.gz artifacts/debug/
+          cp build/filesystem-tools/build-info.json artifacts/debug/filesystem-tools-build-info.json
 
           cd artifacts/debug
           sha256sum *.apk > checksums-sha256.txt
@@ -349,6 +371,10 @@ jobs:
           certificateSha256=$EXPECTED_RELEASE_CERT_SHA256
           EOF
 
+          python3 tests/check_filesystem_apk.py "$FINAL_APK"
+          cp build/filesystem-tools/filesystem-tools-source.tar.gz artifacts/release/
+          cp build/filesystem-tools/build-info.json artifacts/release/filesystem-tools-build-info.json
+
           cd artifacts/release
 
           if find . -type f -iname '*unsigned*' | grep -q .; then
@@ -404,9 +430,64 @@ jobs:
             debug_build_log.txt
             release_build_log.txt
             apk-signature.txt
+            build/filesystem-tools/*.log
+            build/filesystem-tools/build-info.json
             app/build/reports/lint-results-*.html
             app/build/reports/lint-results-*.xml
             app/build/reports/tests/testDebugUnitTest/
             app/build/test-results/testDebugUnitTest/
           if-no-files-found: ignore
           retention-days: 30
+
+  android-filesystems:
+    name: Installed mkfs on Android API ${{ matrix.api }}
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 34]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      - uses: actions/download-artifact@v6
+        with:
+          name: NekoFlash-${{ github.sha }}-debug
+          path: emulator-apk
+      - uses: actions/download-artifact@v6
+        with:
+          name: NekoFlash-${{ github.sha }}-android-test
+          path: emulator-test-apk
+      - name: Prepare emulator access and independent fsck tools
+        run: |
+          sudo chmod 666 /dev/kvm
+          sudo apt-get update -qq
+          sudo apt-get install -y e2fsprogs f2fs-tools
+      - name: Run installed-app filesystem tests without root
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          script: |
+            adb install emulator-apk/NekoFlash-*-debug.apk
+            adb install emulator-test-apk/app-debug-androidTest.apk
+            adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/androidx.test.runner.AndroidJUnitRunner | tee android-mkfs-tests.txt
+            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (4 tests)' in s and 'FAILURES' not in s, s"
+            python3 tests/verify_android_filesystems.py --output android-mkfs-images
+      - name: Upload Android filesystem evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-${{ github.sha }}-mkfs-api${{ matrix.api }}
+          path: |
+            android-mkfs-tests.txt
+            android-mkfs-images/
+          if-no-files-found: ignore
+          retention-days: 30
+

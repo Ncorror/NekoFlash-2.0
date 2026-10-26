@@ -16,7 +16,7 @@ internal fun interface FilesystemFormatter {
 
 /** Uses real filesystem tools on the host. It never substitutes erase for a failed mkfs. */
 internal class FastbootFilesystemFormatter(
-    private val tools: Map<String, File> = discoverTools(),
+    private val tools: Map<String, File>,
     private val nextData: (RandomAccessFile, Long) -> Long? = { _, offset -> offset },
     private val log: (String) -> Unit = {}
 ) : FilesystemFormatter {
@@ -30,14 +30,20 @@ internal class FastbootFilesystemFormatter(
         val raw = File.createTempFile("filesystem-", ".raw", directory)
         val sparse = File.createTempFile("filesystem-", ".sparse", directory)
         val processLog = File.createTempFile("mkfs-", ".log", directory)
+        var profile: File? = null
         var keep = false
         try {
+            if (spec.type == "ext4") {
+                profile = File.createTempFile("mke2fs-", ".conf", directory)
+                profile.writeText(EXT4_PROFILE)
+            }
             RandomAccessFile(raw, "rw").use { it.setLength(size) }
             val args = arguments(tool, spec, raw, size)
             log("Host filesystem: ${spec.type}, $size bytes, tool=${tool.absolutePath}")
             checkCancelled()
             val process = ProcessBuilder(args).redirectErrorStream(true).redirectOutput(processLog).apply {
                 environment()["LC_ALL"] = "C"
+                profile?.let { environment()["MKE2FS_CONFIG"] = it.absolutePath }
             }.start()
             try {
                 process.outputStream.close()
@@ -57,6 +63,7 @@ internal class FastbootFilesystemFormatter(
         } finally {
             raw.delete()
             processLog.delete()
+            profile?.delete()
             if (!keep) sparse.delete()
         }
     }
@@ -74,7 +81,7 @@ internal class FastbootFilesystemFormatter(
             if ("casefold" in spec.options) ",casefold" else ""
         val extended = buildList {
             // Fully initialize our local image before turning holes/zeroes into sparse chunks.
-            add("lazy_itable_init=0"); add("lazy_journal_init=0")
+            add("lazy_itable_init=0"); add("lazy_journal_init=0"); add("root_owner=0:0")
             if (spec.eraseBlockBytes > 0 && spec.logicalBlockBytes > 0) {
                 val stride = maxOf(2L, spec.logicalBlockBytes / 4096)
                 add("stride=$stride"); add("stripe-width=${maxOf(stride, spec.eraseBlockBytes / 4096)}")
@@ -107,12 +114,13 @@ internal class FastbootFilesystemFormatter(
     }
 
     companion object {
-        private fun discoverTools(): Map<String, File> = buildMap {
-            val roots = listOf("/system/bin", "/system/xbin", "/vendor/bin", "/sbin")
-            for ((type, names) in mapOf("ext4" to listOf("mke2fs", "mkfs.ext4"), "f2fs" to listOf("mkfs.f2fs", "make_f2fs"))) {
-                roots.flatMap { root -> names.map { File(root, it) } }.firstOrNull { it.isFile && it.canExecute() }
-                    ?.let { put(type, it) }
-            }
-        }
+        // Keep image defaults independent of the formatting phone's system configuration.
+        private const val EXT4_PROFILE = "[defaults]\n" +
+            "base_features = sparse_super,large_file,filetype,resize_inode,dir_index,ext_attr\n" +
+            "default_mntopts = acl,user_xattr\nenable_periodic_fsck = 0\n" +
+            "blocksize = 4096\ninode_size = 256\ninode_ratio = 16384\n" +
+            "[fs_types]\next4 = {\n inode_ratio = 16384\n}\n" +
+            "small = {\n inode_ratio = 4096\n}\nfloppy = {\n inode_ratio = 8192\n}\n" +
+            "big = {\n inode_ratio = 32768\n}\nhuge = {\n inode_ratio = 65536\n}\n"
     }
 }

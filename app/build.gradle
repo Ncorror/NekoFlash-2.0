@@ -18,6 +18,16 @@ def releaseSigningReady = [
 android {
     namespace = 'ru.forum.adbfastboottool'
     compileSdk = 36
+    ndkVersion = '27.2.12479018'
+
+    sourceSets.main.jniLibs.srcDir(rootProject.file('build/filesystem-tools/jniLibs'))
+    sourceSets.main.assets.srcDir(rootProject.file('build/filesystem-tools/assets'))
+    packaging {
+        jniLibs {
+            // PIE generators must be executable from PackageManager's read-only nativeLibraryDir.
+            useLegacyPackaging = true
+        }
+    }
 
     // AGP 8.x по умолчанию НЕ генерирует BuildConfig — включаем явно,
     // т.к. код использует BuildConfig.VERSION_NAME / VERSION_CODE / DEBUG.
@@ -46,6 +56,7 @@ android {
         applicationId = "ru.forum.adbfastboottool"
         minSdk = 26
         targetSdk = 34
+        testInstrumentationRunner = 'androidx.test.runner.AndroidJUnitRunner'
         versionCode = 234
         versionName = "6.0.0-alpha11"
         def buildCommit = (System.getenv("GITHUB_SHA") ?: System.getenv("NEKOFLASH_BUILD_COMMIT") ?: "local").trim()
@@ -117,6 +128,8 @@ kotlin {
 }
 
 dependencies {
+    androidTestImplementation('androidx.test:runner:1.6.2')
+    androidTestImplementation('androidx.test.ext:junit:1.2.1')
     testImplementation('junit:junit:4.13.2')
     testImplementation('org.robolectric:robolectric:4.17')
     implementation('androidx.core:core-ktx:1.17.0')
@@ -137,6 +150,13 @@ dependencies {
     // Palette API — динамическое извлечение цветов из bg_welcome.jpg
     implementation('androidx.palette:palette-ktx:1.0.0')
 }
+
+def buildFilesystemTools = tasks.register('buildFilesystemTools', Exec) {
+    workingDir(rootProject.projectDir)
+    commandLine('python3', rootProject.file('scripts/build_filesystem_tools.py'),
+        '--ndk', new File(android.sdkDirectory, "ndk/${android.ndkVersion}"))
+}
+tasks.named('preBuild').configure { dependsOn(buildFilesystemTools) }
 
 
 // Production invariant: a release package must never be emitted unsigned.

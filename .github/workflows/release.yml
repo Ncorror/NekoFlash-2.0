@@ -173,11 +173,11 @@ jobs:
           test -x gradlew
           ls -l gradlew
 
-      - name: REV21 structural, source-guard and bilingual checks
+      - name: REV22 structural, source-guard and bilingual checks
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/check_rev21.py
+          python3 tests/check_rev22.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
@@ -188,7 +188,13 @@ jobs:
       - name: Install filesystem integration-test tools
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y e2fsprogs f2fs-tools
+          sudo apt-get install -y e2fsprogs f2fs-tools autoconf automake libtool pkg-config
+
+      - name: Build pinned Android filesystem generators
+        timeout-minutes: 20
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
+          python3 scripts/build_filesystem_tools.py --ndk "$ANDROID_HOME/ndk/27.2.12479018"
 
       - name: Kotlin JVM regression tests
         timeout-minutes: 15
@@ -322,6 +328,10 @@ jobs:
           certificateSha256=$EXPECTED_RELEASE_CERT_SHA256
           EOF
 
+          python3 tests/check_filesystem_apk.py "release-dist/$FINAL_APK"
+          cp build/filesystem-tools/filesystem-tools-source.tar.gz release-dist/
+          cp build/filesystem-tools/build-info.json release-dist/filesystem-tools-build-info.json
+
           cd release-dist
 
           sha256sum "$FINAL_APK" > "${FINAL_APK}.sha256"
@@ -366,6 +376,8 @@ jobs:
           gh release create "$TAG" \
             release-dist/NekoFlash-"$VERSION_NAME".apk \
             release-dist/NekoFlash-"$VERSION_NAME".apk.sha256 \
+            release-dist/filesystem-tools-source.tar.gz \
+            release-dist/filesystem-tools-build-info.json \
             release-dist/apk-signature.txt \
             release-dist/build-info.txt \
             --verify-tag \

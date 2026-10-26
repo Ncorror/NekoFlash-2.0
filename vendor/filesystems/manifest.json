@@ -1,0 +1,19 @@
+{
+  "ndk": "27.2.12479018",
+  "api": 26,
+  "sources": {
+    "e2fsprogs": {
+      "version": "1.47.0",
+      "url": "https://github.com/tytso/e2fsprogs.git",
+      "commit": "25ad8a431331b4d1d444a70b6079456cc612ac40",
+      "tar_sha256": "5206be74ea74a163df27153043248bafa431dc153ca14dcb6f914e29f508f07b"
+    },
+    "f2fs-tools": {
+      "version": "1.16.0",
+      "upstream": "https://kernel.googlesource.com/pub/scm/linux/kernel/git/jaegeuk/f2fs-tools",
+      "url": "https://github.com/LineageOS/android_external_f2fs-tools.git",
+      "commit": "06c027abc6153c4a97cba5317844e8dcaaee3cf7",
+      "tar_sha256": "87d0ecee953f1c800c8c1869b5cdca8e37d5df1fe7e40a80e21b187425205c48"
+    }
+  }
+}
