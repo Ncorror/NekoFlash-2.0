@@ -197,6 +197,7 @@ class MainActivity : AppCompatActivity() {
         data object LocalStatus : TerminalAction()
         data object OpenReportsFolder : TerminalAction()
         data class RawFastboot(val command: String) : TerminalAction()
+        data class FastbootPlan(val steps: List<FastbootExecutionStep>) : TerminalAction()
         data class FastbootFlash(val partition: String, val file: File, val slot: String? = null) : TerminalAction()
         data class FastbootPartitionCommand(val wirePrefix: String, val partition: String, val slot: String? = null) : TerminalAction()
         data class FastbootDownloadAndRun(val file: File, val commandAfterDownload: String) : TerminalAction()
@@ -990,32 +991,8 @@ class MainActivity : AppCompatActivity() {
         when (val action = request.action) {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
-            is TerminalAction.RawFastboot -> {
-                val hostOp = action.command.substringBefore(' ').substringBefore(':')
-                if (!hostOp.matches(Regex("^-{0,2}[A-Za-z0-9][A-Za-z0-9._-]*$"))) {
-                    viewModel.log("❌ Invalid Fastboot command: $hostOp")
-                } else if (viewModel.fastbootProtocol?.isConnected != true) {
-                    viewModel.log(
-                        DiagnosticLogPolicy.Level.ERROR,
-                        "ERROR: Fastboot device is not connected. Command was not sent."
-                    )
-                } else {
-                    // Raw/OEM passthrough остаётся разрешённым; terminal FAIL/OKAY
-                    // показывается в Console без блокирующего progress-dialog.
-                    viewModel.runFastbootCommand(action.command, heavy = false, expectedSerial = expectedSerial)
-                }
-            }
-            is TerminalAction.FastbootFlash -> viewModel.runFlash(action.partition, action.file, action.slot, expectedSerial)
-            is TerminalAction.FastbootPartitionCommand -> viewModel.runFastbootPartitionCommand(action.wirePrefix, action.partition, action.slot, expectedSerial)
-            is TerminalAction.FastbootDownloadAndRun -> viewModel.runFastbootDownloadAndRun(action.file, action.commandAfterDownload, expectedSerial)
-            is TerminalAction.FastbootLogicalInfo -> viewModel.inspectFastbootLogicalPartition(action.partition, expectedSerial)
-            is TerminalAction.FastbootFetch -> viewModel.runFastbootFetch(action.partition, action.outputFile, action.slot, expectedSerial)
-            is TerminalAction.AdbService,
-            is TerminalAction.AdbShell,
-            is TerminalAction.AdbPush,
-            is TerminalAction.AdbPull,
-            is TerminalAction.AdbInstall,
-            is TerminalAction.AdbInstallMultiple -> Unit
+            is TerminalAction.FastbootPlan -> viewModel.runFastbootTerminalPlan(action.steps, expectedSerial)
+            else -> error("Fastboot action was not normalized into one execution plan")
         }
     }
 
@@ -1049,6 +1026,7 @@ class MainActivity : AppCompatActivity() {
             is TerminalAction.AdbPull -> viewModel.runAdbPull(action.remotePath, action.localFile)
             is TerminalAction.AdbInstall -> viewModel.runAdbInstall(action.packageFile, action.options)
             is TerminalAction.AdbInstallMultiple -> viewModel.runAdbInstallMultiple(action.apkFiles, action.options)
+            is TerminalAction.FastbootPlan,
             is TerminalAction.RawFastboot,
             is TerminalAction.FastbootFlash,
             is TerminalAction.FastbootPartitionCommand,
@@ -1068,7 +1046,9 @@ class MainActivity : AppCompatActivity() {
         val wireCommand: String,
         val slot: String? = null,
         val setActive: String? = null,
-        val serial: String? = null
+        val serial: String? = null,
+        val wipe: Boolean = false,
+        val filesystemOptions: Set<String> = emptySet()
     )
 
     private data class FastbootTerminalRequest(val action: TerminalAction, val serial: String?)
@@ -1093,6 +1073,8 @@ class MainActivity : AppCompatActivity() {
         var slot: String? = null
         var setActive: String? = null
         var serial: String? = null
+        var wipe = false
+        var filesystemOptions = emptySet<String>()
         var i = 0
 
         fun nextOptionValue(option: String): String? {
@@ -1107,6 +1089,11 @@ class MainActivity : AppCompatActivity() {
 
         while (i < tokens.size) {
             val token = tokens[i]
+            if (token == "raw" && commandTokens.isEmpty()) {
+                commandTokens += tokens.drop(i)
+                wireTokens += lexicalTokens.drop(i).map { it.literal }
+                break
+            }
             if (token == "--") {
                 commandTokens += tokens.drop(i + 1)
                 wireTokens += lexicalTokens.drop(i + 1).map { it.literal }
@@ -1114,6 +1101,12 @@ class MainActivity : AppCompatActivity() {
             }
             val lower = token.lowercase(Locale.US)
             when {
+                token == "-w" || lower == "--wipe" && commandTokens.firstOrNull() != "update-super" -> wipe = true
+                lower == "--fs-options" || lower.startsWith("--fs-options=") -> {
+                    val value = if ('=' in token) token.substringAfter('=') else nextOptionValue(token) ?: return null
+                    filesystemOptions = try { filesystemOptions + FastbootHostSyntax.filesystemOptions(value) }
+                        catch (error: IllegalArgumentException) { viewModel.log("❌ ${error.message}"); return null }
+                }
                 lower == "--slot" -> {
                     val value = nextOptionValue("--slot") ?: return null
                     slot = normalizeFastbootSlot(value) ?: return null
@@ -1168,7 +1161,7 @@ class MainActivity : AppCompatActivity() {
             i += 1
         }
 
-        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial)
+        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial, wipe, filesystemOptions)
     }
 
     private fun parseFastbootCommand(cmd: String): FastbootTerminalRequest? {
@@ -1183,28 +1176,60 @@ class MainActivity : AppCompatActivity() {
         if (rawTokens.isEmpty()) return null
 
         val parsedOptions = parseFastbootTerminalOptions(rawTokens) ?: return null
-        val action = parseFastbootAction(parsedOptions) ?: return null
-        return FastbootTerminalRequest(action, parsedOptions.serial)
+        val action = try {
+            if (parsedOptions.tokens.isEmpty() && (parsedOptions.wipe || parsedOptions.setActive != null)) TerminalAction.FastbootPlan(emptyList())
+            else parseFastbootAction(parsedOptions) ?: return null
+        } catch (error: IllegalArgumentException) {
+            viewModel.log("❌ ${error.message}")
+            return null
+        }
+        if (action is TerminalAction.LocalStatus || action is TerminalAction.OpenReportsFolder) {
+            if (parsedOptions.wipe || parsedOptions.setActive != null) {
+                viewModel.log("❌ Local status/reports cannot be combined with -w or --set-active")
+                return null
+            }
+            return FastbootTerminalRequest(action, parsedOptions.serial)
+        }
+        val steps = when (action) {
+            is TerminalAction.FastbootPlan -> action.steps
+            is TerminalAction.RawFastboot -> {
+                val op = action.command.substringBefore(' ').substringBefore(':')
+                if (!op.matches(Regex("^-{0,2}[A-Za-z0-9][A-Za-z0-9._-]*$"))) {
+                    viewModel.log("❌ Invalid Fastboot command: $op"); return null
+                }
+                listOf(FastbootExecutionStep.Raw(action.command))
+            }
+            is TerminalAction.FastbootFlash -> listOf(FastbootExecutionStep.Flash(action.partition, action.file, action.slot))
+            is TerminalAction.FastbootPartitionCommand -> listOf(FastbootExecutionStep.PartitionCommand(action.wirePrefix, action.partition, action.slot))
+            is TerminalAction.FastbootDownloadAndRun -> listOf(FastbootExecutionStep.Download(action.file, action.commandAfterDownload))
+            is TerminalAction.FastbootLogicalInfo -> listOf(FastbootExecutionStep.Inspect(action.partition))
+            is TerminalAction.FastbootFetch -> listOf(FastbootExecutionStep.Fetch(action.partition, action.outputFile, action.slot))
+            else -> error("Unexpected ADB action in Fastboot parser")
+        }
+        val plan = FastbootHostSyntax.compose(steps, parsedOptions.wipe, parsedOptions.filesystemOptions, parsedOptions.setActive)
+        return FastbootTerminalRequest(TerminalAction.FastbootPlan(plan), parsedOptions.serial)
     }
 
     private fun parseFastbootAction(parsedOptions: FastbootTerminalOptions): TerminalAction? {
         // Forward only command tokens: host selectors must never reach OEM/raw commands.
         val clean = parsedOptions.wireCommand
-        if (parsedOptions.setActive != null && parsedOptions.tokens.isEmpty()) {
-            return TerminalAction.RawFastboot("set_active:${parsedOptions.setActive}")
-        }
-
         val tokens = parsedOptions.tokens
         if (tokens.isEmpty()) return null
         val op = tokens[0].lowercase(Locale.US)
 
         if (warnIfBatchOrShellSyntax(op, clean)) return null
 
+        if (op == "format" || op.startsWith("format:")) {
+            if (tokens.size != 2) return invalidTerminalFormat("fastboot [--slot=SLOT] [--fs-options=OPTIONS] format[:FS_TYPE[:HEX_SIZE]] PARTITION")
+            return TerminalAction.FastbootPlan(listOf(FastbootHostSyntax.format(op, tokens[1], parsedOptions.slot, parsedOptions.filesystemOptions)))
+        }
         return when (op) {
+            "raw" -> {
+                if (tokens.size < 2) return invalidTerminalFormat("fastboot raw WIRE_COMMAND")
+                TerminalAction.RawFastboot(clean.substringAfter(' ').trimStart())
+            }
             "status", "devices" -> TerminalAction.LocalStatus
             "reports", "open-reports", "report-folder", "reports-folder" -> TerminalAction.OpenReportsFolder
-
-            "-w", "--wipe" -> TerminalAction.RawFastboot("erase:userdata")
 
             "flash" -> {
                 if (tokens.size < 3) return invalidTerminalFormat("fastboot [--slot=<a|b|all|other>] flash <partition> <file.img>")
@@ -1271,7 +1296,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
-            "wipe-super" -> TerminalAction.RawFastboot(clean)
+            "wipe-super" -> {
+                if (tokens.size !in 1..2) return invalidTerminalFormat("fastboot [--slot=SLOT] wipe-super [super_empty.img]")
+                val file = resolveTerminalFile(tokens.getOrNull(1) ?: "super_empty.img") ?: return null
+                TerminalAction.FastbootPlan(listOf(FastbootExecutionStep.WipeSuper(file, parsedOptions.slot)))
+            }
 
             "snapshot-update" -> {
                 val action = tokens.getOrNull(1)?.lowercase(Locale.US)
@@ -1298,11 +1327,6 @@ class MainActivity : AppCompatActivity() {
             "erase" -> {
                 if (tokens.size < 2) return invalidTerminalFormat("fastboot [--slot=<a|b|all|other>] erase <partition>")
                 TerminalAction.FastbootPartitionCommand("erase", tokens[1], parsedOptions.slot)
-            }
-
-            "format" -> {
-                if (tokens.size < 2) return invalidTerminalFormat("fastboot [--slot=<a|b|all|other>] format <partition>")
-                TerminalAction.FastbootPartitionCommand("format", tokens[1], parsedOptions.slot)
             }
 
             "set_active", "set-active" -> {
@@ -3018,6 +3042,12 @@ class MainActivity : AppCompatActivity() {
             toolPartition(R.id.edToolPartition)?.let {
                 autoShowGuiOperation = true
                 viewModel.runFastbootPartitionCommand("erase", it)
+            }
+        }
+        findViewById<View>(R.id.btnToolFormat).setOnClickListener {
+            toolPartition(R.id.edToolPartition)?.let {
+                autoShowGuiOperation = true
+                viewModel.runFastbootTerminalPlan(listOf(FastbootExecutionStep.Format(it)))
             }
         }
         findViewById<View>(R.id.btnToolBoot).setOnClickListener {
