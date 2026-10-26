@@ -8,6 +8,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
@@ -29,7 +30,8 @@ class FlashOperationService : Service() {
         if (task != null && task.tracksProgress && progress != null && !task.job.isCompleted &&
             SystemClock.elapsedRealtime() - lastNotificationAtMs >= 500L) {
             lastNotificationAtMs = SystemClock.elapsedRealtime()
-            notifySafely(buildNotification(task.title, progress.detail, progress.percent, ongoing = true))
+            notifySafely(buildNotification(task.title,
+                progress.detail.ifBlank { getString(R.string.service_default_text) }, progress.percent, ongoing = true))
         }
     }
 
@@ -51,7 +53,7 @@ class FlashOperationService : Service() {
             ServiceCompat.startForeground(this, NOTIFICATION_ID,
                 buildNotification(shown?.title ?: getString(R.string.app_name),
                     shown?.description ?: getString(R.string.rev20_service_preparing), -1, ongoing = true),
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0)
             foregroundStarted = true
         } catch (error: Exception) {
             task?.rejectStartup(getString(R.string.rev20_foreground_failed, error.message ?: error.javaClass.simpleName))

@@ -9,7 +9,6 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import androidx.core.content.ContextCompat
 import androidx.core.content.IntentCompat
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -25,7 +24,7 @@ internal object DeviceSessionStore : ViewModelStoreOwner {
         val session = ViewModelProvider(this, object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
-                DeviceViewModel(application, SavedStateHandle()) as T
+                DeviceViewModel(application) as T
         })[DeviceViewModel::class.java]
         if (!receiverRegistered) {
             val receiver = object : BroadcastReceiver() {

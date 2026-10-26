@@ -56,6 +56,7 @@ class ForegroundServiceLifecycleTest {
         shadowOf(Looper.getMainLooper()).idle()
     }
 
+    @Suppress("DEPRECATION") // API 26 has no PermissionInfo.getProtection().
     @Before fun grantMergedSignaturePermissionInSimulator() {
         if (Build.VERSION.SDK_INT < 33) {
             // Robolectric #9124: the simulator does not grant this merged
@@ -141,6 +142,19 @@ class ForegroundServiceLifecycleTest {
             // protocol. The admission failure must win before that body starts.
             assertTrue(final.detail.contains("test promotion refusal"))
         } finally { controller.destroy() }
+    }
+
+    @Test fun realViewModelRecreationRestoresDraftWithoutSubmittingWork() {
+        val first = DeviceSessionStore.get(app)
+        val image = File(app.filesDir, "queue image.img").apply { writeText("test image") }
+        first.addFlashQueueFile("boot_b", image)
+        first.addFlashQueueFile("boot_a", image)
+        DeviceSessionStore.viewModelStore.clear()
+        val restored = DeviceSessionStore.get(app)
+        assertNotSame(first, restored)
+        assertEquals(listOf("boot_b", "boot_a"), restored.currentFlashOperationDraft().items.map { it.partition })
+        assertNull(shadowOf(app).nextStartedService)
+        assertFalse(restored.operationActive.value!!)
     }
 
     @Test fun realViewModelCompletionLeavesDismissibleResultNotification() {

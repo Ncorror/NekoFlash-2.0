@@ -11,7 +11,6 @@ import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.SavedStateHandle
 import androidx.core.content.edit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -42,10 +41,7 @@ import java.util.concurrent.atomic.AtomicReference
  * и публикует прогресс. Mutation-команды передаются напрямую реальному protocol-слою;
  * ViewModel не вводит отдельные host-side разрешения поверх bootloader/ADB.
  */
-class DeviceViewModel(
-    application: Application,
-    private val savedStateHandle: SavedStateHandle
-) : AndroidViewModel(application) {
+class DeviceViewModel(application: Application) : AndroidViewModel(application) {
 
     enum class ConnectionState { NONE, CONNECTING, FASTBOOT, ADB, ERROR }
 
@@ -171,12 +167,11 @@ class DeviceViewModel(
 
     private val flashDraftLock = Any()
     private var flashDraftSnapshot: FlashOperationDraft =
-        runCatching { recoveryStore.readDraft() }.getOrNull()
-            ?: FlashOperationDraftCodec.decode(savedStateHandle.get<ArrayList<String>>(SAVED_FLASH_QUEUE_DRAFT))
+        runCatching { recoveryStore.readDraft() }.getOrNull() ?: FlashOperationDraft()
     private val _flashOperationDraft = MutableLiveData(flashDraftSnapshot)
     val flashOperationDraft: LiveData<FlashOperationDraft> = _flashOperationDraft
 
-    /** Transient execution object. It is never placed in SavedStateHandle. */
+    /** Transient execution object. Only the lightweight draft is persisted. */
     data class FlashQueueItem(val partition: String, val file: File, val expectedSizeBytes: Long = file.length())
 
     private data class PendingUnlockVerification(
@@ -1424,7 +1419,6 @@ class DeviceViewModel(
     private fun publishFlashOperationDraft(draft: FlashOperationDraft, persist: Boolean) {
         synchronized(flashDraftLock) { flashDraftSnapshot = draft }
         if (persist) {
-            savedStateHandle[SAVED_FLASH_QUEUE_DRAFT] = FlashOperationDraftCodec.encode(draft)
             runCatching { recoveryStore.writeDraft(draft) }
                 .onFailure { log(text(R.string.rev20_draft_save_failed, it.message ?: it.javaClass.simpleName)) }
         }
@@ -2059,7 +2053,6 @@ class DeviceViewModel(
     }
 
     companion object {
-        private const val SAVED_FLASH_QUEUE_DRAFT = "flash_queue_draft_v1"
         private const val WAKE_LOCK_TIMEOUT_MS = 6L * 60L * 60L * 1000L
         private const val TRANSPORT_SHUTDOWN_TIMEOUT_MS = 100_000L
         private const val TRANSPORT_IDLE_POLL_MS = 10L
