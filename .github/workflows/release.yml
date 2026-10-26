@@ -173,17 +173,22 @@ jobs:
           test -x gradlew
           ls -l gradlew
 
-      - name: REV20 structural, source-guard and bilingual checks
+      - name: REV21 structural, source-guard and bilingual checks
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/check_rev20.py
+          python3 tests/check_rev21.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/native_transfer_deadline_test.cpp -o /tmp/native-deadline-test
           /tmp/native-deadline-test
+
+      - name: Install filesystem integration-test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y e2fsprogs f2fs-tools
 
       - name: Kotlin JVM regression tests
         timeout-minutes: 15

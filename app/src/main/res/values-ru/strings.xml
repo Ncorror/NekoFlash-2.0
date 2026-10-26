@@ -440,7 +440,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="flash_rev7_inventory">Обновить сведения</string>
     <string name="flash_rev7_erase">Стереть раздел</string>
     <string name="flash_rev7_boot">Загрузить образ в RAM (boot)</string>
-    <string name="flash_rev7_format_pending">Format не предлагается до проверки настоящей подготовки образа файловой системы. Сырая команда format:раздел не равна desktop fastboot format.</string>
     <string name="flash_rev7_set_slot_a">Сделать активным слот A</string>
     <string name="flash_rev7_set_slot_b">Сделать активным слот B</string>
     <string name="flash_rev7_inspect_logical">Сведения о логическом разделе</string>
@@ -536,4 +535,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev20_state_save_failed">Не удалось сохранить состояние операции: %1$s</string>
     <string name="rev20_service_lost">Сервис выполнения неожиданно остановлен. Запрошено завершение USB-операции; проверь результат на устройстве.</string>
     <string name="rev20_cancelling_cleanup">Отмена запрошена. Ожидаем завершения USB-запросов и освобождения ресурсов.</string>
+    <string name="rev21_format">Форматировать файловую систему</string>
+    <string name="rev21_preparing_plan">Подготовка плана Fastboot</string>
 </resources>

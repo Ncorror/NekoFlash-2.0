@@ -436,7 +436,6 @@ Unlock</string>
     <string name="flash_rev7_inventory">Refresh inventory</string>
     <string name="flash_rev7_erase">Erase partition</string>
     <string name="flash_rev7_boot">Boot image (without flashing)</string>
-    <string name="flash_rev7_format_pending">Format is not offered until a real filesystem-image implementation is verified. Raw format:partition is not equivalent to desktop fastboot format.</string>
     <string name="flash_rev7_set_slot_a">Set active slot A</string>
     <string name="flash_rev7_set_slot_b">Set active slot B</string>
     <string name="flash_rev7_inspect_logical">Inspect logical partition</string>
@@ -532,4 +531,6 @@ Unlock</string>
     <string name="rev20_state_save_failed">Could not save operation state: %1$s</string>
     <string name="rev20_service_lost">The execution service stopped unexpectedly. USB cleanup was requested; check the device result.</string>
     <string name="rev20_cancelling_cleanup">Cancellation requested. Waiting for USB completion and cleanup.</string>
+    <string name="rev21_format">Format filesystem</string>
+    <string name="rev21_preparing_plan">Preparing Fastboot execution plan</string>
 </resources>

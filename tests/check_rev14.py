@@ -57,6 +57,7 @@ assert 'private val folderName = "NekoFlash"' in main
 release = (root/'.github/workflows/release.yml').read_text()
 release_gate = next(
     gate for gate in (
+        'python3 tests/check_rev21.py',
         'python3 tests/check_rev20.py',
         'python3 tests/check_rev19.py',
         'python3 tests/check_rev18.py',

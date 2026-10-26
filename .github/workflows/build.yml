@@ -46,15 +46,20 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV20 structural and source-guard tests
+      - name: REV21 structural and source-guard tests
         run: |
-          python3 tests/check_rev20.py
+          python3 tests/check_rev21.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
         run: |
           g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/native_transfer_deadline_test.cpp -o /tmp/native-deadline-test
           /tmp/native-deadline-test
+
+      - name: Install filesystem integration-test tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y e2fsprogs f2fs-tools
 
       - name: Kotlin JVM queue and diagnostic regression tests
         timeout-minutes: 15

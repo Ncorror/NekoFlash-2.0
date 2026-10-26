@@ -1125,6 +1125,51 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    internal fun runFastbootTerminalPlan(steps: List<FastbootExecutionStep>, expectedSerial: String? = null) {
+        val heavy = steps.any { it !is FastbootExecutionStep.Raw && it !is FastbootExecutionStep.Inspect && it !is FastbootExecutionStep.PartitionCommand }
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.rev21_preparing_plan),
+            heavy = heavy, expectedFastbootSerial = expectedSerial) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
+            val context = kotlinx.coroutines.currentCoroutineContext()
+            val cache = getApplication<Application>().cacheDir
+            val needsImages = steps.any { it is FastbootExecutionStep.Format || it is FastbootExecutionStep.Wipe || it is FastbootExecutionStep.WipeSuper }
+            // Admission is exclusive. Remove private images left by a killed process before creating this job's directory.
+            if (needsImages) cache.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("fastboot-host-[0-9a-f-]{36}")) }
+                ?.forEach { context.ensureActive(); check(it.deleteRecursively()) { "Could not remove interrupted Fastboot images" } }
+            val directory = if (needsImages) File(cache, "fastboot-host-${UUID.randomUUID()}") else cache
+            if (needsImages) check(directory.mkdirs()) { "Could not create private Fastboot image workspace" }
+            try {
+                val port = object : FastbootPlanPort {
+                    override fun getVar(name: String) = proto.getVar(name)
+                    override fun downloadLimitBytes() = proto.hostDownloadLimitBytes()
+                    override fun targets(partition: String, slot: String?) = proto.resolveSlotPartitionTargets(partition, slot)
+                        ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
+                    override fun command(command: String) = proto.runTerminalCommand(command)
+                    override fun flash(partition: String, file: File) {
+                        val result = proto.flashPartitionDetailed(partition, file)
+                        if (!result.success) failOperation(formatFlashFailure(partition, result))
+                    }
+                    override fun download(file: File, command: String) {
+                        if (!proto.downloadAndRun(file, command)) failOperation(text(R.string.rev11_fastboot_download_failed, command))
+                    }
+                    override fun fetch(partition: String, file: File) {
+                        if (!proto.fetchPartition(partition, file)) failOperation("Fastboot fetch failed: $partition")
+                    }
+                    override fun inspect(partition: String) {
+                        if (proto.inspectLogicalPartition(partition) == null) failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
+                    }
+                }
+                val formatter = FastbootFilesystemFormatter(nextData = AndroidImageExtents::nextData, log = ::log)
+                FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log) { detail ->
+                    postOperationProgress(OperationProgress(text(R.string.notif_fastboot_command), -1, detail))
+                }.run(steps)
+            } finally {
+                if (needsImages && !directory.deleteRecursively()) log("Could not remove temporary Fastboot images: ${directory.name}")
+            }
+        }
+    }
+
 
     /** A slot switch is complete only when the bootloader reports it back. */
     fun setActiveSlotAndVerify(slot: String) {

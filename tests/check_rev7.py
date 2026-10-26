@@ -15,7 +15,7 @@ import hashlib
 # Git blob identity pins the narrow orchestrator change; protocol files remain
 # guarded by LEGACY-SOURCE-SHA256.json in REV5.
 raw_vm = (root/'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt').read_bytes()
-expected_blob = 'fdd7ab0725bc8d23a2ac7853735eb4130808b55c'
+expected_blob = 'afc66b11a54898c6768b4d4c970cae8d989cc5e0'
 assert hashlib.sha1(b'blob ' + str(len(raw_vm)).encode() + b'\0' + raw_vm).hexdigest() == expected_blob, 'Unexpected change to DeviceViewModel'
 assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm
@@ -38,7 +38,7 @@ assert 'val cancelButton = cardOperationCenter.findViewById' in activity
 assert 'switchTab("home")' not in activity.split('private fun openOperationCenter()')[1].split('private fun requestOperationCancelFromUi()')[0]
 flash_path = root/'app/src/main/res/layout/page_fastboot.xml'
 raw_flash = flash_path.read_bytes()
-expected_flash_blob = 'df35664a4e3440d39fe22bf2f88601e240af0ab9'
+expected_flash_blob = 'f6dab35e88705f70a564e31e0e60c86444620431'
 assert hashlib.sha1(b'blob ' + str(len(raw_flash)).encode() + b'\0' + raw_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
 flash = ET.parse(flash_path).getroot()
 flash_ids = [node.attrib.get(a+'id','') for node in flash.iter()]
