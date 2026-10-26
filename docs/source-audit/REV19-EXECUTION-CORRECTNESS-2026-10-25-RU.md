@@ -1,5 +1,7 @@
 # NekoFlash 2.0 — REV19: точность исполнения и подтверждение результатов
 
+Следующая ревизия: [REV20 — владелец длительной операции и сохранение статуса](REV20-SERVICE-LIFECYCLE-2026-10-26-RU.md). Описанные ниже результаты REV19 сохранены как отдельная проверенная точка.
+
 Дата: 25 октября 2026. База: REV18 `2f2beb165974b54e59605ceb10bce98baed4cbb2`.
 Код: `96a487687350e530d000af32db32b48e67cf5ef3`.
 Изменения: [Draft PR #5](https://github.com/Ncorror/NekoFlash-2.0/pull/5), поверх [Draft PR #4](https://github.com/Ncorror/NekoFlash-2.0/pull/4).

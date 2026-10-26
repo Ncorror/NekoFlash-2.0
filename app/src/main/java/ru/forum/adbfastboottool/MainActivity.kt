@@ -49,7 +49,6 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.widget.doAfterTextChanged
 import androidx.core.os.LocaleListCompat
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -62,6 +61,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.lang.ref.WeakReference
 import java.util.Locale
 
 /**
@@ -273,7 +273,7 @@ class MainActivity : AppCompatActivity() {
         operationStripProgressBar = findViewById(R.id.operationStripProgressBar)
         btnOperationStripDismiss = findViewById(R.id.btnOperationStripDismiss)
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
-        viewModel = ViewModelProvider(this)[DeviceViewModel::class.java]
+        viewModel = DeviceSessionStore.attachUi(application)
         viewModelReady = true
         operationStoredProgressHidden = savedInstanceState?.getBoolean(
             STATE_HIDE_STORED_OPERATION_PROGRESS,
@@ -2498,14 +2498,17 @@ class MainActivity : AppCompatActivity() {
      */
     private fun runMiUnlockFromUi(auth: MiAccountClient.AuthResult) {
         autoShowGuiOperation = true
+        val screenRef = WeakReference(this)
         viewModel.runMiUnlock(
             auth = auth,
             onClearInfo = { _, _ -> },
             onAuthExpired = {
-                miAuth = null
+                val screen = screenRef.get()
+                if (screen == null || screen.isFinishing || screen.isDestroyed) return@runMiUnlock
+                screen.miAuth = null
                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                buildUnlockPage()
-                Toast.makeText(this, getString(R.string.mi_unlock_session_expired), Toast.LENGTH_LONG).show()
+                screen.buildUnlockPage()
+                Toast.makeText(screen, screen.getString(R.string.mi_unlock_session_expired), Toast.LENGTH_LONG).show()
             }
         )
     }
@@ -4070,6 +4073,8 @@ class MainActivity : AppCompatActivity() {
                 R.string.layout_operation_center_cancelled to R.color.text_secondary
             progress?.finished == true && progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING ->
                 R.string.layout_operation_center_verify_pending to R.color.log_warning
+            progress?.finished == true && progress.outcome == DeviceViewModel.OperationOutcomeKind.INTERRUPTED ->
+                R.string.rev20_operation_interrupted to R.color.log_warning
             else -> R.string.layout_operation_center_idle to R.color.text_secondary
         }
 
@@ -4113,7 +4118,8 @@ class MainActivity : AppCompatActivity() {
         val showLastEvent = recentText != null && when {
             operationRunning -> recentIsError || recentIsWarning
             progress?.finished == true -> progress.outcome == DeviceViewModel.OperationOutcomeKind.FAILED ||
-                progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING
+                progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING ||
+                progress.outcome == DeviceViewModel.OperationOutcomeKind.INTERRUPTED
             else -> false
         }
         tvOperationCenterLastEvent.text = recentText?.let {
@@ -4390,7 +4396,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         if (!isChangingConfigurations && viewModelReady) {
-            viewModel.flushDiagnostics("ACTIVITY_DESTROY", terminal = true)
+            viewModel.flushDiagnostics("ACTIVITY_DESTROY", terminal = false)
         }
         // Android may destroy a removed/background task without leaving
         // isFinishing=true. Any non-configuration destruction ends the entry
@@ -4399,6 +4405,7 @@ class MainActivity : AppCompatActivity() {
             OnboardingGate.endSession()
         }
 
+        if (viewModelReady) DeviceSessionStore.detachUi()
         miAuthExchangeJob?.cancel()
         miAuthExchangeJob = null
         usbPermissionTimeouts.values.forEach(usbPermissionHandler::removeCallbacks)

@@ -1,16 +1,18 @@
-# NekoFlash 2.0 — развитие исходного NekoFlash (REV9)
+# NekoFlash 2.0 — развитие исходного NekoFlash (REV20)
 
-> **Текущая работа:** [PR #1](https://github.com/Ncorror/NekoFlash-2.0/pull/1), ветка feature/rev6-shell. Только подписанный оригинал находится вне этой ветки; **main оставлена на стабильном REV5**. Это NekoFlash 2.0, **не NekoFlash Pro**.
+> **Текущая работа:** [Draft PR #6](https://github.com/Ncorror/NekoFlash-2.0/pull/6), ветка `work/rev20-service-lifecycle-20261025`, поверх REV19 ([PR #5](https://github.com/Ncorror/NekoFlash-2.0/pull/5)) и REV18 ([PR #4](https://github.com/Ncorror/NekoFlash-2.0/pull/4)). Изменения этой серии ещё не объединены в `main`. Это NekoFlash 2.0, **не NekoFlash Pro**.
 
 **Что добавлено в DEV:** USB-панель и пять нижних вкладок; раскрываемый полноэкранный терминал; информационная Главная; три внутренних раздела Прошивки; минимальный Sideload REV3 и Unlock REV4; контекстный Центр операций; очередь массовой прошивки с сохранением порядка и без предела 32 строки; полное сохранение диагностических сегментов и потоковый редактируемый экспорт; передача подтверждённого Recovery-результата Sideload в состояние операции.
 
-**Проверки CI:** регрессии исходных USB/ADB/Fastboot-файлов, автоматические структурные проверки REV5–REV9, настоящие JVM unit-тесты, Android lint, Debug APK. Успех CI означает сборку и офлайн-регрессии, а **не успешный аппаратный тест**.
+**REV20:** исполнение допускается только после успешного запуска foreground-сервиса; закрытие Activity сохраняет общую USB-сессию. Статус операции и черновик очереди сохраняются на диск. После гибели процесса незавершённая операция становится «Прервана», без автоматического повторения. Тихое уведомление показывает прогресс/результат и действие «Открыть». [Отчёт, проверки и оставшаяся работа](docs/source-audit/REV20-SERVICE-LIFECYCLE-2026-10-26-RU.md).
 
-**Где взять DEV APK:** [последний успешный workflow для ветки](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml). Отдельный Debug package ID: ru.forum.adbfastboottool.dev, поэтому **оригинальное приложение удалять нельзя и не нужно**. Подписанный Release не выпускался.
+**Проверки CI:** регрессии исходных USB/ADB/Fastboot-файлов, структурные проверки REV5–REV20, JVM unit-тесты, моделирование Android API 26/34 через Robolectric, Android lint, Debug APK. Успех CI означает сборку и офлайн-регрессии, а **не успешный аппаратный тест**.
 
-**Большой тест:** [подробный сценарий REV9](docs/testing/REV9-BIG-DEVICE-TEST-RU.md) и [автозагрузка только SHA-совпадающего DEV APK](scripts/termux-fetch-rev9-dev.sh). Проверки USB/ADB/Fastboot разрешены только на выделенном разблокированном Poco X3 Pro, а любые потенциально разрушительные действия требуют отдельной подготовки совместимых тестовых файлов и плана восстановления.
+**Где взять DEV APK:** [проверенная сборка REV20](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/40272797111/artifacts/12628244053), [результаты CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/40272797111): 115 тестов, 0 ошибок lint, 47 прежних предупреждений. SHA-256 и срок хранения — в отчёте REV20. Отдельный Debug package ID: ru.forum.adbfastboottool.dev, поэтому **оригинальное приложение удалять нельзя и не нужно**. Подписанный Release не выпускался.
 
-**Известные инженерные долги до заявления о полной поддержке:** полноценно проверенные GUI format/fetch/update-super/logical partition modifications; URI/FD без лишней копии, >4GiB RAW/sparse и USB stall; реальная интерактивность PTY/IME; полный долгоживущий USB lifecycle, фото/характеристики без неподтверждённого каталога. **Не считать эти возможности подтверждёнными лишь потому, что CI зелёный.**
+**Проверка на устройстве:** актуальная матрица в [отчёте REV20](docs/source-audit/REV20-SERVICE-LIFECYCLE-2026-10-26-RU.md); [сценарий REV9](docs/testing/REV9-BIG-DEVICE-TEST-RU.md) остаётся дополнительным историческим чек-листом. Проверки USB/ADB/Fastboot разрешены только на выделенном разблокированном Poco X3 Pro, а любые потенциально разрушительные действия требуют отдельной подготовки совместимых тестовых файлов и плана восстановления.
+
+**Ближайшие задачи:** точная host-семантика `format`/`-w`/`wipe-super`; большие RAW/sparse с учётом `max-download-size`; SAF-источники Mass Flash; восстановление Quick Flash и проверка PTY/IME; аппаратные проверки USB/жизненного цикла, подписи и обновления APK. Полный реестр — [аудит REV18](docs/source-audit/REV18-AUDIT-2026-10-25-RU.md) с уточнениями REV19/REV20. **Не считать эти возможности подтверждёнными лишь потому, что CI зелёный.**
 
 - [Утверждённые макеты и решения](docs/design-approved/README.md)
 - [Аудит оригинального исходника](docs/source-audit/NEKOFLASH2-REV5-AUDIT-AND-ROADMAP-RU.md)
@@ -302,6 +304,11 @@ Do not force-push protected `main` and do not commit build outputs, local signin
 ADB, Fastboot, flashing, sideload and diagnostics operate locally between the host Android device and the USB-connected target. The source tree contains no analytics, advertising or third-party crash-reporting SDK.
 
 Internet/network access is used by the optional Xiaomi / Mi Unlock flow. See [PRIVACY.md](PRIVACY.md) for the data-handling details.
+
+## Developers
+
+- [Ncorror](https://github.com/Ncorror)
+- [IQ-HARRY7](https://github.com/IQ-HARRY7)
 
 ## Documentation
 

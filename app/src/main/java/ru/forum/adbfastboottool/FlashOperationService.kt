@@ -3,149 +3,184 @@ package ru.forum.adbfastboottool
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
+import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.Observer
 
-/**
- * ForegroundService держит USB-операции живыми при выключенном экране.
- * Реальная USB-работа остаётся в DeviceViewModel; этот сервис только управляет уведомлением.
- *
- * FIX #5: На Android 14+ startForeground() может бросить исключение если сервис
- * стартует в неподходящий момент (пользователь нажал Cancel, потом сразу Flash).
- * WakeLock в DeviceViewModel выдаётся ПОСЛЕ успешного старта сервиса, а не до.
- * Добавлен флаг isForegroundStarted для защиты от двойного вызова startForeground().
- */
+/** Owns admitted USB execution. A successful foreground promotion is the start acknowledgement. */
 class FlashOperationService : Service() {
-
-    private var isForegroundStarted = false
+    private var foregroundStarted = false
+    private var activeOperation: ServiceOwnedOperation? = null
+    private var latestStartId = 0
+    private var lastNotificationAtMs = 0L
+    private lateinit var session: DeviceViewModel
+    private val progressObserver = Observer<DeviceViewModel.OperationProgress?> { progress ->
+        val task = activeOperation
+        if (task != null && task.tracksProgress && progress != null && !task.job.isCompleted &&
+            SystemClock.elapsedRealtime() - lastNotificationAtMs >= 500L) {
+            lastNotificationAtMs = SystemClock.elapsedRealtime()
+            notifySafely(buildNotification(task.title,
+                progress.detail.ifBlank { getString(R.string.service_default_text) }, progress.percent, ongoing = true))
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createChannelIfNeeded()
+        session = DeviceSessionStore.get(application)
+        session.operationProgress.observeForever(progressObserver)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Команда остановки, пришедшая раньше, чем сервис успел показать
-        // уведомление. Мы ОБЯЗАНЫ всё равно вызвать startForeground() хотя бы
-        // на миг — иначе система убьёт приложение с
-        // ForegroundServiceDidNotStartInTimeException. Затем сразу останавливаемся.
-        if (intent?.getBooleanExtra(EXTRA_STOP, false) == true) {
-            if (!isForegroundStarted) {
-                try {
-                    startForeground(
-                        NOTIFICATION_ID,
-                        buildNotification(getString(R.string.app_name), "")
-                    )
-                } catch (error: Exception) {
-                    android.util.Log.w(TAG, "Unable to enter foreground before early stop", error)
-                }
-            }
-            stopForegroundCompat()
-            stopSelf()
+        latestStartId = startId
+        val task = registry.find(intent?.getStringExtra(EXTRA_OPERATION_ID))
+        try {
+            // Even a late/cancelled start must satisfy the platform foreground
+            // contract. Its token is never allowed to start another operation.
+            val shown = task ?: activeOperation
+            ServiceCompat.startForeground(this, NOTIFICATION_ID,
+                buildNotification(shown?.title ?: getString(R.string.app_name),
+                    shown?.description ?: getString(R.string.rev20_service_preparing), -1, ongoing = true),
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0)
+            foregroundStarted = true
+        } catch (error: Exception) {
+            task?.rejectStartup(getString(R.string.rev20_foreground_failed, error.message ?: error.javaClass.simpleName))
+            activeOperation?.cancel("Foreground service promotion failed", serviceDestroyed = true)
+            stopSelfResult(startId)
             return START_NOT_STICKY
         }
-
-        val title = intent?.getStringExtra(EXTRA_TITLE) ?: getString(R.string.app_name)
-        val text  = intent?.getStringExtra(EXTRA_TEXT)  ?: getString(R.string.service_default_text)
-
-        if (!isForegroundStarted) {
-            try {
-                startForeground(NOTIFICATION_ID, buildNotification(title, text))
-                isForegroundStarted = true
-            } catch (e: Exception) {
-                android.util.Log.w(TAG, "startForeground failed, stopping self: ${e.message}")
-                stopSelf()
-                return START_NOT_STICKY
-            }
-        } else {
-            getSystemService(NotificationManager::class.java)
-                ?.notify(NOTIFICATION_ID, buildNotification(title, text))
+        if (task != null && !task.job.isCompleted) {
+            activeOperation = task
+            task.acknowledgeForeground()
+        } else if (registry.isEmpty() && activeOperation?.job?.isCompleted != false) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            foregroundStarted = false
+            stopSelfResult(startId)
         }
-
+        // The OS must never redeliver/replay a destructive command after process death.
         return START_NOT_STICKY
     }
 
-    private fun stopForegroundCompat() {
-        try {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-        } catch (error: Exception) {
-            android.util.Log.w(TAG, "Unable to remove foreground notification", error)
+    private fun operationFinished(id: String) {
+        val task = activeOperation
+        val state = session.lastPersistedOperation(id)
+        if (!registry.isEmpty() || task?.job?.isCompleted == false) return
+        // A previous completion may have deferred shutdown while the next
+        // request was pending. If that request never reaches onStartCommand,
+        // its failure still owns the latest persisted result and must stop the
+        // now-idle service. A stale callback must not replace a newer result.
+        if (task?.id != id && state == null) return
+        // Drop foreground ownership first, so the result is dismissible rather
+        // than inheriting the system's foreground-service notification flags.
+        if (foregroundStarted) stopForeground(if (state != null) STOP_FOREGROUND_DETACH else STOP_FOREGROUND_REMOVE)
+        foregroundStarted = false
+        if (state != null) {
+            val status = when (state.phase) {
+                PersistedOperationPhase.SUCCESS -> R.string.layout_operation_center_completed
+                PersistedOperationPhase.CANCELLED -> R.string.layout_operation_center_cancelled
+                PersistedOperationPhase.VERIFY_PENDING -> R.string.layout_operation_center_verify_pending
+                PersistedOperationPhase.INTERRUPTED -> R.string.rev20_operation_interrupted
+                else -> R.string.layout_operation_center_failed
+            }
+            notifySafely(buildNotification("${state.title} · ${getString(status)}", state.detail, state.percent, ongoing = false))
         }
+        activeOperation = null
+        stopSelfResult(latestStartId)
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
+        if (::session.isInitialized) session.operationProgress.removeObserver(progressObserver)
+        val task = activeOperation
+        if (task != null && !task.job.isCompleted) {
+            task.cancel("Foreground execution service was destroyed", serviceDestroyed = true)
+            // Existing two-phase shutdown waits for Java/native completion before closing USB.
+            session.disconnectCurrent()
+        }
+        activeOperation = null
+        foregroundStarted = false
         super.onDestroy()
-        isForegroundStarted = false
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
-    private fun buildNotification(title: String, text: String): Notification {
+    private fun buildNotification(title: String, text: String, percent: Int, ongoing: Boolean): Notification {
+        val open = PendingIntent.getActivity(this, 0,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)
             .setContentText(text)
             .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setOngoing(true)
+            .setContentIntent(open)
+            .addAction(R.drawable.ic_notification, getString(R.string.rev20_notification_open), open)
+            .setOngoing(ongoing)
+            .setAutoCancel(!ongoing)
             .setOnlyAlertOnce(true)
+            .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(if (ongoing) NotificationCompat.CATEGORY_PROGRESS else NotificationCompat.CATEGORY_STATUS)
+            .apply { if (ongoing) setProgress(100, percent.coerceIn(0, 100), percent < 0) }
             .build()
     }
 
+    private fun notifySafely(notification: Notification) {
+        runCatching { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, notification) }
+            .onFailure { android.util.Log.w(TAG, "Notification update failed", it) }
+    }
+
     private fun createChannelIfNeeded() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.service_channel_name),
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
+        val channel = NotificationChannel(CHANNEL_ID, getString(R.string.service_channel_name), NotificationManager.IMPORTANCE_LOW).apply {
             description = getString(R.string.service_channel_description)
+            setSound(null, null)
+            enableVibration(false)
         }
         getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
     }
 
     companion object {
-        private const val TAG              = "FlashOpService"
-        private const val CHANNEL_ID       = "adb_fastboot_operations"
-        private const val NOTIFICATION_ID  = 1401
-        private const val EXTRA_TITLE      = "extra_title"
-        private const val EXTRA_TEXT       = "extra_text"
-        private const val EXTRA_STOP       = "extra_stop"
+        private const val TAG = "FlashOpService"
+        private const val CHANNEL_ID = "adb_fastboot_operations"
+        private const val NOTIFICATION_ID = 1401
+        private const val EXTRA_OPERATION_ID = "operation_id"
+        private const val START_ACK_TIMEOUT_MS = 10_000L
+        private val registry = ServiceOperationRegistry()
+        private val mainHandler = Handler(Looper.getMainLooper())
+        @Volatile private var instance: FlashOperationService? = null
 
-        fun start(context: Context, title: String, text: String) {
-            val intent = Intent(context, FlashOperationService::class.java).apply {
-                putExtra(EXTRA_TITLE, title)
-                putExtra(EXTRA_TEXT, text)
+        internal fun submit(context: Context, task: ServiceOwnedOperation) {
+            if (!registry.register(task)) {
+                task.rejectStartup(context.getString(R.string.rev20_service_busy))
+                return
             }
+            val timeout = Runnable { task.rejectStartup(context.getString(R.string.rev20_service_start_timeout)) }
+            task.job.invokeOnCompletion { mainHandler.removeCallbacks(timeout) }
+            mainHandler.postDelayed(timeout, START_ACK_TIMEOUT_MS)
             try {
-                ContextCompat.startForegroundService(context, intent)
-            } catch (e: Exception) {
-                // FGS старт заблокирован системой — операция продолжится без уведомления.
-                android.util.Log.w(TAG, "startForegroundService failed: ${e.message}")
+                ContextCompat.startForegroundService(context, Intent(context, FlashOperationService::class.java)
+                    .putExtra(EXTRA_OPERATION_ID, task.id))
+            } catch (error: Exception) {
+                task.rejectStartup(context.getString(R.string.rev20_foreground_failed, error.message ?: error.javaClass.simpleName))
             }
         }
 
-        fun stop(context: Context) {
-            // Останавливаем через команду самому сервису (а не stopService напрямую),
-            // чтобы он успел корректно вызвать startForeground()+stopForeground() и
-            // не словить ForegroundServiceDidNotStartInTimeException, если stop
-            // пришёл раньше, чем сервис показал уведомление.
-            val intent = Intent(context, FlashOperationService::class.java).apply {
-                putExtra(EXTRA_STOP, true)
-            }
-            try {
-                ContextCompat.startForegroundService(context, intent)
-            } catch (startError: Exception) {
-                android.util.Log.w(TAG, "Unable to deliver foreground stop command", startError)
-                runCatching {
-                    context.stopService(Intent(context, FlashOperationService::class.java))
-                }.onFailure { stopError ->
-                    android.util.Log.w(TAG, "Fallback stopService failed", stopError)
-                }
-            }
+        internal fun complete(id: String) {
+            registry.remove(id)
+            // Stopping never starts a new service. Late callbacks carry their own token.
+            mainHandler.post { instance?.operationFinished(id) }
         }
     }
 }

@@ -7,12 +7,11 @@ import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.SavedStateHandle
 import androidx.core.content.edit
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
@@ -33,6 +32,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Lifecycle-владелец USB-сессии и пользовательских операций NekoFlash.
@@ -41,22 +41,20 @@ import java.util.concurrent.atomic.AtomicLong
  * и публикует прогресс. Mutation-команды передаются напрямую реальному protocol-слою;
  * ViewModel не вводит отдельные host-side разрешения поверх bootloader/ADB.
  */
-class DeviceViewModel(
-    application: Application,
-    private val savedStateHandle: SavedStateHandle
-) : AndroidViewModel(application) {
+class DeviceViewModel(application: Application) : AndroidViewModel(application) {
 
     enum class ConnectionState { NONE, CONNECTING, FASTBOOT, ADB, ERROR }
 
     enum class OperationStepStatus { PENDING, RUNNING, OK, FAILED, SKIPPED, INFO }
 
-    enum class OperationOutcomeKind { SUCCESS, FAILED, CANCELLED, VERIFY_PENDING }
+    enum class OperationOutcomeKind { SUCCESS, FAILED, CANCELLED, VERIFY_PENDING, INTERRUPTED }
 
     sealed class OperationOutcome {
         object Success : OperationOutcome()
         data class Failed(val message: String) : OperationOutcome()
         data class Cancelled(val message: String) : OperationOutcome()
         data class VerifyPending(val message: String) : OperationOutcome()
+        data class Interrupted(val message: String) : OperationOutcome()
     }
 
     private class OperationAbort(val outcome: OperationOutcome) :
@@ -78,6 +76,13 @@ class DeviceViewModel(
         val status: OperationStepStatus = OperationStepStatus.PENDING
     )
 
+    private val recoveryStore = OperationRecoveryStore(File(application.filesDir, "execution-state"))
+    private val checkpointLock = Any()
+    @Volatile private var persistedOperation: PersistedOperation? = null
+    private var lastCheckpointAtMs = 0L
+    @Volatile private var activeServiceOperation: ServiceOwnedOperation? = null
+    @Volatile private var operationProgressSnapshot: OperationProgress? = null
+
     private val _connectionState   = MutableLiveData(ConnectionState.NONE)
     val connectionState: LiveData<ConnectionState> = _connectionState
 
@@ -86,7 +91,7 @@ class DeviceViewModel(
 
     /** Share the launch lock so workspace cleanup cannot race a new USB job. */
     fun runWorkspaceMaintenanceIfIdle(action: () -> Unit): Boolean = synchronized(operationLaunchLock) {
-        if (operationJob?.isCompleted == false || connectionJob?.isCompleted == false ||
+        if (operationJob != null || connectionJob?.isCompleted == false ||
             NativeUsbfsBackend.hasActiveTransfer || NativeUsbfsBackend.backendState().nativeTransferActive
         ) return@synchronized false
         action()
@@ -113,7 +118,36 @@ class DeviceViewModel(
     val operationProgress: LiveData<OperationProgress?> = _operationProgress
 
     fun postOperationProgress(progress: OperationProgress?) {
+        operationProgressSnapshot = progress
         _operationProgress.postValue(progress)
+        val task = activeServiceOperation
+        if (task == null) {
+            // A later verified Recovery verdict can finalize the persisted pending result.
+            if (progress?.finished == true && progress.outcome != null) synchronized(checkpointLock) {
+                val current = persistedOperation
+                if (current?.phase == PersistedOperationPhase.VERIFY_PENDING && current.title == progress.title) {
+                    val updated = current.copy(detail = progress.detail, percent = progress.percent.coerceIn(-1, 100),
+                        phase = PersistedOperationPhase.valueOf(progress.outcome.name))
+                    persistedOperation = updated
+                    if (updated != current) runCatching { recoveryStore.writeOperation(updated) }
+                        .onFailure { logFileOnly("Recovery verdict checkpoint failed: ${it.message}") }
+                }
+            }
+            return
+        }
+        if (progress == null || !task.tracksProgress) return
+        synchronized(checkpointLock) {
+            val current = persistedOperation ?: return
+            if (current.id != task.id || current.phase != PersistedOperationPhase.RUNNING) return
+            val updated = current.copy(detail = progress.detail, percent = progress.percent.coerceIn(-1, 100))
+            persistedOperation = updated
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastCheckpointAtMs >= 1000L) {
+                lastCheckpointAtMs = now
+                runCatching { recoveryStore.writeOperation(updated) }
+                    .onFailure { logFileOnly("Operation progress checkpoint failed: ${it.message}") }
+            }
+        }
     }
 
     private val _connectionInfo    = MutableLiveData<String?>(null)
@@ -133,11 +167,11 @@ class DeviceViewModel(
 
     private val flashDraftLock = Any()
     private var flashDraftSnapshot: FlashOperationDraft =
-        FlashOperationDraftCodec.decode(savedStateHandle.get<ArrayList<String>>(SAVED_FLASH_QUEUE_DRAFT))
+        runCatching { recoveryStore.readDraft() }.getOrNull() ?: FlashOperationDraft()
     private val _flashOperationDraft = MutableLiveData(flashDraftSnapshot)
     val flashOperationDraft: LiveData<FlashOperationDraft> = _flashOperationDraft
 
-    /** Transient execution object. It is never placed in SavedStateHandle. */
+    /** Transient execution object. Only the lightweight draft is persisted. */
     data class FlashQueueItem(val partition: String, val file: File, val expectedSizeBytes: Long = file.length())
 
     private data class PendingUnlockVerification(
@@ -237,6 +271,32 @@ class DeviceViewModel(
 
     init {
         DiagnosticCrashMarker.install(File(application.filesDir, "diagnostics"), BuildConfig.BUILD_ID)
+        restoreOperationState()
+    }
+
+    internal fun lastPersistedOperation(id: String): PersistedOperation? = persistedOperation?.takeIf { it.id == id }
+
+    private fun restoreOperationState() {
+        try {
+            val previous = recoveryStore.readOperation() ?: return
+            val recovered = previous.afterProcessRestart().let {
+                if (it.phase == PersistedOperationPhase.INTERRUPTED && previous.phase != PersistedOperationPhase.INTERRUPTED) {
+                    it.copy(detail = text(R.string.rev20_interrupted_detail, previous.detail))
+                } else it
+            }
+            persistedOperation = recovered
+            if (recovered != previous) recoveryStore.writeOperation(recovered)
+            val outcome = OperationOutcomeKind.valueOf(recovered.phase.name)
+            postOperationProgress(OperationProgress(recovered.title, recovered.percent, recovered.detail,
+                finished = true, success = outcome == OperationOutcomeKind.SUCCESS, outcome = outcome))
+            if (outcome == OperationOutcomeKind.INTERRUPTED) log(recovered.detail)
+        } catch (error: Exception) {
+            val message = text(R.string.rev20_state_unreadable)
+            log(message)
+            logFileOnly("Operation recovery: ${error.message}")
+            postOperationProgress(OperationProgress(text(R.string.rev20_operation_interrupted), -1, message,
+                finished = true, outcome = OperationOutcomeKind.INTERRUPTED))
+        }
     }
 
     // ─── ЛОГИРОВАНИЕ ─────────────────────────────────────────────────────────
@@ -536,8 +596,8 @@ class DeviceViewModel(
                 onLog = { msg -> log(msg) },
                 onLogVerbose = { msg -> logFileOnly(msg) },
                 onProgress = { percent, detail ->
-                    val currentProgress = _operationProgress.value
-                    _operationProgress.postValue(
+                    val currentProgress = operationProgressSnapshot
+                    postOperationProgress(
                         OperationProgress(
                             title = currentProgress?.title ?: text(R.string.flash_progress_writing),
                             percent = percent,
@@ -597,8 +657,8 @@ class DeviceViewModel(
                 keyDirectory = adbKeyDir,
                 onLog = { msg -> log(msg) },
                 onProgress = { percent, detail ->
-                    val currentProgress = _operationProgress.value
-                    _operationProgress.postValue(
+                    val currentProgress = operationProgressSnapshot
+                    postOperationProgress(
                         OperationProgress(
                             title = currentProgress?.title ?: text(R.string.flash_progress_writing),
                             percent = percent,
@@ -670,11 +730,12 @@ class DeviceViewModel(
      */
     private suspend fun shutdownCurrentTransportsSafely(reason: String): Boolean {
         val activeOperation = operationJob
+        val serviceOperation = activeServiceOperation
         val nativeStateBefore = NativeUsbfsBackend.backendState()
         // isActive becomes false as soon as a Job enters Cancelling, while its
         // finally block or a blocking JNI call may still be running. Only
         // isCompleted proves that the operation no longer owns the transport.
-        val needsDrain = activeOperation?.isCompleted == false ||
+        val needsDrain = serviceOperation != null || activeOperation?.isCompleted == false ||
             NativeUsbfsBackend.hasActiveTransfer || nativeStateBefore.nativeTransferActive
 
         if (needsDrain) {
@@ -685,6 +746,7 @@ class DeviceViewModel(
 
             val clean = withTimeoutOrNull(TRANSPORT_SHUTDOWN_TIMEOUT_MS) {
                 activeOperation?.join()
+                serviceOperation?.finished?.await()
                 awaitNativeUsbfsIdle()
             } == true
 
@@ -725,7 +787,6 @@ class DeviceViewModel(
         // already had a chance to release these resources. The calls below only
         // clear stale state left by an interrupted non-native operation.
         releaseOperationWakeLock(logRelease = false)
-        FlashOperationService.stop(getApplication())
         _operationActive.postValue(false)
         return true
     }
@@ -1141,7 +1202,7 @@ class DeviceViewModel(
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.runService(service)) failOperation("ADB service failed: $service")
             if (AdbServiceCompletionPolicy.expectsOneWayDisconnect(service)) {
-                _operationProgress.postValue(
+                postOperationProgress(
                     OperationProgress(
                         title = text(R.string.notif_adb_command),
                         percent = 100,
@@ -1358,7 +1419,8 @@ class DeviceViewModel(
     private fun publishFlashOperationDraft(draft: FlashOperationDraft, persist: Boolean) {
         synchronized(flashDraftLock) { flashDraftSnapshot = draft }
         if (persist) {
-            savedStateHandle[SAVED_FLASH_QUEUE_DRAFT] = FlashOperationDraftCodec.encode(draft)
+            runCatching { recoveryStore.writeDraft(draft) }
+                .onFailure { log(text(R.string.rev20_draft_save_failed, it.message ?: it.javaClass.simpleName)) }
         }
         _flashOperationDraft.value = draft
     }
@@ -1573,7 +1635,7 @@ class DeviceViewModel(
             logFileOnly("Recovery verdict saved in diagnostics; a different operation owns the GUI state.")
             return
         }
-        _operationProgress.postValue(
+        postOperationProgress(
             OperationProgress(
                 title = sideloadTitle,
                 percent = if (outcome == OperationOutcomeKind.SUCCESS) 100 else -1,
@@ -1682,7 +1744,7 @@ class DeviceViewModel(
                 clearPendingUnlockVerification()
                 val message = "${pending.operationLabel} confirmed by device: getvar:unlocked=$expectedText"
                 log("🎉 $message")
-                _operationProgress.postValue(
+                postOperationProgress(
                     OperationProgress(
                         title = pending.operationLabel,
                         percent = 100,
@@ -1699,7 +1761,7 @@ class DeviceViewModel(
                 val actualText = if (actualUnlocked) "yes" else "no"
                 val message = "${pending.operationLabel} not confirmed: device reports getvar:unlocked=$actualText, expected $expectedText"
                 log("❌ $message")
-                _operationProgress.postValue(
+                postOperationProgress(
                     OperationProgress(
                         title = pending.operationLabel,
                         percent = 0,
@@ -1772,7 +1834,7 @@ class DeviceViewModel(
     ) {
         synchronized(operationLaunchLock) {
             if (viewModelCleared.get()) {
-                log("⚠️ New operation rejected: DeviceViewModel is already finishing safe USB shutdown.")
+                log("⚠️ New operation rejected: USB session is finishing safe shutdown.")
                 return
             }
             if (transportRestartRequired.get()) {
@@ -1783,105 +1845,135 @@ class DeviceViewModel(
                 log("⚠️ USB connect or disconnect is still in progress. Wait for a stable device status.")
                 return
             }
-            if (operationJob?.isCompleted == false || NativeUsbfsBackend.hasActiveTransfer ||
-                NativeUsbfsBackend.backendState().nativeTransferActive
-            ) {
+            // A completed Job can still be delivering its completion callbacks.
+            // The reference is cleared only after state/resources have been finalized.
+            if (operationJob != null || NativeUsbfsBackend.hasActiveTransfer ||
+                NativeUsbfsBackend.backendState().nativeTransferActive) {
                 log("⚠️ Another USB operation is still active. Wait for it to finish first or perform a safe cancel.")
                 return
             }
-
             val gen = operationGeneration.incrementAndGet()
+            val id = UUID.randomUUID().toString()
             sideloadGuiAttemptId = null
-
-            if (heavy) {
-                releaseOperationWakeLock(logRelease = false)
-                acquireOperationWakeLock()
-                FlashOperationService.start(getApplication(), title, text)
-                _operationProgress.postValue(OperationProgress(title = title, percent = -1, detail = text))
-            }
-            _operationActive.postValue(true)
-            diagnosticSessionTracker.recordOperationStarted(title)
-            persistSessionSummary()
-
-            val newJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
+            val pending = PersistedOperation(id, title, text, System.currentTimeMillis(), -1, PersistedOperationPhase.PREPARING)
+            val result = AtomicReference<OperationOutcome>(OperationOutcome.Success)
+            val task = ServiceOwnedOperation(
+                id, title, text, heavy,
+                cancelTransport = {
+                    synchronized(operationLaunchLock) {
+                        if (activeServiceOperation?.id == id) {
+                            fastbootProtocol?.cancel()
+                            adbProtocol?.cancel()
+                        }
+                    }
+                },
+                onFinished = { completed, cause ->
+                    finishServiceOperation(completed, gen, result.get(), cause)
+                }
+            ) {
                 val context = OperationContext()
-                var outcome: OperationOutcome = OperationOutcome.Success
                 try {
+                    // This body can start only after the service acknowledges startForeground.
+                    synchronized(checkpointLock) {
+                        val running = pending.copy(phase = PersistedOperationPhase.RUNNING)
+                        recoveryStore.writeOperation(running)
+                        persistedOperation = running
+                        lastCheckpointAtMs = SystemClock.elapsedRealtime()
+                    }
+                    coroutineContext.ensureActive()
+                    acquireOperationWakeLock()
                     val fastboot = fastbootProtocol
                     if (prepareFastbootSession && fastboot?.isConnected == true && !fastboot.beginOperation()) {
-                        throw OperationAbort(
-                            OperationOutcome.Failed(
-                                "Fastboot session is not ready for a new operation. Reconnect the device."
-                            )
-                        )
+                        context.failOperation("Fastboot session is not ready for a new operation. Reconnect the device.")
                     }
                     if (expectedFastbootSerial != null) {
                         if (fastboot?.isConnected != true) context.failOperation(text(R.string.error_no_fastboot))
                         val actual = FastbootSerialSelection.actual(currentUsbSerial()) { fastboot.getVar("serialno") }
                         if (!FastbootSerialSelection.matches(expectedFastbootSerial, actual)) {
-                            context.failOperation(text(
-                                R.string.rev19_fastboot_serial_mismatch,
-                                expectedFastbootSerial, actual ?: text(R.string.device_bool_unknown)
-                            ))
+                            context.failOperation(text(R.string.rev19_fastboot_serial_mismatch,
+                                expectedFastbootSerial, actual ?: text(R.string.device_bool_unknown)))
                         }
                     }
                     coroutineContext.ensureActive()
                     context.block()
                 } catch (abort: OperationAbort) {
-                    outcome = abort.outcome
-                } catch (_: CancellationException) {
-                    outcome = OperationOutcome.Cancelled("Operation cancelled")
-                } catch (e: Exception) {
-                    val message = e.message ?: e.javaClass.simpleName
-                    outcome = OperationOutcome.Failed(message)
+                    result.set(abort.outcome)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    val message = error.message ?: error.javaClass.simpleName
+                    result.set(OperationOutcome.Failed(message))
                     log(text(R.string.operation_error, message))
-                } finally {
-                    if (gen == operationGeneration.get()) {
-                        _operationActive.postValue(false)
-                        if (heavy) {
-                            releaseOperationWakeLock(logRelease = true)
-                            FlashOperationService.stop(getApplication())
-
-                            val finishedProgress = _operationProgress.value
-                            val outcomeKind = when (outcome) {
-                                OperationOutcome.Success -> OperationOutcomeKind.SUCCESS
-                                is OperationOutcome.Failed -> OperationOutcomeKind.FAILED
-                                is OperationOutcome.Cancelled -> OperationOutcomeKind.CANCELLED
-                                is OperationOutcome.VerifyPending -> OperationOutcomeKind.VERIFY_PENDING
-                            }
-                            val outcomeDetail = when (outcome) {
-                                OperationOutcome.Success -> finishedProgress?.detail.orEmpty()
-                                is OperationOutcome.Failed -> outcome.message
-                                is OperationOutcome.Cancelled -> outcome.message
-                                is OperationOutcome.VerifyPending -> outcome.message
-                            }
-                            val successful = outcome === OperationOutcome.Success
-                            val previousPercent = finishedProgress?.percent ?: 0
-                            _operationProgress.postValue(
-                                OperationProgress(
-                                    title = finishedProgress?.title ?: title,
-                                    percent = if (successful) 100 else previousPercent.coerceAtLeast(0),
-                                    detail = outcomeDetail,
-                                    finished = true,
-                                    success = successful,
-                                    outcome = outcomeKind
-                                )
-                            )
-                        }
-                        val summaryOutcome = when (outcome) {
-                            OperationOutcome.Success -> "SUCCESS"
-                            is OperationOutcome.Failed -> "FAILED"
-                            is OperationOutcome.Cancelled -> "CANCELLED"
-                            is OperationOutcome.VerifyPending -> "VERIFY_PENDING"
-                        }
-                        diagnosticSessionTracker.recordOperationFinished(title, summaryOutcome)
-                        persistSessionSummary()
-                        operationJob = null
-                    }
                 }
             }
-            operationJob = newJob
-            newJob.start()
+            activeServiceOperation = task
+            operationJob = task.job
+            synchronized(checkpointLock) { persistedOperation = pending }
+            if (heavy) postOperationProgress(OperationProgress(title, -1, text))
+            _operationActive.postValue(true)
+            diagnosticSessionTracker.recordOperationStarted(title)
+            persistSessionSummary()
+            try {
+                recoveryStore.writeOperation(pending)
+                FlashOperationService.submit(getApplication(), task)
+            } catch (error: Exception) {
+                task.rejectStartup(text(R.string.rev20_state_save_failed, error.message ?: error.javaClass.simpleName))
+            }
+        }
+    }
+
+    private fun finishServiceOperation(
+        task: ServiceOwnedOperation,
+        generation: Long,
+        reported: OperationOutcome,
+        cause: Throwable?
+    ) {
+        synchronized(operationLaunchLock) {
+            if (generation != operationGeneration.get()) {
+                FlashOperationService.complete(task.id)
+                return
+            }
+            val outcome = when {
+                task.startupFailure != null -> OperationOutcome.Failed(requireNotNull(task.startupFailure))
+                task.serviceLost -> OperationOutcome.Interrupted(text(R.string.rev20_service_lost))
+                cause is CancellationException -> OperationOutcome.Cancelled(text(R.string.operation_cancelled))
+                cause != null -> OperationOutcome.Failed(cause.message ?: cause.javaClass.simpleName)
+                else -> reported
+            }
+            val kind = when (outcome) {
+                OperationOutcome.Success -> OperationOutcomeKind.SUCCESS
+                is OperationOutcome.Failed -> OperationOutcomeKind.FAILED
+                is OperationOutcome.Cancelled -> OperationOutcomeKind.CANCELLED
+                is OperationOutcome.VerifyPending -> OperationOutcomeKind.VERIFY_PENDING
+                is OperationOutcome.Interrupted -> OperationOutcomeKind.INTERRUPTED
+            }
+            val message = when (outcome) {
+                OperationOutcome.Success -> if (task.tracksProgress) operationProgressSnapshot?.detail.orEmpty() else text(R.string.layout_operation_center_completed)
+                is OperationOutcome.Failed -> outcome.message
+                is OperationOutcome.Cancelled -> outcome.message
+                is OperationOutcome.VerifyPending -> outcome.message
+                is OperationOutcome.Interrupted -> outcome.message
+            }
+            val successful = kind == OperationOutcomeKind.SUCCESS
+            val percent = if (successful) 100 else lastPersistedOperation(task.id)?.percent ?: -1
+            releaseOperationWakeLock(logRelease = true)
+            synchronized(checkpointLock) {
+                val record = persistedOperation?.takeIf { it.id == task.id }
+                if (record != null) {
+                    val finished = record.copy(detail = message, percent = percent, phase = PersistedOperationPhase.valueOf(kind.name))
+                    persistedOperation = finished
+                    runCatching { recoveryStore.writeOperation(finished) }
+                        .onFailure { log(text(R.string.rev20_state_save_failed, it.message ?: it.javaClass.simpleName)) }
+                }
+            }
+            postOperationProgress(OperationProgress(task.title, percent, message, finished = true, success = successful, outcome = kind))
+            if (kind == OperationOutcomeKind.FAILED || kind == OperationOutcomeKind.INTERRUPTED) log("❌ $message")
+            diagnosticSessionTracker.recordOperationFinished(task.title, kind.name)
+            persistSessionSummary()
+            _operationActive.postValue(false)
+            FlashOperationService.complete(task.id)
+            activeServiceOperation = null
+            operationJob = null
         }
     }
 
@@ -1911,31 +2003,19 @@ class DeviceViewModel(
     }
 
     fun cancelActiveOperation() {
-        val job = operationJob
-        if (job == null || job.isCompleted) {
-            log(text(R.string.operation_cancelled))
-            return
+        synchronized(operationLaunchLock) {
+            val task = activeServiceOperation
+            if (task == null || task.job.isCompleted) {
+                log(text(R.string.operation_cancelled))
+                return
+            }
+            task.cancel("Operation cancellation requested")
+            if (!task.job.isCompleted) {
+                postOperationProgress(operationProgressSnapshot?.copy(
+                    detail = text(R.string.rev20_cancelling_cleanup)
+                ))
+            }
         }
-
-        // Do not publish a false "cancelled" state yet. Native USBFS is a
-        // blocking JNI call and must first DISCARD + REAP every pending URB.
-        // The operation's finally block releases the WakeLock/FGS only after
-        // the native call has actually returned.
-        // Publish coroutine cancellation first, then wake the blocking USB
-        // transport. This closes the narrow race where native could return
-        // before the Job was marked cancelled.
-        job.cancel(CancellationException("Operation cancellation requested"))
-        fastbootProtocol?.cancel()
-        adbProtocol?.cancel()
-        _operationProgress.postValue(
-            _operationProgress.value?.copy(
-                detail = "Cancellation requested. Finishing pending USB URB and closing the session safely…",
-                finished = false,
-                success = false,
-                outcome = null
-            )
-        )
-        log("⏳ Cancel requested. WakeLock and foreground service will remain active until USB cleanup actually finishes.")
     }
 
     // ─── ОТКЛЮЧЕНИЕ ──────────────────────────────────────────────────────────
@@ -1973,7 +2053,6 @@ class DeviceViewModel(
     }
 
     companion object {
-        private const val SAVED_FLASH_QUEUE_DRAFT = "flash_queue_draft_v1"
         private const val WAKE_LOCK_TIMEOUT_MS = 6L * 60L * 60L * 1000L
         private const val TRANSPORT_SHUTDOWN_TIMEOUT_MS = 100_000L
         private const val TRANSPORT_IDLE_POLL_MS = 10L
