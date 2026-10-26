@@ -18,6 +18,10 @@ class OperationRecoveryStoreTest {
     @Test fun pendingStartIsNeverResumedAfterRestart() {
         assertEquals(PersistedOperationPhase.INTERRUPTED, record(PersistedOperationPhase.PREPARING).afterProcessRestart().phase)
     }
+    @Test fun allBytesTransferredWithoutFinalResultIsStillInterrupted() {
+        val transferred = record(PersistedOperationPhase.RUNNING).copy(percent = 100)
+        assertEquals(PersistedOperationPhase.INTERRUPTED, transferred.afterProcessRestart().phase)
+    }
     @Test fun completedAndUnverifiedResultsKeepTheirMeaning() {
         listOf(PersistedOperationPhase.SUCCESS, PersistedOperationPhase.FAILED, PersistedOperationPhase.CANCELLED,
             PersistedOperationPhase.VERIFY_PENDING, PersistedOperationPhase.INTERRUPTED).forEach {

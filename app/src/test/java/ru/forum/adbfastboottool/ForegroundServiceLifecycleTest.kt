@@ -1,7 +1,12 @@
 package ru.forum.adbfastboottool
 
 import android.app.Application
+import android.app.Notification
+import android.app.NotificationManager
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.PermissionInfo
+import android.os.Build
 import android.os.Bundle
 import android.os.Looper
 import androidx.activity.ComponentActivity
@@ -9,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.After
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.Robolectric
@@ -17,6 +23,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 import java.util.UUID
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -27,8 +34,8 @@ import java.util.concurrent.atomic.AtomicInteger
 class ForegroundServiceLifecycleTest {
     class SessionScreen : ComponentActivity() {
         lateinit var session: DeviceViewModel
-        override fun onCreate(state: Bundle?) {
-            super.onCreate(state)
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
             session = DeviceSessionStore.attachUi(application)
         }
         override fun onDestroy() {
@@ -47,6 +54,21 @@ class ForegroundServiceLifecycleTest {
     private fun awaitFinished(task: ServiceOwnedOperation) = runBlocking {
         withTimeout(5000) { task.finished.await() }
         shadowOf(Looper.getMainLooper()).idle()
+    }
+
+    @Before fun grantMergedSignaturePermissionInSimulator() {
+        if (Build.VERSION.SDK_INT < 33) {
+            // Robolectric #9124: the simulator does not grant this merged
+            // AndroidX signature permission automatically on API 26–32.
+            // Verify the production manifest first; never hide a missing entry.
+            val permission = "${app.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
+            val info = app.packageManager.getPermissionInfo(permission, 0)
+            assertEquals(PermissionInfo.PROTECTION_SIGNATURE,
+                info.protectionLevel and PermissionInfo.PROTECTION_MASK_BASE)
+            assertTrue(app.packageManager.getPackageInfo(app.packageName, PackageManager.GET_PERMISSIONS)
+                .requestedPermissions.orEmpty().contains(permission))
+            shadowOf(app).grantPermissions(permission)
+        }
     }
 
     @After fun clearSession() {
@@ -72,16 +94,77 @@ class ForegroundServiceLifecycleTest {
 
     @Test fun serviceCreationAloneDoesNotAcknowledgeExecution() {
         val calls = AtomicInteger()
-        val task = operation { calls.incrementAndGet() }
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val task = operation {
+            calls.incrementAndGet()
+            entered.countDown()
+            check(release.await(5, TimeUnit.SECONDS))
+        }
         FlashOperationService.submit(app, task)
         val controller = Robolectric.buildService(FlashOperationService::class.java).create()
         try {
             assertEquals(0, calls.get())
             assertFalse(task.job.isActive)
             controller.get().onStartCommand(intent(task), 0, 1)
-            awaitFinished(task)
+            assertTrue(entered.await(5, TimeUnit.SECONDS))
             assertEquals(1, calls.get())
             assertNotNull(shadowOf(controller.get()).lastForegroundNotification)
+        } finally {
+            release.countDown()
+            awaitFinished(task)
+            controller.destroy()
+        }
+    }
+
+    @Test fun realViewModelPersistsPromotionFailureBeforeCommandExecution() {
+        val session = DeviceSessionStore.get(app)
+        session.runFastbootCommand("getvar:product")
+        val start = requireNotNull(shadowOf(app).nextStartedService)
+        val journal = OperationRecoveryStore(File(app.filesDir, "execution-state"))
+        val pending = requireNotNull(journal.readOperation())
+        assertEquals(PersistedOperationPhase.PREPARING, pending.phase)
+        val controller = Robolectric.buildService(FlashOperationService::class.java).create()
+        val service = controller.get()
+        shadowOf(service).setThrowInStartForeground(SecurityException("test promotion refusal"))
+        try {
+            service.onStartCommand(start, 0, 1)
+            shadowOf(Looper.getMainLooper()).idle()
+            assertFalse(session.operationActive.value!!)
+            val progress = requireNotNull(session.operationProgress.value)
+            assertEquals(DeviceViewModel.OperationOutcomeKind.FAILED, progress.outcome)
+            assertTrue(progress.detail.contains("test promotion refusal"))
+            val final = requireNotNull(journal.readOperation())
+            assertEquals(pending.id, final.id)
+            assertEquals(PersistedOperationPhase.FAILED, final.phase)
+            // Executing the command body would instead report a missing USB
+            // protocol. The admission failure must win before that body starts.
+            assertTrue(final.detail.contains("test promotion refusal"))
+        } finally { controller.destroy() }
+    }
+
+    @Test fun realViewModelCompletionLeavesDismissibleResultNotification() {
+        val session = DeviceSessionStore.get(app)
+        session.runFastbootCommand("getvar:product")
+        val start = requireNotNull(shadowOf(app).nextStartedService)
+        val controller = Robolectric.buildService(FlashOperationService::class.java).create()
+        val service = controller.get()
+        try {
+            service.onStartCommand(start, 0, 1)
+            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
+            while (session.operationProgress.value?.finished != true) {
+                check(System.nanoTime() < deadline) { "Operation did not complete" }
+                shadowOf(Looper.getMainLooper()).idle()
+                Thread.sleep(10)
+            }
+            shadowOf(Looper.getMainLooper()).idle()
+            assertFalse(session.operationActive.value!!)
+            assertEquals(DeviceViewModel.OperationOutcomeKind.FAILED, session.operationProgress.value!!.outcome)
+            val notification = requireNotNull(shadowOf(app.getSystemService(NotificationManager::class.java))
+                .getNotification(1401))
+            assertEquals(0, notification.flags and Notification.FLAG_ONGOING_EVENT)
+            assertNotEquals(0, notification.flags and Notification.FLAG_AUTO_CANCEL)
+            assertTrue(shadowOf(service).isStoppedBySelf)
         } finally { controller.destroy() }
     }
 

@@ -294,7 +294,7 @@ class DeviceViewModel(
             val outcome = OperationOutcomeKind.valueOf(recovered.phase.name)
             postOperationProgress(OperationProgress(recovered.title, recovered.percent, recovered.detail,
                 finished = true, success = outcome == OperationOutcomeKind.SUCCESS, outcome = outcome))
-            if (outcome == OperationOutcomeKind.INTERRUPTED) log(text(R.string.rev20_interrupted_detail, previous.detail))
+            if (outcome == OperationOutcomeKind.INTERRUPTED) log(recovered.detail)
         } catch (error: Exception) {
             val message = text(R.string.rev20_state_unreadable)
             log(message)

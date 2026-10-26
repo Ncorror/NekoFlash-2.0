@@ -75,6 +75,10 @@ class FlashOperationService : Service() {
         val task = activeOperation
         if (task?.id != id || !registry.isEmpty()) return
         val state = session.lastPersistedOperation(id)
+        // Drop foreground ownership first, so the result is dismissible rather
+        // than inheriting the system's foreground-service notification flags.
+        if (foregroundStarted) stopForeground(if (state != null) STOP_FOREGROUND_DETACH else STOP_FOREGROUND_REMOVE)
+        foregroundStarted = false
         if (state != null) {
             val status = when (state.phase) {
                 PersistedOperationPhase.SUCCESS -> R.string.layout_operation_center_completed
@@ -85,8 +89,6 @@ class FlashOperationService : Service() {
             }
             notifySafely(buildNotification("${task.title} · ${getString(status)}", state.detail, state.percent, ongoing = false))
         }
-        if (foregroundStarted) stopForeground(if (state != null) STOP_FOREGROUND_DETACH else STOP_FOREGROUND_REMOVE)
-        foregroundStarted = false
         activeOperation = null
         stopSelfResult(latestStartId)
     }

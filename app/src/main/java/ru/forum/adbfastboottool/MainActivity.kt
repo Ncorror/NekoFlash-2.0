@@ -61,6 +61,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.lang.ref.WeakReference
 import java.util.Locale
 
 /**
@@ -2497,15 +2498,17 @@ class MainActivity : AppCompatActivity() {
      */
     private fun runMiUnlockFromUi(auth: MiAccountClient.AuthResult) {
         autoShowGuiOperation = true
+        val screenRef = WeakReference(this)
         viewModel.runMiUnlock(
             auth = auth,
             onClearInfo = { _, _ -> },
             onAuthExpired = {
-                if (isFinishing || isDestroyed) return@runMiUnlock
-                miAuth = null
+                val screen = screenRef.get()
+                if (screen == null || screen.isFinishing || screen.isDestroyed) return@runMiUnlock
+                screen.miAuth = null
                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
-                buildUnlockPage()
-                Toast.makeText(this, getString(R.string.mi_unlock_session_expired), Toast.LENGTH_LONG).show()
+                screen.buildUnlockPage()
+                Toast.makeText(screen, screen.getString(R.string.mi_unlock_session_expired), Toast.LENGTH_LONG).show()
             }
         )
     }
