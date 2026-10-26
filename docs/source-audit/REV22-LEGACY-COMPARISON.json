@@ -1,0 +1,1053 @@
+{
+  "legacy_archive": "NekoFlash-main-legacy.zip",
+  "legacy_zip_sha256": "74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3",
+  "base_rev21_commit": "e5301882db536d8fe5af4898ee5552b45eb0ad33",
+  "rev22_code_commit": "84df7647045af5c089f4c5432527c5808c2e39b5",
+  "counts": {
+    "same": 130,
+    "changed": 32,
+    "deleted": 0
+  },
+  "core_line_similarity": [
+    {
+      "file": "native_usbfs.cpp",
+      "legacy_lines": 860,
+      "rev22_lines": 873,
+      "matching_legacy_lines": 849,
+      "matching_percent": 98.7
+    },
+    {
+      "file": "AdbProtocol.kt",
+      "legacy_lines": 2792,
+      "rev22_lines": 2817,
+      "matching_legacy_lines": 2687,
+      "matching_percent": 96.2
+    },
+    {
+      "file": "DeviceViewModel.kt",
+      "legacy_lines": 1782,
+      "rev22_lines": 2125,
+      "matching_legacy_lines": 1559,
+      "matching_percent": 87.5
+    },
+    {
+      "file": "FastbootProtocol.kt",
+      "legacy_lines": 2426,
+      "rev22_lines": 2555,
+      "matching_legacy_lines": 2374,
+      "matching_percent": 97.9
+    },
+    {
+      "file": "FlashOperationService.kt",
+      "legacy_lines": 151,
+      "rev22_lines": 186,
+      "matching_legacy_lines": 61,
+      "matching_percent": 40.4
+    },
+    {
+      "file": "NativeUsbfsBackend.kt",
+      "legacy_lines": 468,
+      "rev22_lines": 481,
+      "matching_legacy_lines": 458,
+      "matching_percent": 97.9
+    },
+    {
+      "file": "MiAccountClient.kt",
+      "legacy_lines": 315,
+      "rev22_lines": 315,
+      "matching_legacy_lines": 315,
+      "matching_percent": 100.0
+    },
+    {
+      "file": "MiUnlockClient.kt",
+      "legacy_lines": 400,
+      "rev22_lines": 400,
+      "matching_legacy_lines": 400,
+      "matching_percent": 100.0
+    }
+  ],
+  "files": [
+    {
+      "path": ".gitattributes",
+      "status": "same",
+      "legacy_sha256": "fe1bc654c6873f92935d1cd7998c35aa586d18d8277a86669217b596275ce170",
+      "current_sha256": "fe1bc654c6873f92935d1cd7998c35aa586d18d8277a86669217b596275ce170"
+    },
+    {
+      "path": ".github/workflows/build.yml",
+      "status": "changed",
+      "legacy_sha256": "e7cd89ec0f167173730ba44bd9f42b49acd2163f587c472471e3e382aafd48b6",
+      "current_sha256": "62cd19e2d211f39c83845e592c9788080e94960b575c76d67270750a5c7d2a8d"
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "status": "changed",
+      "legacy_sha256": "a98c7dcb035715be328874a469d31dd3d553b58d065e5ee7746b810982c27a94",
+      "current_sha256": "851ec5f19c33bbce37295409697ef6c146a7a6f4be58b57a008726d981fc16fb"
+    },
+    {
+      "path": ".gitignore",
+      "status": "changed",
+      "legacy_sha256": "6ef4cb7c1322f73140659e270fa965fbba450912e4db773b0a2ec9c3bda730fc",
+      "current_sha256": "a4bc78c4ceb151fa2b7dce656bba3001174129f6a34f0a3a13419f3a1754d120"
+    },
+    {
+      "path": "ASSETS_LICENSE.md",
+      "status": "same",
+      "legacy_sha256": "948e2a47531f1b1a7d5cdb1b71632170d41f2bad661485b09aef63bb918f90c5",
+      "current_sha256": "948e2a47531f1b1a7d5cdb1b71632170d41f2bad661485b09aef63bb918f90c5"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "status": "same",
+      "legacy_sha256": "42933ee22889dabc2bc793508b93b10aa220e1199365c144a39b6b612e6b3f4f",
+      "current_sha256": "42933ee22889dabc2bc793508b93b10aa220e1199365c144a39b6b612e6b3f4f"
+    },
+    {
+      "path": "LAUNCHER_ARTWORK_SHA256.txt",
+      "status": "same",
+      "legacy_sha256": "241f56a3546accc39b1d353ee044e9bdbb183dbe112a9107d383e13875a5e178",
+      "current_sha256": "241f56a3546accc39b1d353ee044e9bdbb183dbe112a9107d383e13875a5e178"
+    },
+    {
+      "path": "LICENSE",
+      "status": "same",
+      "legacy_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "current_sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4"
+    },
+    {
+      "path": "NOTICE",
+      "status": "same",
+      "legacy_sha256": "350943ed6dfbb3ad49251d875c0a778615443fdfcce98e839f0f7b3448c5f5c4",
+      "current_sha256": "350943ed6dfbb3ad49251d875c0a778615443fdfcce98e839f0f7b3448c5f5c4"
+    },
+    {
+      "path": "PRIVACY.md",
+      "status": "same",
+      "legacy_sha256": "c581593dffce0ec730662d04e31b3e5f9f6cf62edea10b1d1deefbe966c5fbcb",
+      "current_sha256": "c581593dffce0ec730662d04e31b3e5f9f6cf62edea10b1d1deefbe966c5fbcb"
+    },
+    {
+      "path": "README.md",
+      "status": "changed",
+      "legacy_sha256": "e32aa229d1187a7dd5d71017bb0bf90dcdff000d06fdb3692cb29e644cb53a1c",
+      "current_sha256": "f7d90317ba419bdb1c28e722c27d803b396985e343a73ae27a297f8767eb2532"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "status": "same",
+      "legacy_sha256": "7e754699e6dda9a94534e130743bdd20d73412d57d4bdc9f994f16d397cef1aa",
+      "current_sha256": "7e754699e6dda9a94534e130743bdd20d73412d57d4bdc9f994f16d397cef1aa"
+    },
+    {
+      "path": "WELCOME_ARTWORK_SHA256.txt",
+      "status": "same",
+      "legacy_sha256": "f8998b5a3fc15bb4468dafb0cd5fec6313b978b949e13310a2795a048a8705de",
+      "current_sha256": "f8998b5a3fc15bb4468dafb0cd5fec6313b978b949e13310a2795a048a8705de"
+    },
+    {
+      "path": "app/build.gradle",
+      "status": "changed",
+      "legacy_sha256": "8a1190890e8273ab11d6e39d012175dea6a1723f18c84296485ae6f411f534bc",
+      "current_sha256": "055df673005045dffdf7a46372b3ac83ee0447d2ab77d69a5ce42566c2a7db45"
+    },
+    {
+      "path": "app/proguard-rules.pro",
+      "status": "same",
+      "legacy_sha256": "6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0",
+      "current_sha256": "6e83455d7092b6fd29a6aac28433a8fc3cadc80aa86baa97529f289e9c6b35e0"
+    },
+    {
+      "path": "app/src/main/AndroidManifest.xml",
+      "status": "changed",
+      "legacy_sha256": "c4f2bc61940e9b228d5bea56a1c9636b37897dcab2fa913c15ac0a3714a08b32",
+      "current_sha256": "38c26ae822170e46966a588d0acd49510b11b56d9b3b39b5f628f8fb480262c1"
+    },
+    {
+      "path": "app/src/main/cpp/CMakeLists.txt",
+      "status": "same",
+      "legacy_sha256": "e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8",
+      "current_sha256": "e9c27e92fa6ccee517e65b8efe3b6624eafe6a13f45b688f2d70c2bc3d58f1f8"
+    },
+    {
+      "path": "app/src/main/cpp/native_usbfs.cpp",
+      "status": "changed",
+      "legacy_sha256": "652052fbc91f89adfb09c0c0b4dc968385032f584792e1a2c7d779cde79f5317",
+      "current_sha256": "271aac53c554cdeb33d4296736ddd16942c7997073f99a8b32c22babbc6881c7"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/AdbKeyStore.kt",
+      "status": "same",
+      "legacy_sha256": "83b2deb40e73106a13ab5e2411ed0ea2c47da24077ac343d41ade3c7bd466761",
+      "current_sha256": "83b2deb40e73106a13ab5e2411ed0ea2c47da24077ac343d41ade3c7bd466761"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/AdbPacketChecksum.kt",
+      "status": "same",
+      "legacy_sha256": "0e54a4caaa263051857a176d44bbafed38322427d6036cf1cbde9a70a8c01709",
+      "current_sha256": "0e54a4caaa263051857a176d44bbafed38322427d6036cf1cbde9a70a8c01709"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/AdbPacketDispatcher.kt",
+      "status": "same",
+      "legacy_sha256": "34d9c758fac86affcbff49108f1a18dbd558c714dd72070723e1e75a9331cccf",
+      "current_sha256": "34d9c758fac86affcbff49108f1a18dbd558c714dd72070723e1e75a9331cccf"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt",
+      "status": "changed",
+      "legacy_sha256": "f83d19e6294b1e12b5ecb0608e895de142ffb6304c6b6de236323f21afea7a45",
+      "current_sha256": "8d1ff71d4c7b84f70d234e6c8c5988ae53d491e00fadada531a15edd36a44c5c"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/AdbServiceCompletionPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "7d8e6149c5650ea8721154c8179368c2dc5cf97a1ed612843fab394496646369",
+      "current_sha256": "7d8e6149c5650ea8721154c8179368c2dc5cf97a1ed612843fab394496646369"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/CompactLogRenderPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "9d82261f74884aad0aa54d20e2ee472b44f62016ad80afb6a15ecc996ffa282a",
+      "current_sha256": "9d82261f74884aad0aa54d20e2ee472b44f62016ad80afb6a15ecc996ffa282a"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/ConnectionModeUiPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "17d6b13f68b029b275ef22bdbe1a995729b1d0d31430651f5a69ff4e1cc5a70c",
+      "current_sha256": "17d6b13f68b029b275ef22bdbe1a995729b1d0d31430651f5a69ff4e1cc5a70c"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/ConsoleDockController.kt",
+      "status": "changed",
+      "legacy_sha256": "7f30e9afea98341a63a9bfc9c1611882b1abc970c3ff8a6cfdfd5b8ce23ba7bd",
+      "current_sha256": "a7e6e489355aa98c3f7dbd956a8a79d4f790918fea527a99fa2d4024012b8889"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/ConsoleLogAdapter.kt",
+      "status": "same",
+      "legacy_sha256": "62e4599c7ca1c448cfb66b590fe310d66a1b950b0cccfecaa75e9d9e8cb042a5",
+      "current_sha256": "62e4599c7ca1c448cfb66b590fe310d66a1b950b0cccfecaa75e9d9e8cb042a5"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/ConsoleSheetPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "e3049c37bfb07062fab24367a1abfc5500f07b1690605503e1d0df3e81806936",
+      "current_sha256": "e3049c37bfb07062fab24367a1abfc5500f07b1690605503e1d0df3e81806936"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt",
+      "status": "changed",
+      "legacy_sha256": "b23ccf2d651a4b974f68d833bc56f32902f8a5242ddbdd0b64e17f601a87fe7c",
+      "current_sha256": "3678e9809a5b9cb9720f04bf93c51b02427561f279a61545a52b7ebe852d04fd"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/DiagnosticCrashMarker.kt",
+      "status": "same",
+      "legacy_sha256": "fca8fe1ce826db1ffed77fdb37c6d0dbc6cbdf039c965c01306eb17dfb94d220",
+      "current_sha256": "fca8fe1ce826db1ffed77fdb37c6d0dbc6cbdf039c965c01306eb17dfb94d220"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/DiagnosticJson.kt",
+      "status": "same",
+      "legacy_sha256": "8d9bfb769619237c0899546751c7acc7ec1ab6e8cdb88c5881b162b62dbcd56b",
+      "current_sha256": "8d9bfb769619237c0899546751c7acc7ec1ab6e8cdb88c5881b162b62dbcd56b"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/DiagnosticLogPolicy.kt",
+      "status": "changed",
+      "legacy_sha256": "b755861a8d649e36343cb231a3acd9ae5ebd1da814ce423a0a356e0900fd2219",
+      "current_sha256": "628efe22f5af4a19ed3458fa2f7a9d6616f9a1d969c1f94855a6de25489bb623"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/DiagnosticLogStore.kt",
+      "status": "changed",
+      "legacy_sha256": "027777c96903639c8990f7b520d99993e395064728fe7f37e866187e41381b4c",
+      "current_sha256": "f02619fde221fef6cc00bf64d566944287e3f73f5f9af23ebdefbe574b661227"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/DiagnosticSessionTracker.kt",
+      "status": "same",
+      "legacy_sha256": "a2235c51c1785b28cd7e0c4ed4e97e29f21aedb84cd25288062b97274d1f9c5f",
+      "current_sha256": "a2235c51c1785b28cd7e0c4ed4e97e29f21aedb84cd25288062b97274d1f9c5f"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FastbootGetVarAllParser.kt",
+      "status": "same",
+      "legacy_sha256": "4ebd0ba6027b7627048b242b84c102eb96786bb140959ec5505f7b14c35735e2",
+      "current_sha256": "4ebd0ba6027b7627048b242b84c102eb96786bb140959ec5505f7b14c35735e2"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FastbootPartitionInventory.kt",
+      "status": "same",
+      "legacy_sha256": "2c0956340477e80ab7672e641cf45e3696eccb1ade214b5c69965c9d88aef465",
+      "current_sha256": "2c0956340477e80ab7672e641cf45e3696eccb1ade214b5c69965c9d88aef465"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FastbootPartitionProbePlanner.kt",
+      "status": "same",
+      "legacy_sha256": "5f2df376ca1e7df06c3335f78b8789b460f25d3429c70f7da9e03fd0f09a472a",
+      "current_sha256": "5f2df376ca1e7df06c3335f78b8789b460f25d3429c70f7da9e03fd0f09a472a"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt",
+      "status": "changed",
+      "legacy_sha256": "5b5c6b7d68757ef41cb585ba7231bfe2d5d95d15d7e3389e25b200776dfb9766",
+      "current_sha256": "b613b03cc4dc1c10657f7b208a8efbc928a6ff386917cbf06c84759e47095237"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FastbootValueParser.kt",
+      "status": "same",
+      "legacy_sha256": "a1dbb1d2016e00fc2d980b2f1f3bd94f3cdf5b5b86caa8a1183755dace58b26a",
+      "current_sha256": "a1dbb1d2016e00fc2d980b2f1f3bd94f3cdf5b5b86caa8a1183755dace58b26a"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FlashOperationDraft.kt",
+      "status": "changed",
+      "legacy_sha256": "589b59ea5aebd4aee9aa3404741fdb882910a2f2bf8a2ca554d45ad078646ee4",
+      "current_sha256": "248c970bd57a7e74deca570f1350ddddc80e3da8992262eb328143eb6d0de35c"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/FlashOperationService.kt",
+      "status": "changed",
+      "legacy_sha256": "d3ac310a4fb3333ec2160ae60565cd1379153fcc2ff5f3112778c45e02681b0f",
+      "current_sha256": "469e72684bde1222befbe1121e2246be8e80e12b5c10f84accbd3170b91a15aa"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/IntentCompat.kt",
+      "status": "same",
+      "legacy_sha256": "eb0d154258f30b26fb05f0d7a4a5f419af49e8fb6c941e06ad061de1ee1ff980",
+      "current_sha256": "eb0d154258f30b26fb05f0d7a4a5f419af49e8fb6c941e06ad061de1ee1ff980"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/LogMenuPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "2fd5abc3d64159ee4a0aad818f7afa87190521a2a3e879ce1a19fd080fbc8d56",
+      "current_sha256": "2fd5abc3d64159ee4a0aad818f7afa87190521a2a3e879ce1a19fd080fbc8d56"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt",
+      "status": "changed",
+      "legacy_sha256": "b2bc63b222a804a5e04f76d67e0237c93e38c9ecd203ff407a19a97b567450fd",
+      "current_sha256": "06dbd5bf9747c4750763cfb56b178eaf242bf25752fd26a001933a2b722f20bd"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt",
+      "status": "same",
+      "legacy_sha256": "3c44abb55c0a3403c5ba4d4bf725350488af0919cbb16922cfeeccf9de843887",
+      "current_sha256": "3c44abb55c0a3403c5ba4d4bf725350488af0919cbb16922cfeeccf9de843887"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/MiAccountSecurityPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "674e70a132c5b914988f401ccdcb6ee4ebe978f84b7508bf97b6c96e5b58b3fa",
+      "current_sha256": "674e70a132c5b914988f401ccdcb6ee4ebe978f84b7508bf97b6c96e5b58b3fa"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt",
+      "status": "same",
+      "legacy_sha256": "37bba2db65529534fabf209eb966487a072842d30fdf9ade96315b7cdfa20975",
+      "current_sha256": "37bba2db65529534fabf209eb966487a072842d30fdf9ade96315b7cdfa20975"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt",
+      "status": "same",
+      "legacy_sha256": "99a447bccb31711dadd3576634ed61ead388f7ff22c2357d4a3e0121271f5f00",
+      "current_sha256": "99a447bccb31711dadd3576634ed61ead388f7ff22c2357d4a3e0121271f5f00"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/NativeTransferProgress.kt",
+      "status": "same",
+      "legacy_sha256": "c56546d1cb415e44cf6d29f314ea96bc1d47ffeab6901feecac8b33625a7ddce",
+      "current_sha256": "c56546d1cb415e44cf6d29f314ea96bc1d47ffeab6901feecac8b33625a7ddce"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/NativeUsbfsBackend.kt",
+      "status": "changed",
+      "legacy_sha256": "5e7a53e18e4639a29d781cdc324a7a12c94ba8131240ff6f0c8bee4b0a9efc64",
+      "current_sha256": "831b7201d60b6a762c4b06048bcbe09c7a1128e95cb4d68cb01e014aa30d3c78"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/OnboardingGate.kt",
+      "status": "changed",
+      "legacy_sha256": "6cc576e89ce409da1c45bae14832ccaf8eba1e83f5d88ce6b7ce67678112f088",
+      "current_sha256": "fc902bda9e8f133fd20798780be85c45a0b1c116fdce059e7484bdc6128c0c0b"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/PartitionNameResolver.kt",
+      "status": "same",
+      "legacy_sha256": "b0a4c9e268445694e8c5d49a4cf632b40929961daacda9b84377525d385a4f4d",
+      "current_sha256": "b0a4c9e268445694e8c5d49a4cf632b40929961daacda9b84377525d385a4f4d"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/PermissionGate.kt",
+      "status": "changed",
+      "legacy_sha256": "452b44caa75a0ba1da94bd773760dc39ce0cc45c8ed3686b656ed0ebf920484d",
+      "current_sha256": "2c5f68792f8f88b3f47dd380cff438ba40b959442f52de2797e6ceb6a0b1251e"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/RecoveryInstallVerifier.kt",
+      "status": "changed",
+      "legacy_sha256": "2117189b96afd8dc7ee5862504fc408d654f6911f7bfe74776d8687ad93b8da7",
+      "current_sha256": "d01314f528764d728fe96bc727e179b4aad138aea8db64b1bf502cf80b6b5c75"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/ReportSanitizer.kt",
+      "status": "same",
+      "legacy_sha256": "0efc5e9e21b6ee42ff445a17652c1d12da59a315b6012f856e28296227c4212e",
+      "current_sha256": "0efc5e9e21b6ee42ff445a17652c1d12da59a315b6012f856e28296227c4212e"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/SanitizedLogShare.kt",
+      "status": "changed",
+      "legacy_sha256": "83a79dfe66e06f91ce7e957269f9519d7a4f330a11f9d94b28c88030165ecc01",
+      "current_sha256": "59d121cb530738c1e7b7a22e296078a653ad54ce8b9b88565bc966ba7c80a703"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/TabController.kt",
+      "status": "changed",
+      "legacy_sha256": "8597d835a52138c7da9803ccbb161bccc552f63569dac6636bd024b36d7e6a3f",
+      "current_sha256": "40086110f302eb13916a40abe8fb82408e9db1e4310b3a8bf30ee67eddf7fa7b"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/ThemePalette.kt",
+      "status": "same",
+      "legacy_sha256": "f1cc31aefd49b18c7b7f691bc2ed2c06af354b147d355a6898a4654f4546693a",
+      "current_sha256": "f1cc31aefd49b18c7b7f691bc2ed2c06af354b147d355a6898a4654f4546693a"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/UsbDeviceInspector.kt",
+      "status": "same",
+      "legacy_sha256": "e688beed15d16ecf4ac5f50acc1bfd7adaa32547101b767f4bcb17601f6ce52f",
+      "current_sha256": "e688beed15d16ecf4ac5f50acc1bfd7adaa32547101b767f4bcb17601f6ce52f"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/UsbSessionSnapshot.kt",
+      "status": "same",
+      "legacy_sha256": "fa6c0c3a6cdb4a77bbdc3ea451af9f009c54fc3b4d1014bb5b5ea729f4216aa7",
+      "current_sha256": "fa6c0c3a6cdb4a77bbdc3ea451af9f009c54fc3b4d1014bb5b5ea729f4216aa7"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/UsbTransportShutdownPolicy.kt",
+      "status": "same",
+      "legacy_sha256": "d50d9d7f7080698955a66518a31637a09ca5827c01dae0e71e2adfbeb4ebc202",
+      "current_sha256": "d50d9d7f7080698955a66518a31637a09ca5827c01dae0e71e2adfbeb4ebc202"
+    },
+    {
+      "path": "app/src/main/java/ru/forum/adbfastboottool/WelcomeActivity.kt",
+      "status": "changed",
+      "legacy_sha256": "b8d3d10fbf97b6e348229127b1f2a914a22512477621b5fcb4b58741ff89e8b7",
+      "current_sha256": "3c7c6aa0ce95bb31b631ae553b5f51288f99b41523ff4b507ed89c6669b8e653"
+    },
+    {
+      "path": "app/src/main/res/color/nf_action_tile_background.xml",
+      "status": "same",
+      "legacy_sha256": "63c11a63917d03fea84ecc275e446bc338bc9e99e6297656430a1ff9ae54021d",
+      "current_sha256": "63c11a63917d03fea84ecc275e446bc338bc9e99e6297656430a1ff9ae54021d"
+    },
+    {
+      "path": "app/src/main/res/color/nf_action_tile_stroke.xml",
+      "status": "same",
+      "legacy_sha256": "e012bad2e37a4b03a8c9d0c00d472263c49ce1470175502c0486958e49f97bed",
+      "current_sha256": "e012bad2e37a4b03a8c9d0c00d472263c49ce1470175502c0486958e49f97bed"
+    },
+    {
+      "path": "app/src/main/res/color/nf_action_tile_text.xml",
+      "status": "same",
+      "legacy_sha256": "9f08724060b46dd91506729ce552a2d111c2df512b28396bb93b0c9ba793f81d",
+      "current_sha256": "9f08724060b46dd91506729ce552a2d111c2df512b28396bb93b0c9ba793f81d"
+    },
+    {
+      "path": "app/src/main/res/color/nf_button_ripple.xml",
+      "status": "same",
+      "legacy_sha256": "681437df802de692aede0e7683d51d7fba23ceacdfc948c6ce17ea679d9b8051",
+      "current_sha256": "681437df802de692aede0e7683d51d7fba23ceacdfc948c6ce17ea679d9b8051"
+    },
+    {
+      "path": "app/src/main/res/drawable-nodpi/bg_welcome.jpg",
+      "status": "same",
+      "legacy_sha256": "d16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7",
+      "current_sha256": "d16195d6ab022a4ec8f9686a1d750a4dd83595140e68f718c992df8a0a60a8f7"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_app_header.xml",
+      "status": "same",
+      "legacy_sha256": "9962e772e69a5f075d8e41dbf31a44c8d1eb9b90de97e0fffd9a79cf32c2b708",
+      "current_sha256": "9962e772e69a5f075d8e41dbf31a44c8d1eb9b90de97e0fffd9a79cf32c2b708"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_bottom_sheet.xml",
+      "status": "same",
+      "legacy_sha256": "a1b33abd76000fce65f91269e5174e8fb9d56ce32990d2958278fe06d6d3b255",
+      "current_sha256": "a1b33abd76000fce65f91269e5174e8fb9d56ce32990d2958278fe06d6d3b255"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_console_handle.xml",
+      "status": "same",
+      "legacy_sha256": "e4b7076e7fa7906ebdf4a519fad2bc6cc0e2a1f5d78f6b3e9327d73b7b99d240",
+      "current_sha256": "e4b7076e7fa7906ebdf4a519fad2bc6cc0e2a1f5d78f6b3e9327d73b7b99d240"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_console_header.xml",
+      "status": "same",
+      "legacy_sha256": "4e2c06fdc6fbd4408fb9a6e546625a26a9fa02a70ace018eb2a6d85e2e70fce4",
+      "current_sha256": "4e2c06fdc6fbd4408fb9a6e546625a26a9fa02a70ace018eb2a6d85e2e70fce4"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_console_input.xml",
+      "status": "same",
+      "legacy_sha256": "97bae8258a1df4da4c6d319980bf5bd589e6b5bddd5c79afb1fbe51289db05fc",
+      "current_sha256": "97bae8258a1df4da4c6d319980bf5bd589e6b5bddd5c79afb1fbe51289db05fc"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_otg_strip.xml",
+      "status": "same",
+      "legacy_sha256": "e1c6d8fb5d117cfb7508a02952cb606fdff9eff6b7d238545bb0913c09c9b51d",
+      "current_sha256": "e1c6d8fb5d117cfb7508a02952cb606fdff9eff6b7d238545bb0913c09c9b51d"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_welcome_chip.xml",
+      "status": "same",
+      "legacy_sha256": "1b7abc4bd35d9d90511b21ce48c5741b2cd4cf28f9150367002099eda73d10da",
+      "current_sha256": "1b7abc4bd35d9d90511b21ce48c5741b2cd4cf28f9150367002099eda73d10da"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_welcome_panel.xml",
+      "status": "same",
+      "legacy_sha256": "2d9d006e1a265abe1dbc46206fa07103af0537ab69b716d7e2b5ea2d15f4bc20",
+      "current_sha256": "2d9d006e1a265abe1dbc46206fa07103af0537ab69b716d7e2b5ea2d15f4bc20"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_welcome_primary_button.xml",
+      "status": "same",
+      "legacy_sha256": "b77b72c661e27fc604b66e5f87e93cb22ddf7b148682c918e8a31515cb7fd376",
+      "current_sha256": "b77b72c661e27fc604b66e5f87e93cb22ddf7b148682c918e8a31515cb7fd376"
+    },
+    {
+      "path": "app/src/main/res/drawable/bg_welcome_status_row.xml",
+      "status": "same",
+      "legacy_sha256": "ea2556fb35aa59383eac767a17c4b0d1765d626d25da8c440af1ec2b18663664",
+      "current_sha256": "ea2556fb35aa59383eac767a17c4b0d1765d626d25da8c440af1ec2b18663664"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_arrow_right.xml",
+      "status": "same",
+      "legacy_sha256": "3efbffabbdf55a69f0fa72ec6074cde71fe87e416754b5d9dfd72e4a2176a4d1",
+      "current_sha256": "3efbffabbdf55a69f0fa72ec6074cde71fe87e416754b5d9dfd72e4a2176a4d1"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_launcher_monochrome.xml",
+      "status": "same",
+      "legacy_sha256": "465518f77dd8379571e1085c3e34b28673e5dd295ea54e01f806c00d0ac8db14",
+      "current_sha256": "465518f77dd8379571e1085c3e34b28673e5dd295ea54e01f806c00d0ac8db14"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_nf_import.xml",
+      "status": "same",
+      "legacy_sha256": "70081555b513434c4d6f60fde7abc2f90c7891964ff6eede9123a7e275fd6263",
+      "current_sha256": "70081555b513434c4d6f60fde7abc2f90c7891964ff6eede9123a7e275fd6263"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_nf_recovery_green.xml",
+      "status": "same",
+      "legacy_sha256": "8dbd91ce5234f8df3e9355e60ebc9c2142439f9c8ef06db78d7cfff9f9822f69",
+      "current_sha256": "8dbd91ce5234f8df3e9355e60ebc9c2142439f9c8ef06db78d7cfff9f9822f69"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_nf_reports.xml",
+      "status": "same",
+      "legacy_sha256": "25d0ab9e26a898373c66ef5af0d383d41c5145caeff7bd5e3e7b8f6ae47fc89e",
+      "current_sha256": "25d0ab9e26a898373c66ef5af0d383d41c5145caeff7bd5e3e7b8f6ae47fc89e"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_notification.xml",
+      "status": "same",
+      "legacy_sha256": "aaf6c70fa77f7cd8b85848d403d6e3a1a9f05bb4bae551dd393919209891bcbb",
+      "current_sha256": "aaf6c70fa77f7cd8b85848d403d6e3a1a9f05bb4bae551dd393919209891bcbb"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_send.xml",
+      "status": "same",
+      "legacy_sha256": "2376e36a5bd541e12009b0c3eb6fe8693bf8eeba87073f7549f73f7a4d536bcf",
+      "current_sha256": "2376e36a5bd541e12009b0c3eb6fe8693bf8eeba87073f7549f73f7a4d536bcf"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_status_check_green.xml",
+      "status": "same",
+      "legacy_sha256": "b717fa7790618bffa3e6cd562eefbd6a8520cbb08ba895b771e541023624749b",
+      "current_sha256": "b717fa7790618bffa3e6cd562eefbd6a8520cbb08ba895b771e541023624749b"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_status_optional_gray.xml",
+      "status": "same",
+      "legacy_sha256": "2585f2a9cac68b2735ffcfa7a11b4b157a59bb3d9c97882ee1fc6bca13dea5fb",
+      "current_sha256": "2585f2a9cac68b2735ffcfa7a11b4b157a59bb3d9c97882ee1fc6bca13dea5fb"
+    },
+    {
+      "path": "app/src/main/res/drawable/ic_status_warning_amber.xml",
+      "status": "same",
+      "legacy_sha256": "d754ee73dc0e78502bc88d321f124bfc41ef0b7131631b2e57932abbdbdd18d8",
+      "current_sha256": "d754ee73dc0e78502bc88d321f124bfc41ef0b7131631b2e57932abbdbdd18d8"
+    },
+    {
+      "path": "app/src/main/res/layout/activity_main.xml",
+      "status": "changed",
+      "legacy_sha256": "737f1417d01ee0ab6e22a58d707969498b3eff2b2dc64a28b1e3936f35db5074",
+      "current_sha256": "6d0fec558c44355419d43cb8099297e49ed68598067b4f44f2c1780f3bacb2a8"
+    },
+    {
+      "path": "app/src/main/res/layout/activity_welcome.xml",
+      "status": "changed",
+      "legacy_sha256": "7b2c85ee283603f05d522f813851a0e21a6f2898d014da70c54e118cf9d1c572",
+      "current_sha256": "79ae6ed88d365a29433edd684c060372136e504fc4cf67be4f7400c8072b0c02"
+    },
+    {
+      "path": "app/src/main/res/layout/item_console_line.xml",
+      "status": "same",
+      "legacy_sha256": "37b814a0ec6586c907adf967ad8403ba01196dcf8195a0d1805223a1094ff2ae",
+      "current_sha256": "37b814a0ec6586c907adf967ad8403ba01196dcf8195a0d1805223a1094ff2ae"
+    },
+    {
+      "path": "app/src/main/res/layout/page_adb.xml",
+      "status": "changed",
+      "legacy_sha256": "eb84df52c63fb9873ec36012149206c1f54f657f90b5ee51825443a38210c7d6",
+      "current_sha256": "40c88ea146d539bed529ba02a40c8d549e55b0a3934dd8b97b149ece3f85db8b"
+    },
+    {
+      "path": "app/src/main/res/layout/page_fastboot.xml",
+      "status": "changed",
+      "legacy_sha256": "b8f49d5936976f4917cd586c1f5c557d298101904375a4a21ef473b2c6cef977",
+      "current_sha256": "74463979d1d0879a93d434a61ef4bf8c065652d7fd05905e672da83a733970d0"
+    },
+    {
+      "path": "app/src/main/res/layout/page_home.xml",
+      "status": "changed",
+      "legacy_sha256": "98987ea022f9d7df6293d8d9a3b7fd9aae4f6f0bb7efd4921dc1af4c35bb81f6",
+      "current_sha256": "145a1ab3077ec26a832969f9085566f8d00f94588f9107344cb965549ba0181d"
+    },
+    {
+      "path": "app/src/main/res/mipmap-anydpi/ic_launcher.xml",
+      "status": "same",
+      "legacy_sha256": "49a2dc6d3b344e651805fd54947575e86203a3c044afc027d025e52aa8d57d45",
+      "current_sha256": "49a2dc6d3b344e651805fd54947575e86203a3c044afc027d025e52aa8d57d45"
+    },
+    {
+      "path": "app/src/main/res/mipmap-anydpi/ic_launcher_round.xml",
+      "status": "same",
+      "legacy_sha256": "49a2dc6d3b344e651805fd54947575e86203a3c044afc027d025e52aa8d57d45",
+      "current_sha256": "49a2dc6d3b344e651805fd54947575e86203a3c044afc027d025e52aa8d57d45"
+    },
+    {
+      "path": "app/src/main/res/mipmap-hdpi/ic_launcher_foreground.png",
+      "status": "same",
+      "legacy_sha256": "e158a2cf139b0f2e78077c3083366b4464939c5278a297392ae5f352375cbbab",
+      "current_sha256": "e158a2cf139b0f2e78077c3083366b4464939c5278a297392ae5f352375cbbab"
+    },
+    {
+      "path": "app/src/main/res/mipmap-mdpi/ic_launcher_foreground.png",
+      "status": "same",
+      "legacy_sha256": "71c8a3d44637b5c26305fb732a8d0a90e3676ad238e9bc41b6c50d50649bb24e",
+      "current_sha256": "71c8a3d44637b5c26305fb732a8d0a90e3676ad238e9bc41b6c50d50649bb24e"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xhdpi/ic_launcher_foreground.png",
+      "status": "same",
+      "legacy_sha256": "397bf6bbeef9823a90ce0aed5aacbbdefc9aa100b7acfce6ba8e30a3e2530091",
+      "current_sha256": "397bf6bbeef9823a90ce0aed5aacbbdefc9aa100b7acfce6ba8e30a3e2530091"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxhdpi/ic_launcher_foreground.png",
+      "status": "same",
+      "legacy_sha256": "4ce0928a32de8a7ceb725514cc67394e964856c0adea5e9c7fac8c249c270e02",
+      "current_sha256": "4ce0928a32de8a7ceb725514cc67394e964856c0adea5e9c7fac8c249c270e02"
+    },
+    {
+      "path": "app/src/main/res/mipmap-xxxhdpi/ic_launcher_foreground.png",
+      "status": "same",
+      "legacy_sha256": "8e8a03c01136cd2e35a2902d836e8914157e98776fb0e88960e4913bd534259a",
+      "current_sha256": "8e8a03c01136cd2e35a2902d836e8914157e98776fb0e88960e4913bd534259a"
+    },
+    {
+      "path": "app/src/main/res/values-land/dimens.xml",
+      "status": "same",
+      "legacy_sha256": "b840420442b300a347425ce8006e9f9f9fd9c0af2f66ad0d2d9e353e6b6c74a7",
+      "current_sha256": "b840420442b300a347425ce8006e9f9f9fd9c0af2f66ad0d2d9e353e6b6c74a7"
+    },
+    {
+      "path": "app/src/main/res/values-ru/strings.xml",
+      "status": "changed",
+      "legacy_sha256": "d620619f46cfc8f40aa19f0d3b1281ae6fa5aaff5c0aa32d7913c6af15e478ae",
+      "current_sha256": "54b92781d07cdd3ce1c1616cf3077d427b1aab8fec7c695790c23c57e8f3c2f8"
+    },
+    {
+      "path": "app/src/main/res/values-v27/styles.xml",
+      "status": "same",
+      "legacy_sha256": "2133db8ba6e69382b179a02ffda34fb39e0bf5b01c580198846f2a07ebf6e7aa",
+      "current_sha256": "2133db8ba6e69382b179a02ffda34fb39e0bf5b01c580198846f2a07ebf6e7aa"
+    },
+    {
+      "path": "app/src/main/res/values/colors.xml",
+      "status": "changed",
+      "legacy_sha256": "c0c34b5c436526777ba7e61445546fd49ac5198bff702dbb786d03f0681ef024",
+      "current_sha256": "47b1eda14be697026362b16aead69f90bfa0a1cea1de1dd9b40ad8135f29b4b8"
+    },
+    {
+      "path": "app/src/main/res/values/dimens.xml",
+      "status": "changed",
+      "legacy_sha256": "f2534fa0968734c77547b048267be1b069a442dd971a40cdc2e61a9a2b18c6ee",
+      "current_sha256": "2f53c30b6a13db999a0d05da556466aaa08e511e093b58e0ecaf01842aaed036"
+    },
+    {
+      "path": "app/src/main/res/values/strings.xml",
+      "status": "changed",
+      "legacy_sha256": "95b164ec91b8abeed9d28ad23f51d971c76064aabe0724c0a460e461ee533f8d",
+      "current_sha256": "ff68303bd141babd37b434d340e4e3081dc12a58b6f88a18814d6856b65a9c33"
+    },
+    {
+      "path": "app/src/main/res/values/styles.xml",
+      "status": "same",
+      "legacy_sha256": "3aa8c39fc09791d49e00010013fc28f96a49ca1d4643c9d975258e3fce69d34d",
+      "current_sha256": "3aa8c39fc09791d49e00010013fc28f96a49ca1d4643c9d975258e3fce69d34d"
+    },
+    {
+      "path": "app/src/main/res/xml/backup_rules.xml",
+      "status": "same",
+      "legacy_sha256": "2c5c697984f4c52b526337ab61113f5843e0bfc6af4722374916ffe6da38dd9a",
+      "current_sha256": "2c5c697984f4c52b526337ab61113f5843e0bfc6af4722374916ffe6da38dd9a"
+    },
+    {
+      "path": "app/src/main/res/xml/data_extraction_rules.xml",
+      "status": "same",
+      "legacy_sha256": "eda9dddce1e895de1efd716fe75e244187bf8f91a3bb7444c6ea1731e51c74a8",
+      "current_sha256": "eda9dddce1e895de1efd716fe75e244187bf8f91a3bb7444c6ea1731e51c74a8"
+    },
+    {
+      "path": "app/src/main/res/xml/device_filter.xml",
+      "status": "same",
+      "legacy_sha256": "b8d8ae593bfddd75be51645a6e94d2855e5de0ea575e937bb84d7b897e191a95",
+      "current_sha256": "b8d8ae593bfddd75be51645a6e94d2855e5de0ea575e937bb84d7b897e191a95"
+    },
+    {
+      "path": "app/src/main/res/xml/file_paths.xml",
+      "status": "same",
+      "legacy_sha256": "5d28cc00348de1a41a2e35a4257436ba538c020064835e99838b002ebb5cba3c",
+      "current_sha256": "5d28cc00348de1a41a2e35a4257436ba538c020064835e99838b002ebb5cba3c"
+    },
+    {
+      "path": "app/src/main/res/xml/locales_config.xml",
+      "status": "same",
+      "legacy_sha256": "80236fcd00f908a5e93f2e395ccd5c23654b8940379a063515dcd2eb638ac75f",
+      "current_sha256": "80236fcd00f908a5e93f2e395ccd5c23654b8940379a063515dcd2eb638ac75f"
+    },
+    {
+      "path": "build.gradle",
+      "status": "same",
+      "legacy_sha256": "68a85ed7aab4bec2d45854e4c7d22160514862cbf2226878cbfa559aef967a9c",
+      "current_sha256": "68a85ed7aab4bec2d45854e4c7d22160514862cbf2226878cbfa559aef967a9c"
+    },
+    {
+      "path": "docs/.nojekyll",
+      "status": "same",
+      "legacy_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "current_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "docs/404.html",
+      "status": "same",
+      "legacy_sha256": "e60bae1219f201d6bec023e654943b742fc12c353c40bec6fe7eb18c2b13f0ab",
+      "current_sha256": "e60bae1219f201d6bec023e654943b742fc12c353c40bec6fe7eb18c2b13f0ab"
+    },
+    {
+      "path": "docs/HARDWARE_VALIDATION.md",
+      "status": "same",
+      "legacy_sha256": "0e55b90dc21a537d370458497713537b59876e931ad39aa045df9b9cf5624e81",
+      "current_sha256": "0e55b90dc21a537d370458497713537b59876e931ad39aa045df9b9cf5624e81"
+    },
+    {
+      "path": "docs/LEGAL_REVIEW.md",
+      "status": "same",
+      "legacy_sha256": "2ac3f74bdb898e40b81e738a521d3cdb7c1bd17dfaf454097dbeb1c2a3ee35e8",
+      "current_sha256": "2ac3f74bdb898e40b81e738a521d3cdb7c1bd17dfaf454097dbeb1c2a3ee35e8"
+    },
+    {
+      "path": "docs/UI_UX_AUDIT.md",
+      "status": "same",
+      "legacy_sha256": "303febabeaa2bf25937f655716427fa0a736ac25897ceca6c40077367e77aa6a",
+      "current_sha256": "303febabeaa2bf25937f655716427fa0a736ac25897ceca6c40077367e77aa6a"
+    },
+    {
+      "path": "docs/USB_CONNECTION_TROUBLESHOOTING.md",
+      "status": "same",
+      "legacy_sha256": "71b2fdc12e6895f2f1b6d457724f4ec155f143da91ced8fbe5002e999d878d20",
+      "current_sha256": "71b2fdc12e6895f2f1b6d457724f4ec155f143da91ced8fbe5002e999d878d20"
+    },
+    {
+      "path": "docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png",
+      "status": "same",
+      "legacy_sha256": "fc098f5bea87aea9c2ad0dbddb74ea8277c94145403fb4d76032f36bb0ce1832",
+      "current_sha256": "fc098f5bea87aea9c2ad0dbddb74ea8277c94145403fb4d76032f36bb0ce1832"
+    },
+    {
+      "path": "docs/artwork/nekoflash_launcher_monochrome_v5.9.13.svg",
+      "status": "same",
+      "legacy_sha256": "80d42e03821b64d26e512c72c3112b921195c79963b702f59045559eb2a3b826",
+      "current_sha256": "80d42e03821b64d26e512c72c3112b921195c79963b702f59045559eb2a3b826"
+    },
+    {
+      "path": "docs/assets/favicon.svg",
+      "status": "same",
+      "legacy_sha256": "a7eabcaffed138e8175bf62ba297f2d88077228281583afd9c1d89438707f078",
+      "current_sha256": "a7eabcaffed138e8175bf62ba297f2d88077228281583afd9c1d89438707f078"
+    },
+    {
+      "path": "docs/assets/images/home.webp",
+      "status": "same",
+      "legacy_sha256": "14311d7cd8b38645790d6604eddb1bb86e67c49fd2c264db84d6ac44ee8ba8ce",
+      "current_sha256": "14311d7cd8b38645790d6604eddb1bb86e67c49fd2c264db84d6ac44ee8ba8ce"
+    },
+    {
+      "path": "docs/assets/images/quick-flash.webp",
+      "status": "same",
+      "legacy_sha256": "043f536034f6fde33194047d3cd20624e0eae742f4a6a6f06867c87576adff7b",
+      "current_sha256": "043f536034f6fde33194047d3cd20624e0eae742f4a6a6f06867c87576adff7b"
+    },
+    {
+      "path": "docs/assets/images/sideload.webp",
+      "status": "same",
+      "legacy_sha256": "2bae9e6ea65aa952ab236e514efff2db0a42d54031f2210121b7267637ff290b",
+      "current_sha256": "2bae9e6ea65aa952ab236e514efff2db0a42d54031f2210121b7267637ff290b"
+    },
+    {
+      "path": "docs/assets/images/terminal.webp",
+      "status": "same",
+      "legacy_sha256": "9527bc447ea61a0457b9ff2d58dbd11ad453015f32806f35870f4f51b3b819a0",
+      "current_sha256": "9527bc447ea61a0457b9ff2d58dbd11ad453015f32806f35870f4f51b3b819a0"
+    },
+    {
+      "path": "docs/assets/images/unlock.webp",
+      "status": "same",
+      "legacy_sha256": "5327e4e582334e0d306276d50936c25c3709d70c8c13987da209a96b95a91d75",
+      "current_sha256": "5327e4e582334e0d306276d50936c25c3709d70c8c13987da209a96b95a91d75"
+    },
+    {
+      "path": "docs/assets/images/welcome.webp",
+      "status": "same",
+      "legacy_sha256": "60829699d4c67e694f171a7544eacbe78b40d57f24a4947d63bad72a1b7c1f45",
+      "current_sha256": "60829699d4c67e694f171a7544eacbe78b40d57f24a4947d63bad72a1b7c1f45"
+    },
+    {
+      "path": "docs/assets/og-image.png",
+      "status": "same",
+      "legacy_sha256": "d371a12bf7013a29f873d93f0cef63a879e54a148b6889cf7145d28c65eb0617",
+      "current_sha256": "d371a12bf7013a29f873d93f0cef63a879e54a148b6889cf7145d28c65eb0617"
+    },
+    {
+      "path": "docs/assets/site.css",
+      "status": "same",
+      "legacy_sha256": "022cc51fd7f455669a17ef182efc9e016407722af6a87773b21f4ddf1e1d2939",
+      "current_sha256": "022cc51fd7f455669a17ef182efc9e016407722af6a87773b21f4ddf1e1d2939"
+    },
+    {
+      "path": "docs/evidence/POCO_X3_PRO_ALPHA10_1.md",
+      "status": "same",
+      "legacy_sha256": "5620417571920ef80b557c1c4fb04b428ff0555c59f3630a1dc243b381eddea3",
+      "current_sha256": "5620417571920ef80b557c1c4fb04b428ff0555c59f3630a1dc243b381eddea3"
+    },
+    {
+      "path": "docs/evidence/POCO_X7_PRO_ALPHA10.md",
+      "status": "same",
+      "legacy_sha256": "3cfc39df3df346971db33a725125a66e01e55df9bcd3c236be27f10947ee590d",
+      "current_sha256": "3cfc39df3df346971db33a725125a66e01e55df9bcd3c236be27f10947ee590d"
+    },
+    {
+      "path": "docs/guides/adb-sideload/index.html",
+      "status": "same",
+      "legacy_sha256": "237394fb6fe0548a8d7ddc3cb5592887417c6273c55277c538c66e0c0b67787e",
+      "current_sha256": "237394fb6fe0548a8d7ddc3cb5592887417c6273c55277c538c66e0c0b67787e"
+    },
+    {
+      "path": "docs/guides/fastboot-from-android/index.html",
+      "status": "same",
+      "legacy_sha256": "43ceb97f9ff88758b343ed995c38fbda0af85d59c7039281ff11849d417701a5",
+      "current_sha256": "43ceb97f9ff88758b343ed995c38fbda0af85d59c7039281ff11849d417701a5"
+    },
+    {
+      "path": "docs/guides/flash-recovery-twrp/index.html",
+      "status": "same",
+      "legacy_sha256": "4bb7821c7e9738875edaa12349a50490fd7cdc27a98d4e71574bb0671cba0174",
+      "current_sha256": "4bb7821c7e9738875edaa12349a50490fd7cdc27a98d4e71574bb0671cba0174"
+    },
+    {
+      "path": "docs/guides/index.html",
+      "status": "same",
+      "legacy_sha256": "253e27c20a7247deba4e576abc8e99ddb88eccb65b1d79bb24d21e88b4495853",
+      "current_sha256": "253e27c20a7247deba4e576abc8e99ddb88eccb65b1d79bb24d21e88b4495853"
+    },
+    {
+      "path": "docs/index.html",
+      "status": "same",
+      "legacy_sha256": "9e468b9ba414f5acb25bb6f9b5011bdad8bf11c4fa5a16092cdddc3910da6a01",
+      "current_sha256": "9e468b9ba414f5acb25bb6f9b5011bdad8bf11c4fa5a16092cdddc3910da6a01"
+    },
+    {
+      "path": "docs/robots.txt",
+      "status": "same",
+      "legacy_sha256": "487da96451e1ea163ece8a5fd034544e4d482b3429b3e783d4c4133d47fe6ed0",
+      "current_sha256": "487da96451e1ea163ece8a5fd034544e4d482b3429b3e783d4c4133d47fe6ed0"
+    },
+    {
+      "path": "docs/ru/guides/adb-sideload/index.html",
+      "status": "same",
+      "legacy_sha256": "49c84db16d3dba73491d8b56bbf99ef6f4eff7d156a213a4707fd8b1fb81e2c7",
+      "current_sha256": "49c84db16d3dba73491d8b56bbf99ef6f4eff7d156a213a4707fd8b1fb81e2c7"
+    },
+    {
+      "path": "docs/ru/guides/fastboot-from-android/index.html",
+      "status": "same",
+      "legacy_sha256": "d793dba6a9d0dc657797c701d440e1149966e5eccb87ec30beebe7bc9f7d72d2",
+      "current_sha256": "d793dba6a9d0dc657797c701d440e1149966e5eccb87ec30beebe7bc9f7d72d2"
+    },
+    {
+      "path": "docs/ru/guides/flash-recovery-twrp/index.html",
+      "status": "same",
+      "legacy_sha256": "18b7f4fd970e25af08642692466f368783162e1c3c29383aea1732d4d1979340",
+      "current_sha256": "18b7f4fd970e25af08642692466f368783162e1c3c29383aea1732d4d1979340"
+    },
+    {
+      "path": "docs/ru/guides/index.html",
+      "status": "same",
+      "legacy_sha256": "bbddbd24fe231450b777ac228b2e13e1ef274c0a1b49f4c8b3508b4de33ee0cc",
+      "current_sha256": "bbddbd24fe231450b777ac228b2e13e1ef274c0a1b49f4c8b3508b4de33ee0cc"
+    },
+    {
+      "path": "docs/ru/index.html",
+      "status": "same",
+      "legacy_sha256": "cae4220a807c40419277ba310624382c2354620510a154cb057857cc3ad17245",
+      "current_sha256": "cae4220a807c40419277ba310624382c2354620510a154cb057857cc3ad17245"
+    },
+    {
+      "path": "docs/screenshots/home.png",
+      "status": "same",
+      "legacy_sha256": "eb21dee3b7b1415216bf41a1bf9d3146b4c053c876902421283cc7b978281ddb",
+      "current_sha256": "eb21dee3b7b1415216bf41a1bf9d3146b4c053c876902421283cc7b978281ddb"
+    },
+    {
+      "path": "docs/screenshots/quick-flash.png",
+      "status": "same",
+      "legacy_sha256": "2270cdd8f1570cf8bedf25a7ef2185cc9d4fcec4fa34e3a6cb6fe0034a5cefad",
+      "current_sha256": "2270cdd8f1570cf8bedf25a7ef2185cc9d4fcec4fa34e3a6cb6fe0034a5cefad"
+    },
+    {
+      "path": "docs/screenshots/sideload.png",
+      "status": "same",
+      "legacy_sha256": "4c7ab225d022939330c6b6fd378f9688a5ba579f3dc1ef06e17a60ca0b6bd62b",
+      "current_sha256": "4c7ab225d022939330c6b6fd378f9688a5ba579f3dc1ef06e17a60ca0b6bd62b"
+    },
+    {
+      "path": "docs/screenshots/terminal.png",
+      "status": "same",
+      "legacy_sha256": "8dea666ee5b763f283af42be432fdfd7dbe73d6c14fd49878d174dee641d2197",
+      "current_sha256": "8dea666ee5b763f283af42be432fdfd7dbe73d6c14fd49878d174dee641d2197"
+    },
+    {
+      "path": "docs/screenshots/unlock.png",
+      "status": "same",
+      "legacy_sha256": "9319d6b3b7357afb5fc1d6a4addf0ab2683304df0e9dcb1e2bf207acbcbeabc0",
+      "current_sha256": "9319d6b3b7357afb5fc1d6a4addf0ab2683304df0e9dcb1e2bf207acbcbeabc0"
+    },
+    {
+      "path": "docs/screenshots/welcome.png",
+      "status": "same",
+      "legacy_sha256": "65634b71464bd608ccff2306843956f0c28cfc59754c22ec1156ff5b5902c11a",
+      "current_sha256": "65634b71464bd608ccff2306843956f0c28cfc59754c22ec1156ff5b5902c11a"
+    },
+    {
+      "path": "docs/site.webmanifest",
+      "status": "same",
+      "legacy_sha256": "a9efc318eca0229bfc8362d4220184f2af2c4c8e061c9e1e925cef2f0b4a6640",
+      "current_sha256": "a9efc318eca0229bfc8362d4220184f2af2c4c8e061c9e1e925cef2f0b4a6640"
+    },
+    {
+      "path": "docs/sitemap.xml",
+      "status": "same",
+      "legacy_sha256": "a6a38b56ac8aa3345d98aee2f0f20562c04c9192c93e4b81268ce8a5b13a71c4",
+      "current_sha256": "a6a38b56ac8aa3345d98aee2f0f20562c04c9192c93e4b81268ce8a5b13a71c4"
+    },
+    {
+      "path": "gradle.properties",
+      "status": "same",
+      "legacy_sha256": "6f3837d5dd3b9f5c39d218527db766c3c7d963129b132be6ea43312759c18781",
+      "current_sha256": "6f3837d5dd3b9f5c39d218527db766c3c7d963129b132be6ea43312759c18781"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.jar",
+      "status": "same",
+      "legacy_sha256": "0336f591bc0ec9aa0c9988929b93ecc916b3c1d52aed202c7381db144aa0ef15",
+      "current_sha256": "0336f591bc0ec9aa0c9988929b93ecc916b3c1d52aed202c7381db144aa0ef15"
+    },
+    {
+      "path": "gradle/wrapper/gradle-wrapper.properties",
+      "status": "same",
+      "legacy_sha256": "cf1a984a946684359380acf9ef64061c4a330fc38d2e7da3b83e106ad05c06e1",
+      "current_sha256": "cf1a984a946684359380acf9ef64061c4a330fc38d2e7da3b83e106ad05c06e1"
+    },
+    {
+      "path": "gradlew",
+      "status": "same",
+      "legacy_sha256": "ad7b3abb941ff36fdcf45b5ebabf9dfcca938762c8b4c521e694bbf1d217d13e",
+      "current_sha256": "ad7b3abb941ff36fdcf45b5ebabf9dfcca938762c8b4c521e694bbf1d217d13e"
+    },
+    {
+      "path": "gradlew.bat",
+      "status": "same",
+      "legacy_sha256": "ca41db1ef11c8066ea5a2fd649912c07d091ff67c9feaca81dd5fe00c2c25ee4",
+      "current_sha256": "ca41db1ef11c8066ea5a2fd649912c07d091ff67c9feaca81dd5fe00c2c25ee4"
+    },
+    {
+      "path": "lint.xml",
+      "status": "same",
+      "legacy_sha256": "f964afaf535fa15a3df029f9b4e64de0e74c75cb6a88c5dceb9eb82847c53e74",
+      "current_sha256": "f964afaf535fa15a3df029f9b4e64de0e74c75cb6a88c5dceb9eb82847c53e74"
+    },
+    {
+      "path": "scripts/build-apk.sh",
+      "status": "same",
+      "legacy_sha256": "fb714eb93aa96988144895f6b732b7a98c605ea2198028497f266a1ba9a32677",
+      "current_sha256": "fb714eb93aa96988144895f6b732b7a98c605ea2198028497f266a1ba9a32677"
+    },
+    {
+      "path": "scripts/termux-bootstrap.sh",
+      "status": "same",
+      "legacy_sha256": "500da3e1b11c4a184e5b4117dcbca77b1ec1a931678597731ecb2c1a845a8fbb",
+      "current_sha256": "500da3e1b11c4a184e5b4117dcbca77b1ec1a931678597731ecb2c1a845a8fbb"
+    },
+    {
+      "path": "scripts/termux-ci.sh",
+      "status": "same",
+      "legacy_sha256": "de46cace31fc7991b40bffaad1e4ce71b8748586dc2659660a480a25ef896666",
+      "current_sha256": "de46cace31fc7991b40bffaad1e4ce71b8748586dc2659660a480a25ef896666"
+    },
+    {
+      "path": "scripts/termux-publish.sh",
+      "status": "same",
+      "legacy_sha256": "08920e8e91d76468263a1ea6b035812b76972403977ce4c75828fc5735ffda4e",
+      "current_sha256": "08920e8e91d76468263a1ea6b035812b76972403977ce4c75828fc5735ffda4e"
+    },
+    {
+      "path": "settings.gradle",
+      "status": "same",
+      "legacy_sha256": "9c68088a9fd8ffe8538d8ec5f019fa7c58c7755ad351efa4cdd52af6fcedc028",
+      "current_sha256": "9c68088a9fd8ffe8538d8ec5f019fa7c58c7755ad351efa4cdd52af6fcedc028"
+    }
+  ],
+  "comparison_basis": "Checked-out REV22 implementation plus its README/report updates; every original file is hashed. .gitattributes end-of-line policy applies (gradlew.bat CRLF). Added report files do not affect the original-file inventory.",
+  "unchanged_from_rev21": [
+    "app/src/main/cpp/native_usbfs.cpp",
+    "app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt",
+    "app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt",
+    "app/src/main/java/ru/forum/adbfastboottool/FlashOperationService.kt",
+    "app/src/main/java/ru/forum/adbfastboottool/NativeUsbfsBackend.kt",
+    "app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt",
+    "app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt"
+  ]
+}

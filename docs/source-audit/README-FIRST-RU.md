@@ -1,4 +1,4 @@
-> Актуальная точка продолжения: [REV21 — host-команды Fastboot](REV21-FASTBOOT-HOST-2026-10-26-RU.md), [Draft PR #7](https://github.com/Ncorror/NekoFlash-2.0/pull/7). Код проверен в CI: 179 тестов, lint и четыре ABI. Ниже сохранена историческая заметка REV5; её статус «не собрано» относится только к тому этапу.
+> Актуальная точка продолжения: [REV22 — встроенные mkfs](REV22-BUNDLED-MKFS-2026-10-26-RU.md), [Draft PR #9](https://github.com/Ncorror/NekoFlash-2.0/pull/9). 179 JVM-тестов, по 4 Android-теста API 26/34, fsck, lint и четыре ABI — PASS. Ниже историческая заметка REV5; её статус «не собрано» относится только к тому этапу.
 
 # NekoFlash 2.0 REV5 — точка продолжения
 
