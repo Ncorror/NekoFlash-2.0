@@ -92,9 +92,8 @@ internal class FastbootFilesystemFormatter(
         val b = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN)
         if (type == "ext4") {
             require(b.getShort(56).toInt() and 0xffff == 0xef53) { "Generated image is not ext4" }
-            val blockSize = 1024L shl b.getInt(24)
             val count = b.getInt(4).toLong() and 0xffff_ffffL
-            require(blockSize == 4096L && Math.multiplyExact(count, blockSize) == size) { "ext4 geometry mismatch" }
+            require(b.getInt(24) == 2 && Math.multiplyExact(count, 4096L) == size) { "ext4 geometry mismatch" }
         } else {
             require(b.getInt(0) == 0xf2f52010.toInt()) { "Generated image is not F2FS" }
             require(b.getInt(16) == 12 && b.getLong(36) > 0 && Math.multiplyExact(b.getLong(36), 4096L) <= size) { "F2FS geometry mismatch" }

@@ -1089,7 +1089,7 @@ class MainActivity : AppCompatActivity() {
 
         while (i < tokens.size) {
             val token = tokens[i]
-            if (token == "raw" && commandTokens.isEmpty()) {
+            if (token.equals("raw", ignoreCase = true) && commandTokens.isEmpty()) {
                 commandTokens += tokens.drop(i)
                 wireTokens += lexicalTokens.drop(i).map { it.literal }
                 break
@@ -1101,7 +1101,7 @@ class MainActivity : AppCompatActivity() {
             }
             val lower = token.lowercase(Locale.US)
             when {
-                token == "-w" || lower == "--wipe" && commandTokens.firstOrNull() != "update-super" -> wipe = true
+                token == "-w" || lower == "--wipe" && !commandTokens.firstOrNull().equals("update-super", ignoreCase = true) -> wipe = true
                 lower == "--fs-options" || lower.startsWith("--fs-options=") -> {
                     val value = if ('=' in token) token.substringAfter('=') else nextOptionValue(token) ?: return null
                     filesystemOptions = try { filesystemOptions + FastbootHostSyntax.filesystemOptions(value) }

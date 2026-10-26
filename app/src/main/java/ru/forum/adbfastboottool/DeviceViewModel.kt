@@ -1133,11 +1133,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val context = kotlinx.coroutines.currentCoroutineContext()
             val cache = getApplication<Application>().cacheDir
+            val needsImages = steps.any { it is FastbootExecutionStep.Format || it is FastbootExecutionStep.Wipe || it is FastbootExecutionStep.WipeSuper }
             // Admission is exclusive. Remove private images left by a killed process before creating this job's directory.
-            cache.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("fastboot-host-[0-9a-f-]{36}")) }
+            if (needsImages) cache.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("fastboot-host-[0-9a-f-]{36}")) }
                 ?.forEach { context.ensureActive(); check(it.deleteRecursively()) { "Could not remove interrupted Fastboot images" } }
-            val directory = File(cache, "fastboot-host-${UUID.randomUUID()}")
-            check(directory.mkdirs()) { "Could not create private Fastboot image workspace" }
+            val directory = if (needsImages) File(cache, "fastboot-host-${UUID.randomUUID()}") else cache
+            if (needsImages) check(directory.mkdirs()) { "Could not create private Fastboot image workspace" }
             try {
                 val port = object : FastbootPlanPort {
                     override fun getVar(name: String) = proto.getVar(name)
@@ -1159,9 +1160,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     }
                 }
                 val formatter = FastbootFilesystemFormatter(nextData = AndroidImageExtents::nextData, log = ::log)
-                FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log).run(steps)
+                FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log) { detail ->
+                    postOperationProgress(OperationProgress(text(R.string.notif_fastboot_command), -1, detail))
+                }.run(steps)
             } finally {
-                if (!directory.deleteRecursively()) log("Could not remove temporary Fastboot images: ${directory.name}")
+                if (needsImages && !directory.deleteRecursively()) log("Could not remove temporary Fastboot images: ${directory.name}")
             }
         }
     }

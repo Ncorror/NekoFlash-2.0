@@ -19,7 +19,8 @@ internal class FastbootPlanExecutor(
     private val formatter: FilesystemFormatter,
     private val directory: File,
     private val checkCancelled: () -> Unit = {},
-    private val log: (String) -> Unit = {}
+    private val log: (String) -> Unit = {},
+    private val onProgress: (String) -> Unit = {}
 ) {
     private data class Prepared(val label: String, val payload: File? = null, val execute: () -> Unit)
     private var plannedActive: String? = null
@@ -45,6 +46,7 @@ internal class FastbootPlanExecutor(
         prepared.forEachIndexed { index, action ->
             checkCancelled()
             log("Fastboot ${index + 1}/${prepared.size}: ${action.label}")
+            onProgress("${index + 1}/${prepared.size}: ${action.label}")
             action.execute()
         }
     }
@@ -93,6 +95,7 @@ internal class FastbootPlanExecutor(
             }
         }
         is FastbootExecutionStep.WipeSuper -> {
+            onProgress("Preparing wipe-super metadata")
             val metadata = SuperEmptyImage.load(step.image, directory, checkCancelled)
             val images = metadata.build(directory, checkCancelled)
             val flashes = images.flatMap { image ->
@@ -130,6 +133,7 @@ internal class FastbootPlanExecutor(
         }
         checkCancelled()
         log("Preparing $type filesystem for $target ($size bytes)")
+        onProgress("Preparing $type filesystem for $target ($size bytes)")
         return formatter.generate(FilesystemSpec(type, size, block("erase-block-size"), block("logical-block-size"), options), directory, checkCancelled)
     }
 
