@@ -46,9 +46,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV22 structural and source-guard tests
+      - name: REV23 structural and source-guard tests
         run: |
-          python3 tests/check_rev22.py
+          python3 tests/check_rev23.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests

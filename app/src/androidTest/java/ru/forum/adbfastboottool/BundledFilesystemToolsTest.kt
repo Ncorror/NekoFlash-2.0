@@ -29,7 +29,28 @@ class BundledFilesystemToolsTest {
             assertTrue(image.length() < bytes)
             assertEquals(listOf(image), work.listFiles()!!.toList())
             val outputs = File(context.filesDir, "mkfs-test-output").also { it.mkdirs() }
-            image.copyTo(File(outputs, "$type-${if (options.isEmpty()) "default" else "options"}.sparse"), overwrite = true)
+            val name = "$type-${if (options.isEmpty()) "default" else "options"}"
+            image.copyTo(File(outputs, "$name.sparse"), overwrite = true)
+            val packets = File(work, "packets").also { it.mkdir() }
+            val limit = 16384L
+            val manifest = mutableListOf(limit.toString())
+            FirmwareSource.WorkspaceFile(image).open().use { opened ->
+                val plan = FastbootFlashImage.prepare(opened, limit)
+                assertTrue(plan.needsResparse)
+                assertTrue(plan.partCount > 1)
+                assertTrue(plan.forEachPart(packets) { part, index, total ->
+                    assertEquals(plan.partCount, total)
+                    assertEquals(1, packets.listFiles()!!.size)
+                    assertTrue(part.length() <= limit)
+                    val partName = "$name-part-$index.sparse"
+                    part.copyTo(File(outputs, partName), overwrite = true)
+                    manifest += partName
+                    true
+                })
+                assertEquals(plan.partCount, manifest.size.toLong() - 1)
+            }
+            assertTrue(packets.listFiles()!!.isEmpty())
+            File(outputs, "$name.parts.txt").writeText(manifest.joinToString("\n") + "\n")
         } finally {
             work.deleteRecursively()
         }

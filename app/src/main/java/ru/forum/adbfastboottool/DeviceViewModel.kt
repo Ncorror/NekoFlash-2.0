@@ -116,6 +116,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _operationProgress = MutableLiveData<OperationProgress?>(null)
     val operationProgress: LiveData<OperationProgress?> = _operationProgress
+    private data class SparseProgress(val label: String, val before: Long, val bytes: Long, val total: Long)
+    @Volatile private var sparseProgress: SparseProgress? = null
 
     fun postOperationProgress(progress: OperationProgress?) {
         operationProgressSnapshot = progress
@@ -597,11 +599,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 onLogVerbose = { msg -> logFileOnly(msg) },
                 onProgress = { percent, detail ->
                     val currentProgress = operationProgressSnapshot
+                    val sparse = sparseProgress
                     postOperationProgress(
                         OperationProgress(
                             title = currentProgress?.title ?: text(R.string.flash_progress_writing),
-                            percent = percent,
-                            detail = detail
+                            percent = if (sparse != null && percent >= 0)
+                                ((sparse.before.toDouble() + sparse.bytes.toDouble() * percent / 100) * 100 / sparse.total).toInt().coerceIn(0, 100)
+                                else percent,
+                            detail = sparse?.let { "${it.label} · $detail" } ?: detail
                         )
                     )
                 },
@@ -1125,7 +1130,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    internal fun runFastbootTerminalPlan(steps: List<FastbootExecutionStep>, expectedSerial: String? = null) {
+    internal fun runFastbootTerminalPlan(steps: List<FastbootExecutionStep>, expectedSerial: String? = null, sparseLimit: Long = 0) {
         val heavy = steps.any { it !is FastbootExecutionStep.Raw && it !is FastbootExecutionStep.Inspect && it !is FastbootExecutionStep.PartitionCommand }
         startOperation(text(R.string.notif_fastboot_command), text(R.string.rev21_preparing_plan),
             heavy = heavy, expectedFastbootSerial = expectedSerial) {
@@ -1147,7 +1152,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                         ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
                     override fun command(command: String) = proto.runTerminalCommand(command)
                     override fun flash(partition: String, file: File) {
-                        val result = proto.flashPartitionDetailed(partition, file)
+                        val result = flashImage(proto, partition, FirmwareSource.WorkspaceFile(file), sparseLimit) { context.ensureActive() }
                         if (!result.success) failOperation(formatFlashFailure(partition, result))
                     }
                     override fun download(file: File, command: String) {
@@ -1163,7 +1168,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 val formatter = FastbootFilesystemFormatter(
                     BundledFilesystemTools.fromDirectory(File(getApplication<Application>().applicationInfo.nativeLibraryDir)),
                     nextData = AndroidImageExtents::nextData, log = ::log)
-                FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log) { detail ->
+                FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log, sparseLimit) { detail ->
                     postOperationProgress(OperationProgress(text(R.string.notif_fastboot_command), -1, detail))
                 }.run(steps)
             } finally {
@@ -1376,15 +1381,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
                 ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
+            val context = kotlinx.coroutines.currentCoroutineContext()
             targets.forEach { target ->
-                val result = when (source) {
-                    is FirmwareSource.WorkspaceFile ->
-                        proto.flashPartitionDetailed(target, source.file)
-                    is FirmwareSource.SafDocument ->
-                        proto.flashPartitionDetailed(
-                            target, source, getApplication<Application>().contentResolver
-                        )
-                }
+                val result = flashImage(proto, target, source) { context.ensureActive() }
                 if (!result.success) {
                     if (source is FirmwareSource.SafDocument &&
                         result.stage == FastbootProtocol.FlashStage.VALIDATION
@@ -1394,6 +1393,52 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     }
                     failOperation(formatFlashFailure(target, result))
                 }
+            }
+        }
+    }
+
+    /** Every entry point uses this host preparation; each packet retains the original DATA/flash transport. */
+    private fun flashImage(proto: FastbootProtocol, partition: String, source: FirmwareSource,
+        sparseLimit: Long = 0, checkCancelled: () -> Unit): FastbootProtocol.FlashResult {
+        val app = getApplication<Application>()
+        source.open(app.contentResolver).use { opened ->
+            postOperationProgress(OperationProgress(text(R.string.notif_flash_img), -1, text(R.string.rev23_preparing_image, source.displayName)))
+            val image = FastbootFlashImage.prepare(opened, proto.hostDownloadLimitBytes(), sparseLimit, checkCancelled)
+            checkCancelled()
+            if (!image.needsResparse) return when (source) {
+                is FirmwareSource.WorkspaceFile -> proto.flashPartitionDetailed(partition, source.file)
+                is FirmwareSource.SafDocument -> proto.flashPartitionDetailed(partition, source, app.contentResolver)
+            }
+            // Exclusive service admission makes it safe to remove only our interrupted part directories.
+            app.cacheDir.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("fastboot-sparse-[0-9a-f-]{36}")) }
+                ?.forEach { checkCancelled(); check(it.deleteRecursively()) { "Could not remove interrupted sparse packets" } }
+            val directory = File(app.cacheDir, "fastboot-sparse-${UUID.randomUUID()}")
+            check(directory.mkdirs()) { "Could not create sparse packet workspace" }
+            var sent = 0L
+            var completed = 0L
+            var result = FastbootProtocol.FlashResult.ok()
+            try {
+                require(directory.usableSpace >= image.largestPartBytes) {
+                    "Not enough temporary storage for a sparse packet: need ${image.largestPartBytes} bytes"
+                }
+                log("Resparse ${source.displayName}: ${image.partCount} packets, limit=${image.limitBytes}, expanded=${image.expandedBytes}, download=${image.downloadBytes}")
+                image.forEachPart(directory) { part, index, total ->
+                    checkCancelled()
+                    val label = text(R.string.rev23_image_part, index, total)
+                    sparseProgress = SparseProgress(label, sent, part.length(), image.downloadBytes)
+                    log("$label → flash:$partition (${part.length()} bytes)")
+                    val current = proto.flashPartitionDetailed(partition, part)
+                    sent = Math.addExact(sent, current.dataBytesTransferred)
+                    if (current.success) completed++
+                    result = current.copy(dataBytesTransferred = sent,
+                        message = if (current.success) current.message else "$label: ${current.message}. Completed packets: $completed/$total; no automatic retry.")
+                    current.success
+                }
+                return result
+            } finally {
+                sparseProgress = null
+                if (!directory.deleteRecursively()) log("Could not remove sparse packet workspace: ${directory.name}")
+                if (completed < image.partCount) log("Resparse stopped after $completed/${image.partCount} completed packets. Previous writes were not rolled back.")
             }
         }
     }
@@ -1494,6 +1539,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 markOperationStep(1, OperationStepStatus.FAILED, text(R.string.error_no_fastboot))
                 failOperation("No Fastboot connection")
             }
+            val context = kotlinx.coroutines.currentCoroutineContext()
             ordered.forEachIndexed { index, item ->
                 val stepNumber = index + 1
                 if (!item.file.isFile || !item.file.canRead() || item.file.length() != item.expectedSizeBytes) {
@@ -1503,7 +1549,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 markOperationStep(stepNumber, OperationStepStatus.RUNNING, "fastboot flash ${item.partition}")
                 log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.file.name} ===")
-                val result = proto.flashPartitionDetailed(item.partition, item.file)
+                val result = flashImage(proto, item.partition, FirmwareSource.WorkspaceFile(item.file)) { context.ensureActive() }
                 val diagnostics = proto.currentDiagnostics()
                 if (diagnostics != null) _fastbootDiagnostics.postValue(diagnostics)
                 markOperationStep(

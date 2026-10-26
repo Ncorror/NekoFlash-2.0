@@ -85,6 +85,37 @@ class FastbootPlanExecutorTest {
         assertThrows(IllegalArgumentException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe())) }
         assertTrue(mutations().isEmpty())
     }
+    @Test fun validLargeFlashCanBePlannedAfterWipeUnderDeviceDownloadLimit() {
+        variables["max-download-size"] = "8192"
+        val input = temporary.newFile().also { it.writeBytes(ByteArray(30000)) }
+        executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Flash("system", input, null)))
+        assertEquals(listOf("erase:userdata", "flash:userdata", "flash:system"), mutations())
+    }
+    @Test fun malformedLaterSparseIsRejectedBeforeFirstWipeErase() {
+        val input = temporary.newFile()
+        AndroidSparseImage.Writer(input, 4096, 3).use { it.raw(ByteArray(4096 * 3)); it.finish() }
+        input.writeBytes(input.readBytes().dropLast(1).toByteArray())
+        assertThrows(IllegalArgumentException::class.java) {
+            executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Flash("system", input, null)))
+        }
+        assertTrue(mutations().isEmpty())
+    }
+    @Test fun indivisibleBootStillFailsPreflightBeforeWipe() {
+        variables["max-download-size"] = "8192"
+        val input = temporary.newFile().also { it.writeBytes(ByteArray(30000)) }
+        assertThrows(IllegalArgumentException::class.java) {
+            executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Download(input, "boot")))
+        }
+        assertTrue(events.none { it.startsWith("download:") }); assertTrue(mutations().isEmpty())
+    }
+    @Test fun impossibleUserSparseLimitFailsBeforeErase() {
+        val input = temporary.newFile().also { it.writeBytes(ByteArray(30000)) }
+        assertThrows(IllegalArgumentException::class.java) {
+            FastbootPlanExecutor(port, formatter, temporary.root, sparseLimit = 4096)
+                .run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Flash("system", input, null)))
+        }
+        assertTrue(mutations().isEmpty())
+    }
     @Test fun stopOnFailureDoesNotFlashOrRunTheTailOfThePlan() {
         fail = "erase:userdata"
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot"))) }

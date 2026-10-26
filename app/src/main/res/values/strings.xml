@@ -510,7 +510,6 @@ Unlock</string>
     <string name="rev13_image_source_workspace">NekoFlash workspace · local image</string>
     <string name="rev15_shell_not_open">Interactive ADB shell is not open.</string>
     <string name="rev15_shell_already_closed">Interactive ADB shell is already closed.</string>
-    <string name="rev16_sparse_option_not_implemented">Automatic Fastboot sparse splitting (-S) is not implemented yet. The command was not sent. Use a compatible pre-split sparse image/chunk set.</string>
 
     <string name="rev18_queue_source_changed">Source unavailable or size changed: %1$s ← %2$s. Select the image again.</string>
     <string name="rev18_history_previous">Previous command</string>
@@ -533,4 +532,6 @@ Unlock</string>
     <string name="rev20_cancelling_cleanup">Cancellation requested. Waiting for USB completion and cleanup.</string>
     <string name="rev21_format">Format filesystem</string>
     <string name="rev21_preparing_plan">Preparing Fastboot execution plan</string>
+    <string name="rev23_preparing_image">Preparing image: %1$s</string>
+    <string name="rev23_image_part">Part %1$d/%2$d</string>
 </resources>

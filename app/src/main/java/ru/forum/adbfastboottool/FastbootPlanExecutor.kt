@@ -21,9 +21,10 @@ internal class FastbootPlanExecutor(
     private val directory: File,
     private val checkCancelled: () -> Unit = {},
     private val log: (String) -> Unit = {},
+    private val sparseLimit: Long = 0,
     private val onProgress: (String) -> Unit = {}
 ) {
-    private data class Prepared(val label: String, val payload: File? = null, val execute: () -> Unit)
+    private data class Prepared(val label: String, val payload: File? = null, val flash: Boolean = false, val execute: () -> Unit)
     private var plannedActive: String? = null
 
     fun run(steps: List<FastbootExecutionStep>) {
@@ -31,14 +32,22 @@ internal class FastbootPlanExecutor(
         require(directory.isDirectory)
         plannedActive = null
         val prepared = steps.flatMap { step -> checkCancelled(); prepare(step) }
-        val payloads = prepared.mapNotNull { it.payload }.distinct()
+        val payloads = prepared.filter { it.payload != null }.distinctBy { it.payload to it.flash }
         if (payloads.isNotEmpty()) {
             val max = port.downloadLimitBytes()
-            for (file in payloads) {
+            for (action in payloads) {
+                val file = checkNotNull(action.payload)
                 require(file.isFile && file.canRead()) { "Payload is unavailable: ${file.name}" }
-                val rejection = FastbootDownloadSizePolicy.validate(file.length(), max)
-                require(rejection == null) {
-                    "Payload ${file.name}: ${file.length()} bytes exceeds Fastboot download capacity (${rejection?.reason}, ${rejection?.maxBytes}). No erase was sent; resparse is not implemented yet."
+                if (action.flash) {
+                    FirmwareSource.WorkspaceFile(file).open().use {
+                        FastbootFlashImage.prepare(it, max, sparseLimit, checkCancelled)
+                    }
+                } else {
+                    // boot/update-super/download are one command payload, not partition overlays.
+                    val rejection = FastbootDownloadSizePolicy.validate(file.length(), max)
+                    require(rejection == null) {
+                        "Payload ${file.name}: ${file.length()} bytes exceeds single-download capacity (${rejection?.reason}, ${rejection?.maxBytes}). No erase was sent."
+                    }
                 }
             }
         }
@@ -53,7 +62,7 @@ internal class FastbootPlanExecutor(
     private fun command(wire: String) = Prepared(wire) {
         check(port.command(wire)) { "Fastboot command failed: $wire. Execution stopped; completed steps were not rolled back." }
     }
-    private fun flash(target: String, file: File) = Prepared("flash $target (${file.length()} bytes)", file) {
+    private fun flash(target: String, file: File) = Prepared("flash $target (${file.length()} bytes)", file, flash = true) {
         port.flash(target, file)
     }
     private fun targets(partition: String, slot: String?): List<String> = port.targets(partition, slot ?: plannedActive).also {
