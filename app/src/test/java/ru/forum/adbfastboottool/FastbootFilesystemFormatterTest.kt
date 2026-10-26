@@ -65,11 +65,13 @@ class FastbootFilesystemFormatterTest {
         assertThrows(InterruptedException::class.java) {
             FastbootFilesystemFormatter(mapOf("ext4" to script))
                 .generate(FilesystemSpec("ext4", 32L * 1024 * 1024), temporary.root) {
-                    if (++checks >= 2) throw InterruptedException()
+                    if (++checks >= 2 && pid.isFile) throw InterruptedException()
                 }
         }
         assertTrue((System.nanoTime() - start) / 1_000_000 < 5000)
-        assertFalse(ProcessHandle.of(pid.readText().trim().toLong()).map { it.isAlive }.orElse(false))
+        // These integration tests run on Linux; Android's compile stubs do not expose ProcessHandle.
+        val processId = pid.readText().trim().toLong()
+        assertFalse(File("/proc/$processId").exists())
         assertTrue(temporary.root.listFiles()!!.none { it.name.startsWith("filesystem-") || it.name.startsWith("mkfs-") })
     }
 }

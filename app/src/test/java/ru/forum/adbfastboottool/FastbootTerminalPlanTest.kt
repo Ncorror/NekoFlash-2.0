@@ -75,4 +75,10 @@ class FastbootTerminalPlanTest {
         val file = image()
         assertEquals(listOf(FastbootExecutionStep.SetActive("b"), FastbootExecutionStep.Flash("boot", file, null)), steps(parse("--set-active=b flash boot '${file.path}'")!!))
     }
+    @Test fun trailingCommandsCannotBeSilentlyDroppedFromAWipePlan() {
+        val file = image()
+        for (command in listOf("-w flash boot '${file.path}' reboot", "-w erase userdata reboot", "-w boot '${file.path}' reboot", "update-super '${file.path}' super ignored")) {
+            assertNull(command, parse(command))
+        }
+    }
 }

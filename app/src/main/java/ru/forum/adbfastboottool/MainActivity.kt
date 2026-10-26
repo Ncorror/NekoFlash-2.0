@@ -1219,6 +1219,19 @@ class MainActivity : AppCompatActivity() {
 
         if (warnIfBatchOrShellSyntax(op, clean)) return null
 
+        // Never discard a second host command or a misspelled argument after consuming -w.
+        val arity = when (op) {
+            "flash", "create-logical-partition", "resize-logical-partition" -> 3..3
+            "boot", "erase", "is-logical", "logical-info", "delete-logical-partition", "gsi" -> 2..2
+            "fetch" -> 2..3
+            "getvar", "reboot", "snapshot-update", "set_active", "set-active", "wipe-super" -> 1..2
+            "status", "devices", "reports", "open-reports", "report-folder", "reports-folder" -> 1..1
+            "update-super" -> 2..4
+            else -> null
+        }
+        if (arity != null && tokens.size !in arity) {
+            return invalidTerminalFormat("fastboot $op: unexpected/missing arguments; use one host command with optional -w / --set-active, or raw for a wire command")
+        }
         if (op == "format" || op.startsWith("format:")) {
             if (tokens.size != 2) return invalidTerminalFormat("fastboot [--slot=SLOT] [--fs-options=OPTIONS] format[:FS_TYPE[:HEX_SIZE]] PARTITION")
             return TerminalAction.FastbootPlan(listOf(FastbootHostSyntax.format(op, tokens[1], parsedOptions.slot, parsedOptions.filesystemOptions)))
@@ -1281,7 +1294,9 @@ class MainActivity : AppCompatActivity() {
                 if (tokens.size < 2) return invalidTerminalFormat("fastboot update-super <super.img> [wipe] [superPartition]")
                 val file = resolveTerminalFile(tokens[1]) ?: return null
                 val wipe = tokens.drop(2).any { it.equals("wipe", ignoreCase = true) || it.equals("--wipe", ignoreCase = true) }
-                val explicitSuper = tokens.drop(2).firstOrNull { !it.equals("wipe", ignoreCase = true) && !it.equals("--wipe", ignoreCase = true) }
+                val superNames = tokens.drop(2).filter { !it.equals("wipe", ignoreCase = true) && !it.equals("--wipe", ignoreCase = true) }
+                if (superNames.size > 1) return invalidTerminalFormat("fastboot update-super FILE [wipe] [superPartition]")
+                val explicitSuper = superNames.singleOrNull()
                 val superName = explicitSuper ?: viewModel.currentFastbootDiagnostics()?.superPartitionName ?: "super"
                 val wire = "update-super:$superName" + if (wipe) ":wipe" else ""
                 TerminalAction.FastbootDownloadAndRun(file, wire)
