@@ -63,9 +63,32 @@ class FastbootTerminalPlanTest {
             assertNull(command, parse(command))
         }
     }
-    @Test fun serialConflictAndUnimplementedSparseSplittingAreExplicitlyRejected() {
+    @Test fun conflictingSerialsAreExplicitlyRejected() {
         assertNull(parse("-s one -s two -w"))
-        assertNull(parse("-S 1G format userdata"))
+    }
+    @Test fun sparseLimitsReachFlashAndFormatPlansWithSerialAndSlotIntact() {
+        val file = image()
+        for (option in listOf("-S 1G", "-S1G", "--sparse-limit 1G", "--sparse-limit=1G")) {
+            val request = parse("-s AbC $option flash boot '${file.path}' --slot=b")!!
+            assertEquals("AbC", field(request, "serial"))
+            assertEquals(1L shl 30, field(field(request, "action")!!, "sparseLimit"))
+            assertEquals(listOf(FastbootExecutionStep.Flash("boot", file, "b")), steps(request))
+        }
+        val request = parse("-S0 format userdata")!!
+        assertEquals(0L, field(field(request, "action")!!, "sparseLimit"))
+        assertEquals(listOf(FastbootExecutionStep.Format("userdata")), steps(request))
+    }
+    @Test fun invalidOrInapplicableSparseLimitsCannotBeSilentlyIgnored() {
+        val file = image()
+        for (command in listOf("-S -1 format userdata", "-S 1GB format userdata", "-S", "-S 999999999999G -w",
+            "-S 1M reboot", "-S 1M boot '${file.path}'", "-S 1M update-super '${file.path}'", "-S 1M status")) {
+            assertNull(command, parse(command))
+        }
+    }
+    @Test fun rawAndEndOfOptionsPreserveOpaqueSparseLookingArguments() {
+        for (prefix in listOf("raw", "--")) {
+            assertEquals(listOf(FastbootExecutionStep.Raw("oem test -S 1M")), steps(parse("$prefix oem test -S 1M")!!))
+        }
     }
     @Test fun updateSuperWipeArgumentDoesNotBecomeGlobalUserdataWipe() {
         val file = image()

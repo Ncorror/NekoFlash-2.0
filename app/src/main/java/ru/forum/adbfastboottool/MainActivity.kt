@@ -197,7 +197,7 @@ class MainActivity : AppCompatActivity() {
         data object LocalStatus : TerminalAction()
         data object OpenReportsFolder : TerminalAction()
         data class RawFastboot(val command: String) : TerminalAction()
-        data class FastbootPlan(val steps: List<FastbootExecutionStep>) : TerminalAction()
+        data class FastbootPlan(val steps: List<FastbootExecutionStep>, val sparseLimit: Long = 0) : TerminalAction()
         data class FastbootFlash(val partition: String, val file: File, val slot: String? = null) : TerminalAction()
         data class FastbootPartitionCommand(val wirePrefix: String, val partition: String, val slot: String? = null) : TerminalAction()
         data class FastbootDownloadAndRun(val file: File, val commandAfterDownload: String) : TerminalAction()
@@ -991,7 +991,7 @@ class MainActivity : AppCompatActivity() {
         when (val action = request.action) {
             TerminalAction.LocalStatus -> viewModel.logConnectionStatus()
             TerminalAction.OpenReportsFolder -> openReportsFolder()
-            is TerminalAction.FastbootPlan -> viewModel.runFastbootTerminalPlan(action.steps, expectedSerial)
+            is TerminalAction.FastbootPlan -> viewModel.runFastbootTerminalPlan(action.steps, expectedSerial, action.sparseLimit)
             else -> error("Fastboot action was not normalized into one execution plan")
         }
     }
@@ -1048,7 +1048,8 @@ class MainActivity : AppCompatActivity() {
         val setActive: String? = null,
         val serial: String? = null,
         val wipe: Boolean = false,
-        val filesystemOptions: Set<String> = emptySet()
+        val filesystemOptions: Set<String> = emptySet(),
+        val sparseLimit: Long? = null
     )
 
     private data class FastbootTerminalRequest(val action: TerminalAction, val serial: String?)
@@ -1075,6 +1076,7 @@ class MainActivity : AppCompatActivity() {
         var serial: String? = null
         var wipe = false
         var filesystemOptions = emptySet<String>()
+        var sparseLimit: Long? = null
         var i = 0
 
         fun nextOptionValue(option: String): String? {
@@ -1135,14 +1137,15 @@ class MainActivity : AppCompatActivity() {
                 lower == "--skip-reboot" || lower == "--skip-secondary" || lower == "--force" || lower == "--verbose" || lower == "-v" -> {
                     viewModel.log("ℹ️ Option $token is not used by the terminal handler for a single USB command.")
                 }
-                token == "-S" || lower == "--sparse-limit" -> {
-                    nextOptionValue(token) ?: return null
-                    viewModel.log(getString(R.string.rev16_sparse_option_not_implemented))
-                    return null
-                }
-                token.startsWith("-S") && token.length > 2 -> {
-                    viewModel.log(getString(R.string.rev16_sparse_option_not_implemented))
-                    return null
+                token == "-S" || lower == "--sparse-limit" ||
+                    token.startsWith("-S") && token.length > 2 || lower.startsWith("--sparse-limit=") -> {
+                    val value = when {
+                        lower.startsWith("--sparse-limit=") -> token.substringAfter('=')
+                        token.length > 2 && token.startsWith("-S") -> token.substring(2)
+                        else -> nextOptionValue(token) ?: return null
+                    }
+                    sparseLimit = try { FastbootFlashImage.parseLimit(value) }
+                    catch (error: IllegalArgumentException) { viewModel.log("❌ ${error.message}"); return null }
                 }
                 token == "-s" || token.startsWith("-s") && token.length > 2 -> {
                     val value = if (token == "-s") nextOptionValue("-s") ?: return null else token.substring(2)
@@ -1161,7 +1164,7 @@ class MainActivity : AppCompatActivity() {
             i += 1
         }
 
-        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial, wipe, filesystemOptions)
+        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial, wipe, filesystemOptions, sparseLimit)
     }
 
     private fun parseFastbootCommand(cmd: String): FastbootTerminalRequest? {
@@ -1184,8 +1187,8 @@ class MainActivity : AppCompatActivity() {
             return null
         }
         if (action is TerminalAction.LocalStatus || action is TerminalAction.OpenReportsFolder) {
-            if (parsedOptions.wipe || parsedOptions.setActive != null) {
-                viewModel.log("❌ Local status/reports cannot be combined with -w or --set-active")
+            if (parsedOptions.wipe || parsedOptions.setActive != null || parsedOptions.sparseLimit != null) {
+                viewModel.log("❌ Local status/reports cannot be combined with -w, --set-active or -S")
                 return null
             }
             return FastbootTerminalRequest(action, parsedOptions.serial)
@@ -1207,7 +1210,14 @@ class MainActivity : AppCompatActivity() {
             else -> error("Unexpected ADB action in Fastboot parser")
         }
         val plan = FastbootHostSyntax.compose(steps, parsedOptions.wipe, parsedOptions.filesystemOptions, parsedOptions.setActive)
-        return FastbootTerminalRequest(TerminalAction.FastbootPlan(plan), parsedOptions.serial)
+        if (parsedOptions.sparseLimit != null && plan.none {
+                it is FastbootExecutionStep.Flash || it is FastbootExecutionStep.Format ||
+                    it is FastbootExecutionStep.Wipe || it is FastbootExecutionStep.WipeSuper
+            }) {
+            viewModel.log("❌ -S applies to flash/format/wipe images, not boot/download/raw commands")
+            return null
+        }
+        return FastbootTerminalRequest(TerminalAction.FastbootPlan(plan, parsedOptions.sparseLimit ?: 0), parsedOptions.serial)
     }
 
     private fun parseFastbootAction(parsedOptions: FastbootTerminalOptions): TerminalAction? {

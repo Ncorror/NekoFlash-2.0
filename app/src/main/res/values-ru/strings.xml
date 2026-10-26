@@ -514,7 +514,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev13_image_source_workspace">Рабочая папка NekoFlash · локальный образ</string>
     <string name="rev15_shell_not_open">Интерактивный ADB shell не открыт.</string>
     <string name="rev15_shell_already_closed">Интерактивный ADB shell уже закрыт.</string>
-    <string name="rev16_sparse_option_not_implemented">Автоматическое разделение Fastboot sparse (-S) пока не реализовано. Команда не отправлена. Используй совместимый заранее разделённый sparse-образ или набор chunk-файлов.</string>
 
     <string name="rev18_queue_source_changed">Источник недоступен или изменился размер: %1$s ← %2$s. Выбери образ заново.</string>
     <string name="rev18_history_previous">Предыдущая команда</string>
@@ -537,4 +536,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev20_cancelling_cleanup">Отмена запрошена. Ожидаем завершения USB-запросов и освобождения ресурсов.</string>
     <string name="rev21_format">Форматировать файловую систему</string>
     <string name="rev21_preparing_plan">Подготовка плана Fastboot</string>
+    <string name="rev23_preparing_image">Подготовка образа: %1$s</string>
+    <string name="rev23_image_part">Часть %1$d/%2$d</string>
 </resources>

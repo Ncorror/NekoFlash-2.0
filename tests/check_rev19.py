@@ -14,7 +14,7 @@ fastboot = (java / 'FastbootProtocol.kt').read_text()
 assert '-s SERIAL is not used' not in main
 assert 'val expectedSerial = request.serial' in main
 handler = main.split('private fun handleFastbootTerminalCommand(')[1].split('private fun handleAdbTerminalCommand(')[0]
-assert 'viewModel.runFastbootTerminalPlan(action.steps, expectedSerial)' in handler
+assert 'viewModel.runFastbootTerminalPlan(action.steps, expectedSerial, action.sparseLimit)' in handler
 assert handler.count('viewModel.runFastboot') == 1, 'Every terminal wire/payload route uses one serial-bound plan'
 start = vm.split('private fun startOperation(')[1]
 assert start.index('FastbootSerialSelection.matches') < start.index('context.block()')

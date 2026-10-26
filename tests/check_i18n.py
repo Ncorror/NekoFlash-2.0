@@ -137,9 +137,9 @@ for key in ("rev15_shell_not_open", "rev15_shell_already_closed"):
     assert key in en and key in ru
     assert "R.string." + key in vm
 
-assert "rev16_sparse_option_not_implemented" in en
-assert "rev16_sparse_option_not_implemented" in ru
-assert "R.string.rev16_sparse_option_not_implemented" in main
+for key in ("rev23_preparing_image", "rev23_image_part"):
+    assert key in en and key in ru
+    assert "R.string." + key in vm
 
 print(f"PASS I18N: {len(en)} paired strings, {len(plural_en)} plural keys, "
       "format-safe RU/EN, package and workspace paths unchanged")

@@ -26,10 +26,10 @@ assert 'FastbootDownloadSizePolicy.validate(' in flash_validation
 download_run = fastboot.split('fun downloadAndRun(file: File, commandAfterDownload: String)')[1]
 assert 'FastbootDownloadSizePolicy.validate(' in download_run.split('val hexSize =')[0]
 
-# -S must never be silently accepted while sparse splitting is unimplemented.
+# REV23 implements -S as a host preparation limit; the original single-download checks remain.
 assert 'Sparse splitting (-S) is not required' not in main
-sparse = main.split('token == "-S" || lower == "--sparse-limit" ->')[1].split('token.startsWith("-S")')[0]
-assert 'R.string.rev16_sparse_option_not_implemented' in sparse
-assert 'return null' in sparse
+assert 'FastbootFlashImage.parseLimit(value)' in main
+assert 'TerminalAction.FastbootPlan(plan, parsedOptions.sparseLimit ?: 0)' in main
+assert 'rev16_sparse_option_not_implemented' not in main
 assert (root/'app/src/test/java/ru/forum/adbfastboottool/FastbootDownloadSizePolicyTest.kt').is_file()
-print('PASS REV16: device max-download preflight, 32-bit wire limit preserved, -S not silently ignored')
+print('PASS REV16: device max-download preflight, 32-bit wire limit preserved, -S forwarded explicitly')

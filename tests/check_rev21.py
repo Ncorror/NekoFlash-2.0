@@ -18,7 +18,8 @@ plan = vm.split('internal fun runFastbootTerminalPlan(')[1].split('fun setActive
 assert plan.count('startOperation(') == 1
 assert 'expectedFastbootSerial = expectedSerial' in plan
 assert 'context.ensureActive()' in plan and 'directory.deleteRecursively()' in plan
-assert 'proto.flashPartitionDetailed(partition, file)' in plan
+assert 'flashImage(proto, partition, FirmwareSource.WorkspaceFile(file), sparseLimit)' in plan
+assert 'proto.flashPartitionDetailed(partition, source.file)' in vm
 assert 'override fun downloadLimitBytes() = proto.hostDownloadLimitBytes()' in plan
 assert 'internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock { effectiveMaxDownloadSizeBytes() }' in (java / 'FastbootProtocol.kt').read_text()
 assert executor.index('val prepared =') < executor.index('prepared.forEachIndexed')

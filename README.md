@@ -1,23 +1,23 @@
-# NekoFlash 2.0 — развитие исходного NekoFlash (REV22)
+# NekoFlash 2.0 — развитие исходного NekoFlash (REV23)
 
-> **Текущая работа:** [Draft PR #9](https://github.com/Ncorror/NekoFlash-2.0/pull/9), ветка `work/rev22-bundled-mkfs-20261026`, поверх REV21 ([PR #7](https://github.com/Ncorror/NekoFlash-2.0/pull/7)) и предыдущих ревизий. Серия ещё не объединена в `main`. Это NekoFlash 2.0, **не NekoFlash Pro**.
+> **Текущая работа:** [Draft PR #10](https://github.com/Ncorror/NekoFlash-2.0/pull/10), ветка `work/rev23-fastboot-resparse-20261026`, поверх REV22 ([PR #9](https://github.com/Ncorror/NekoFlash-2.0/pull/9)) и предыдущих ревизий. Серия ещё не объединена в `main`. Это NekoFlash 2.0, **не NekoFlash Pro**.
 
 **Что есть в DEV:** пять нижних вкладок и единая USB-панель; полноэкранный терминал; информационная Главная; три раздела Прошивки; утверждённые Sideload и Unlock; Центр операций; очередь без предела 32 строки; сохранение диагностических сегментов и экспорт; привязанный к попытке Recovery-вердикт. REV20 добавил исполнение через foreground-сервис, независимость от Activity, сохранение статуса/черновика и «Прервана» после гибели процесса без автоматического повторения.
 
-**REV21:** `format`, `-w`, `wipe-super` выполняются как host-планы с подготовкой реальных filesystem/LP sparse-образов и отправкой через старый Fastboot-движок. Добавлены Format в инструментах, этапы подготовки в Центре операций, `--fs-options`, raw escape; `-s`, `--slot` и `--set-active` сохраняются в общем плане. [Полный отчёт и ограничения](docs/source-audit/REV21-FASTBOOT-HOST-2026-10-26-RU.md).
+**REV21–22:** `format`, `-w`, `wipe-super` используют host-планы с подготовкой настоящих filesystem/LP sparse-образов. Генераторы ext4/F2FS входят в APK для четырёх ABI и запускаются без root/Termux. Сохранены `--fs-options`, raw escape, `-s`, `--slot` и `--set-active`. [Host-планы](docs/source-audit/REV21-FASTBOOT-HOST-2026-10-26-RU.md), [встроенные mkfs](docs/source-audit/REV22-BUNDLED-MKFS-2026-10-26-RU.md), [сборка и лицензии](vendor/filesystems/README.md).
 
-**REV22 — встроенные mkfs:** генераторы ext4/F2FS собираются из закреплённых исходников и входят в APK для четырёх ABI. Запускаются из `nativeLibraryDir`, без root/Termux и системных mkfs. Android 8/14 создают валидные образы, проверенные независимым fsck. Ошибка подготовки останавливает план до erase. [Полный отчёт](docs/source-audit/REV22-BUNDLED-MKFS-2026-10-26-RU.md), [сборка и лицензии](vendor/filesystems/README.md).
+**REV23 — большие RAW/sparse:** терминал, Quick Flash и очередь разбивают большой образ под `max-download-size`, сохраняя прежний USB-передатчик. Работает `-S 128M` (также компактная/длинная форма); `-S 0` — автоматический лимит. Проверяются структура и CRC; временно хранится один пакет. Терминальный план проверяет возможность разбиения и свободное место до erase. В интерфейсе появились подготовка образа, номер части и общий прогресс. [Полный отчёт и ограничения](docs/source-audit/REV23-RESPARSE-2026-10-27-RU.md).
 
-**Проверки:** [CI 40370975789](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/40370975789) — **179 JVM-тестов без ошибок/пропусков; 4 инструментальных теста на каждой из Android API 26/34; lint 0 ошибок, 47 прежних предупреждений; Debug для четырёх ABI**. Восемь упакованных ELF прошли проверку. Android runtime проверен на эмуляторах x86_64; физические ARM/USB-тесты ещё впереди.
+**Проверки:** [CI 40415548975](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/40415548975) — **208 JVM-тестов без ошибок/пропусков; lint 0 ошибок, 49 предупреждений; Debug для четырёх ABI**. На Android API 26/34 прошли по 4 инструментальных теста: 8 образов ext4/F2FS восстановлены из 50 пакетов с совпадением SHA-256 и fsck=0. Восемь встроенных ELF проверены в скачанном APK. Физические ARM/USB-тесты ещё впереди.
 
-**DEV APK:** [проверенная сборка REV22 и соответствующие исходники mkfs](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/40370975789/artifacts/12673810170). APK 10 795 582 байта; SHA-256 и сроки хранения — в отчёте. Пакет `ru.forum.adbfastboottool.dev` устанавливается рядом с исходным NekoFlash. Production Release в этой работе не выпускался.
+**DEV APK:** [проверенная сборка REV23 и соответствующие исходники mkfs](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/40415548975/artifacts/12695108201). APK 10 815 746 байт; SHA-256 и сроки хранения — в отчёте. Пакет `ru.forum.adbfastboottool.dev` устанавливается рядом с исходным NekoFlash. Production Release в этой работе не выпускался.
 
-**Ближайшие задачи:** большие RAW/sparse и `max-download-size`; SAF для Mass Flash; восстановление источника Quick Flash, PTY/IME и длинные очереди; аппаратная матрица ARM/USB/жизненного цикла; интеграция веток и подписанный выпуск. Текущая оценка — **около 75%, техническая альфа**. Полный реестр — [REV18](docs/source-audit/REV18-AUDIT-2026-10-25-RU.md) с уточнениями REV19–REV22.
+**Ближайшие задачи:** аппаратная проверка больших RAW/sparse на bootloader/fastbootd и жизненного цикла USB; SAF для Mass Flash, место/отмена импорта и восстановление Quick Flash; PTY/IME, длинные очереди, полировка интерфейса; интеграция веток и подписанный выпуск. Текущая оценка — **около 80%, техническая альфа**. Полный реестр — [REV18](docs/source-audit/REV18-AUDIT-2026-10-25-RU.md) с уточнениями REV19–REV23.
 
-**Аппаратная проверка:** выделенный разблокированный Poco X3 Pro и совместимые тестовые файлы/план восстановления. Наличие кнопки, сохранённые исходные строки и зелёный CI не подтверждают успешное форматирование, wipe-super или прошивку на телефоне.
+**Аппаратная проверка:** выделенный разблокированный Poco X3 Pro и совместимые тестовые файлы/план восстановления. Эмуляторные проверки не подтверждают успешную прошивку на физическом телефоне.
 
 - [Утверждённые макеты](docs/design-approved/README.md)
-- [Сверка с исходным архивом](docs/source-audit/REV22-LEGACY-COMPARISON.json)
+- [Сверка с исходным архивом](docs/source-audit/REV23-LEGACY-COMPARISON.json)
 - [Исходный аудит REV5](docs/source-audit/NEKOFLASH2-REV5-AUDIT-AND-ROADMAP-RU.md)
 
 ---
