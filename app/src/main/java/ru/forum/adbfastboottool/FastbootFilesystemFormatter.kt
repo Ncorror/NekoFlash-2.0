@@ -118,6 +118,9 @@ internal class FastbootFilesystemFormatter(
         private const val EXT4_PROFILE = "[defaults]\n" +
             "base_features = sparse_super,large_file,filetype,resize_inode,dir_index,ext_attr\n" +
             "default_mntopts = acl,user_xattr\nenable_periodic_fsck = 0\n" +
-            "blocksize = 4096\ninode_size = 256\ninode_ratio = 16384\n"
+            "blocksize = 4096\ninode_size = 256\ninode_ratio = 16384\n" +
+            "[fs_types]\next4 = {\n inode_ratio = 16384\n}\n" +
+            "small = {\n inode_ratio = 4096\n}\nfloppy = {\n inode_ratio = 8192\n}\n" +
+            "big = {\n inode_ratio = 32768\n}\nhuge = {\n inode_ratio = 65536\n}\n"
     }
 }

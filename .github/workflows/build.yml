@@ -64,7 +64,7 @@ jobs:
       - name: Build pinned Android filesystem generators
         timeout-minutes: 20
         run: |
-          sdkmanager "ndk;27.2.12479018"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;27.2.12479018"
           python3 scripts/build_filesystem_tools.py --ndk "$ANDROID_HOME/ndk/27.2.12479018"
 
       - name: Kotlin JVM queue and diagnostic regression tests

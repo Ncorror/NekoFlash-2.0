@@ -89,9 +89,13 @@ def main():
     # Only our dedicated build directory is removed; never the source cache or NDK.
     if output == ROOT or ROOT.is_relative_to(output) or ndk.is_relative_to(output):
         raise ValueError('Unsafe output directory')
+    marker = output / '.nekoflash-filesystem-build'
     if output.exists():
+        if any(output.iterdir()) and not marker.is_file():
+            raise ValueError('Refusing to replace a directory not owned by this builder')
         shutil.rmtree(output)
     output.mkdir(parents=True)
+    marker.touch()
     src = sources(manifest, args.source_cache.resolve(), output)
     run(['autoreconf', '-fi'], cwd=src['f2fs-tools'], log=output / 'autoconf.log')
     jobs = str(min(os.cpu_count() or 2, 8))
