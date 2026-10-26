@@ -40,7 +40,10 @@ internal class FastbootPlanExecutor(
                 require(file.isFile && file.canRead()) { "Payload is unavailable: ${file.name}" }
                 if (action.flash) {
                     FirmwareSource.WorkspaceFile(file).open().use {
-                        FastbootFlashImage.prepare(it, max, sparseLimit, checkCancelled)
+                        val image = FastbootFlashImage.prepare(it, max, sparseLimit, checkCancelled)
+                        require(!image.needsResparse || directory.usableSpace >= image.largestPartBytes) {
+                            "Not enough temporary storage for a sparse packet: need ${image.largestPartBytes} bytes. No erase was sent."
+                        }
                     }
                 } else {
                     // boot/update-super/download are one command payload, not partition overlays.

@@ -98,8 +98,10 @@ class FastbootFlashImageTest {
             }
         }
     }
-    @Test fun tooSmallLimitFailsDuringPreparation() = source(input(ByteArray(5000))).use {
-        assertThrows(IllegalArgumentException::class.java) { FastbootFlashImage.prepare(it, 4096) }
+    @Test fun tooSmallLimitFailsDuringPreparation() {
+        source(input(ByteArray(5000))).use {
+            assertThrows(IllegalArgumentException::class.java) { FastbootFlashImage.prepare(it, 4096) }
+        }
     }
     @Test fun sourceMagicWithInvalidSparseGeometryIsNeverTreatedAsRaw() {
         val bytes = ByteArray(28); put(bytes, 0, 0xed26ff3aL)

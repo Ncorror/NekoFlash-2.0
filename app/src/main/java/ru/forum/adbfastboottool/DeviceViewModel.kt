@@ -1549,7 +1549,15 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 }
                 markOperationStep(stepNumber, OperationStepStatus.RUNNING, "fastboot flash ${item.partition}")
                 log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.file.name} ===")
-                val result = flashImage(proto, item.partition, FirmwareSource.WorkspaceFile(item.file)) { context.ensureActive() }
+                val result = try {
+                    flashImage(proto, item.partition, FirmwareSource.WorkspaceFile(item.file)) { context.ensureActive() }
+                } catch (cancelled: CancellationException) {
+                    markOperationStep(stepNumber, OperationStepStatus.SKIPPED, text(R.string.operation_cancelled))
+                    throw cancelled
+                } catch (error: Exception) {
+                    markOperationStep(stepNumber, OperationStepStatus.FAILED, error.message ?: error.javaClass.simpleName)
+                    throw error
+                }
                 val diagnostics = proto.currentDiagnostics()
                 if (diagnostics != null) _fastbootDiagnostics.postValue(diagnostics)
                 markOperationStep(

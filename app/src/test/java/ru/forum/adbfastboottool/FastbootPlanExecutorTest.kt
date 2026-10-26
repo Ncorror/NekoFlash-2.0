@@ -116,6 +116,18 @@ class FastbootPlanExecutorTest {
         }
         assertTrue(mutations().isEmpty())
     }
+    @Test fun insufficientPacketWorkspaceIsDetectedBeforeWipeErase() {
+        variables["max-download-size"] = "8192"
+        val input = temporary.newFile().also { it.writeBytes(ByteArray(30000)) }
+        val noSpace = object : File(temporary.root.absolutePath) {
+            override fun getUsableSpace() = 0L
+        }
+        assertThrows(IllegalArgumentException::class.java) {
+            FastbootPlanExecutor(port, formatter, noSpace)
+                .run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Flash("system", input, null)))
+        }
+        assertTrue(mutations().isEmpty())
+    }
     @Test fun stopOnFailureDoesNotFlashOrRunTheTailOfThePlan() {
         fail = "erase:userdata"
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot"))) }

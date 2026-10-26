@@ -9,7 +9,7 @@ java = root / 'app/src/main/java/ru/forum/adbfastboottool'
 vm = (java / 'DeviceViewModel.kt').read_text()
 image = (java / 'FastbootFlashImage.kt').read_text()
 executor = (java / 'FastbootPlanExecutor.kt').read_text()
-assert vm.count('= flashImage(') == 3, 'Terminal, Quick and queue must share resparse preparation'
+assert vm.count('flashImage(proto,') == 3, 'Terminal, Quick and queue must share resparse preparation'
 assert 'proto.flashPartitionDetailed(partition, part)' in vm
 assert 'proto.flashPartitionDetailed(partition, source, app.contentResolver)' in vm
 assert 'directory.usableSpace >= image.largestPartBytes' in vm
