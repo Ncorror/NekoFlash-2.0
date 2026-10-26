@@ -1160,7 +1160,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                         if (proto.inspectLogicalPartition(partition) == null) failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
                     }
                 }
-                val formatter = FastbootFilesystemFormatter(nextData = AndroidImageExtents::nextData, log = ::log)
+                val formatter = FastbootFilesystemFormatter(
+                    BundledFilesystemTools.fromDirectory(File(getApplication<Application>().applicationInfo.nativeLibraryDir)),
+                    nextData = AndroidImageExtents::nextData, log = ::log)
                 FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log) { detail ->
                     postOperationProgress(OperationProgress(text(R.string.notif_fastboot_command), -1, detail))
                 }.run(steps)
