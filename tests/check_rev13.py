@@ -62,9 +62,9 @@ assert 'poison_backend_noexcept()' in native
 # New primary Quick-Flash picker, existing workspace choice and GUI controls.
 assert 'registerQuickImageLauncher()' in main
 assert 'startQuickImageDocumentPicker()' in main
-assert 'quickFlashSource = FirmwareSource.SafDocument(' in main
-assert 'quickFlashSource = FirmwareSource.WorkspaceFile(file)' in main
-assert 'viewModel.runFlash(partition, source, chosenSlot)' in main
+assert 'return FirmwareSource.SafDocument(uri, name, queryFileSize(uri))' in main
+assert 'viewModel.selectQuickFlashSource(FirmwareSource.WorkspaceFile(it))' in main
+assert 'viewModel.runFlash(partition, selection.source(), chosenSlot, expectedSizeBytes = selection.expectedSizeBytes)' in main
 assert 'viewModel.runFlash(partition, file, slot)' in main  # legacy quick actions
 assert 'viewModel.addFlashQueueFile(partition, file)' in main
 assert 'private val folderName = "NekoFlash"' in main

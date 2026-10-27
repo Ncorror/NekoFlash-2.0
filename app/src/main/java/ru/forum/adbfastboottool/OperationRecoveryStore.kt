@@ -28,6 +28,7 @@ internal data class PersistedOperation(
 internal class OperationRecoveryStore(private val directory: File) {
     private val operationFile get() = File(directory, "last-operation.properties")
     private val draftFile get() = File(directory, "flash-draft.txt")
+    private val quickSourceFile get() = File(directory, "quick-source.properties")
 
     @Synchronized fun readOperation(): PersistedOperation? {
         if (!operationFile.exists()) return null
@@ -64,6 +65,27 @@ internal class OperationRecoveryStore(private val directory: File) {
     @Synchronized fun writeDraft(draft: FlashOperationDraft) {
         val bytes = FlashOperationDraftCodec.encode(draft).joinToString("\n").toByteArray(Charsets.UTF_8)
         publish(draftFile) { it.write(bytes) }
+    }
+
+    @Synchronized fun readQuickSource(): FirmwareSelection? {
+        if (!quickSourceFile.exists()) return null
+        val fields = Properties().apply { quickSourceFile.inputStream().use(::load) }
+        if (fields.getProperty("schema") != "1") throw IOException("Unknown image selection schema")
+        return try {
+            FirmwareSelection(requireNotNull(fields.getProperty("uri")), requireNotNull(fields.getProperty("name")),
+                fields.getProperty("size")?.toLong()).also { it.source() }
+        } catch (error: Exception) { throw IOException("Invalid image selection", error) }
+    }
+
+    @Synchronized fun writeQuickSource(selection: FirmwareSelection) {
+        selection.source() // Reject unsupported URI schemes before replacing a valid record.
+        val fields = Properties().apply {
+            setProperty("schema", "1")
+            setProperty("uri", selection.sourceUri)
+            setProperty("name", selection.displayName)
+            selection.expectedSizeBytes?.let { setProperty("size", it.toString()) }
+        }
+        publish(quickSourceFile) { fields.store(it, "NekoFlash selected image; never replay") }
     }
 
     private fun publish(target: File, write: (FileOutputStream) -> Unit) {

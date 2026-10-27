@@ -173,8 +173,18 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val _flashOperationDraft = MutableLiveData(flashDraftSnapshot)
     val flashOperationDraft: LiveData<FlashOperationDraft> = _flashOperationDraft
 
+    private val quickSourceLock = Any()
+    private var quickSourceGeneration = 0L
+    @Volatile private var quickSourceSnapshot = QuickFlashSourceState()
+    private val _quickFlashSource = MutableLiveData(quickSourceSnapshot)
+    internal val quickFlashSource: LiveData<QuickFlashSourceState> = _quickFlashSource
+    private var queueSourceGeneration = 0L
+    private val pendingQueueSources = mutableMapOf<String, Long>()
+    private val _queueSourceState = MutableLiveData(QueueSourceState())
+    internal val queueSourceState: LiveData<QueueSourceState> = _queueSourceState
+
     /** Transient execution object. Only the lightweight draft is persisted. */
-    data class FlashQueueItem(val partition: String, val file: File, val expectedSizeBytes: Long = file.length())
+    internal data class FlashQueueItem(val partition: String, val selection: FirmwareSelection)
 
     private data class PendingUnlockVerification(
         val product: String,
@@ -274,6 +284,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     init {
         DiagnosticCrashMarker.install(File(application.filesDir, "diagnostics"), BuildConfig.BUILD_ID)
         restoreOperationState()
+        runCatching { recoveryStore.readQuickSource() }
+            .onSuccess { it?.let(::checkQuickFlashSource) }
+            .onFailure { log(text(R.string.rev24_source_save_failed, it.message ?: it.javaClass.simpleName)) }
     }
 
     internal fun lastPersistedOperation(id: String): PersistedOperation? = persistedOperation?.takeIf { it.id == id }
@@ -1370,7 +1383,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun runFlash(partition: String, file: File, slot: String? = null, expectedSerial: String? = null) =
         runFlash(partition, FirmwareSource.WorkspaceFile(file), slot, expectedSerial)
 
-    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null, expectedSerial: String? = null) {
+    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null,
+        expectedSerial: String? = null, expectedSizeBytes: Long? = null) {
         val label = partition + slot?.let { " --slot=$it" }.orEmpty()
         startOperation(
             text(R.string.notif_flash_img),
@@ -1383,7 +1397,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
             val context = kotlinx.coroutines.currentCoroutineContext()
             targets.forEach { target ->
-                val result = flashImage(proto, target, source) { context.ensureActive() }
+                val result = flashImage(proto, target, source, expectedSizeBytes = expectedSizeBytes) { context.ensureActive() }
                 if (!result.success) {
                     if (source is FirmwareSource.SafDocument &&
                         result.stage == FastbootProtocol.FlashStage.VALIDATION
@@ -1399,9 +1413,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     /** Every entry point uses this host preparation; each packet retains the original DATA/flash transport. */
     private fun flashImage(proto: FastbootProtocol, partition: String, source: FirmwareSource,
-        sparseLimit: Long = 0, checkCancelled: () -> Unit): FastbootProtocol.FlashResult {
+        sparseLimit: Long = 0, expectedSizeBytes: Long? = null, checkCancelled: () -> Unit): FastbootProtocol.FlashResult {
         val app = getApplication<Application>()
         source.open(app.contentResolver).use { opened ->
+            FirmwareSelection.from(source).copy(expectedSizeBytes = expectedSizeBytes).requireSize(opened.sizeBytes)
             postOperationProgress(OperationProgress(text(R.string.notif_flash_img), -1, text(R.string.rev23_preparing_image, source.displayName)))
             val image = FastbootFlashImage.prepare(opened, proto.hostDownloadLimitBytes(), sparseLimit, checkCancelled)
             checkCancelled()
@@ -1457,12 +1472,99 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         flashDraftSnapshot
     }
 
+    internal fun currentQuickFlashSelection(): FirmwareSelection? =
+        quickSourceSnapshot.takeIf { it.ready }?.selection
+
+    internal fun selectQuickFlashSource(source: FirmwareSource) = checkQuickFlashSource(FirmwareSelection.from(source))
+
+    internal fun refreshQuickFlashSource() {
+        if (quickSourceSnapshot.checking || operationJob != null) return
+        quickSourceSnapshot.selection?.let(::checkQuickFlashSource)
+    }
+
+    private fun checkQuickFlashSource(selection: FirmwareSelection) {
+        val generation = synchronized(quickSourceLock) { ++quickSourceGeneration }
+        publishQuickSource(generation, QuickFlashSourceState(selection, checking = true))
+        transportScope.launch {
+            // Persist the user's new choice even when its provider is temporarily unavailable.
+            publishQuickSource(generation, QuickFlashSourceState(selection, checking = true), persist = true)
+            try {
+                val checked = selection.verify(getApplication<Application>().contentResolver) { coroutineContext.ensureActive() }
+                publishQuickSource(generation, QuickFlashSourceState(checked, ready = true), persist = true)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                publishQuickSource(generation, QuickFlashSourceState(selection,
+                    error = text(R.string.rev24_source_unavailable, selection.displayName, error.message ?: error.javaClass.simpleName)))
+            }
+        }
+    }
+
+    private fun publishQuickSource(generation: Long, state: QuickFlashSourceState, persist: Boolean = false) {
+        synchronized(quickSourceLock) {
+            if (generation != quickSourceGeneration || viewModelCleared.get()) return
+            if (persist) runCatching { recoveryStore.writeQuickSource(requireNotNull(state.selection)) }
+                .onFailure { log(text(R.string.rev24_source_save_failed, it.message ?: it.javaClass.simpleName)) }
+            quickSourceSnapshot = state
+            mainHandler.post {
+                synchronized(quickSourceLock) {
+                    if (generation == quickSourceGeneration && !viewModelCleared.get()) _quickFlashSource.value = state
+                }
+            }
+        }
+    }
+
+    /** Read/probe a document off the UI thread; stale picker results cannot replace a later choice. */
+    internal fun addFlashQueueSource(partition: String, source: FirmwareSource) {
+        val target = partition.trim()
+        val generation = synchronized(flashDraftLock) {
+            (++queueSourceGeneration).also { pendingQueueSources[target] = it }
+        }
+        publishQueueSourceState()
+        transportScope.launch {
+            val result = runCatching {
+                FirmwareSelection.from(source).verify(getApplication<Application>().contentResolver) { coroutineContext.ensureActive() }
+                    .queueItem(target)
+            }
+            coroutineContext.ensureActive()
+            mainHandler.post {
+                if (viewModelCleared.get()) return@post
+                val current = synchronized(flashDraftLock) {
+                    if (pendingQueueSources[target] != generation) false
+                    else { pendingQueueSources.remove(target); true }
+                }
+                if (!current) return@post
+                result.onSuccess { addFlashQueueItem(it) }.onFailure {
+                    val message = text(R.string.rev24_queue_add_failed, source.displayName, it.message ?: it.javaClass.simpleName)
+                    publishQueueSourceState(message)
+                    log(message)
+                }
+            }
+        }
+    }
+
+    private fun publishQueueSourceState(error: String? = null) {
+        _queueSourceState.value = QueueSourceState(synchronized(flashDraftLock) { pendingQueueSources.keys.toSet() }, error)
+    }
+
+    private fun invalidatePendingQueueSource(partition: String? = null) {
+        synchronized(flashDraftLock) {
+            if (partition == null) pendingQueueSources.clear() else pendingQueueSources.remove(partition)
+        }
+        publishQueueSourceState()
+    }
+
     fun addFlashQueueFile(partition: String, file: File) {
+        invalidatePendingQueueSource(partition.trim())
         val item = runCatching { FlashOperationDraftPolicy.createItem(partition, file) }
             .getOrElse { error ->
                 log("❌ Could not add file to the queue: ${error.message ?: error.javaClass.simpleName}")
                 return
             }
+        addFlashQueueItem(item)
+    }
+
+    private fun addFlashQueueItem(item: FlashQueueDraftItem) {
+        invalidatePendingQueueSource(item.partition)
         val next = runCatching { FlashOperationDraftPolicy.upsert(currentFlashOperationDraft(), item) }
             .getOrElse { error ->
                 log("❌ Could not update queue: ${error.message ?: error.javaClass.simpleName}")
@@ -1478,11 +1580,13 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun removeFlashQueueDraftItem(partition: String) {
+        invalidatePendingQueueSource(partition)
         val next = FlashOperationDraftPolicy.remove(currentFlashOperationDraft(), partition)
         publishFlashOperationDraft(next, persist = true)
     }
 
     fun clearFlashQueueDraft() {
+        invalidatePendingQueueSource()
         publishFlashOperationDraft(
             FlashOperationDraftPolicy.clear(currentFlashOperationDraft()),
             persist = true
@@ -1491,20 +1595,16 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun executeFlashQueueDraft() {
+        if (synchronized(flashDraftLock) { pendingQueueSources.isNotEmpty() }) {
+            log(text(R.string.rev24_queue_checking, synchronized(flashDraftLock) { pendingQueueSources.keys.joinToString() }))
+            return
+        }
         val draft = currentFlashOperationDraft()
         if (draft.items.isEmpty()) {
             log(text(R.string.flash_queue_empty_log))
             return
         }
-        val executionItems = ArrayList<FlashQueueItem>(draft.items.size)
-        for (item in draft.items) {
-            val file = FlashOperationDraftPolicy.resolve(item)
-            if (file == null) {
-                log("❌ " + text(R.string.rev18_queue_source_changed, item.partition, item.displayName))
-                return
-            }
-            executionItems += FlashQueueItem(item.partition, file, item.expectedSizeBytes)
-        }
+        val executionItems = draft.items.map { FlashQueueItem(it.partition, FirmwareSelection.from(it)) }
         runFlashQueue(executionItems)
     }
 
@@ -1529,8 +1629,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 OperationStep(
                     index = index + 1,
                     total = ordered.size,
-                    title = "flash ${item.partition} ← ${item.file.name}",
-                    subtitle = formatBytesShort(item.file.length()),
+                    title = "flash ${item.partition} ← ${item.selection.displayName}",
+                    subtitle = formatBytesShort(requireNotNull(item.selection.expectedSizeBytes)),
                     status = OperationStepStatus.PENDING
                 )
             })
@@ -1540,17 +1640,22 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 failOperation("No Fastboot connection")
             }
             val context = kotlinx.coroutines.currentCoroutineContext()
+            // Probe every source before the first download; persisted URI metadata is not a grant.
             ordered.forEachIndexed { index, item ->
-                val stepNumber = index + 1
-                if (!item.file.isFile || !item.file.canRead() || item.file.length() != item.expectedSizeBytes) {
-                    val reason = text(R.string.rev18_queue_source_changed, item.partition, item.file.name)
-                    markOperationStep(stepNumber, OperationStepStatus.FAILED, reason)
+                try { item.selection.verify(getApplication<Application>().contentResolver) { context.ensureActive() } }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    val reason = text(R.string.rev24_source_unavailable, item.selection.displayName, error.message ?: error.javaClass.simpleName)
+                    markOperationStep(index + 1, OperationStepStatus.FAILED, reason)
                     failOperation(reason)
                 }
+            }
+            ordered.forEachIndexed { index, item ->
+                val stepNumber = index + 1
                 markOperationStep(stepNumber, OperationStepStatus.RUNNING, "fastboot flash ${item.partition}")
-                log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.file.name} ===")
+                log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.selection.displayName} ===")
                 val result = try {
-                    flashImage(proto, item.partition, FirmwareSource.WorkspaceFile(item.file)) { context.ensureActive() }
+                    flashImage(proto, item.partition, item.selection.source(), expectedSizeBytes = item.selection.expectedSizeBytes) { context.ensureActive() }
                 } catch (cancelled: CancellationException) {
                     markOperationStep(stepNumber, OperationStepStatus.SKIPPED, text(R.string.operation_cancelled))
                     throw cancelled

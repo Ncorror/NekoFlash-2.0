@@ -46,9 +46,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV23 structural and source-guard tests
+      - name: REV24 structural and source-guard tests
         run: |
-          python3 tests/check_rev23.py
+          python3 tests/check_rev24.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
@@ -478,7 +478,10 @@ jobs:
             adb install emulator-apk/NekoFlash-*-debug.apk
             adb install emulator-test-apk/app-debug-androidTest.apk
             adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/androidx.test.runner.AndroidJUnitRunner | tee android-mkfs-tests.txt
-            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (4 tests)' in s and 'FAILURES' not in s, s"
+            mkdir -p android-source-ui
+            adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-restored.png > android-source-ui/quick-restored.png
+            adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-unavailable.png > android-source-ui/quick-unavailable.png
+            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (10 tests)' in s and 'FAILURES' not in s, s; assert all(p.stat().st_size > 0 for p in Path('android-source-ui').glob('*.png'))"
             python3 tests/verify_android_filesystems.py --output android-mkfs-images
       - name: Upload Android filesystem evidence
         if: always()
@@ -488,6 +491,7 @@ jobs:
           path: |
             android-mkfs-tests.txt
             android-mkfs-images/
+            android-source-ui/
           if-no-files-found: ignore
           retention-days: 30
 

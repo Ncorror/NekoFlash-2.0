@@ -1,0 +1,8 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- Test APK only. Serves generated fixture bytes, never user files. -->
+        <provider android:name="ru.forum.adbfastboottool.FirmwareFixtureProvider"
+            android:authorities="ru.forum.adbfastboottool.dev.test.images"
+            android:exported="true" />
+    </application>
+</manifest>

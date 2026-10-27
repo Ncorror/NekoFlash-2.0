@@ -24,7 +24,8 @@ assert "FilePublication.publishNew(staged, target)" in main
 assert "target.delete()" not in main.split("private fun importFirmwareFile")[1].split("private fun ")[0]
 assert 'to "reboot-fastboot"' in main and 'to "reboot:fastboot"' not in main
 assert "runWorkspaceMaintenanceIfIdle" in main and "synchronized(operationLaunchLock)" in vm
-assert "item.file.length() != item.expectedSizeBytes" in vm
+assert "expectedSizeBytes = item.selection.expectedSizeBytes" in vm
+assert "requireSize(opened.sizeBytes)" in vm
 a = "{http://schemas.android.com/apk/res/android}"
 layout = ET.parse(root / "app/src/main/res/layout/activity_main.xml").getroot()
 for name in ("usbHeader", "bottomNavigation", "consoleHeader", "consoleInputBar"):
