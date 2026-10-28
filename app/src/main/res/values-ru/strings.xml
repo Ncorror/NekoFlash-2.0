@@ -515,7 +515,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev15_shell_not_open">Интерактивный ADB shell не открыт.</string>
     <string name="rev15_shell_already_closed">Интерактивный ADB shell уже закрыт.</string>
 
-    <string name="rev18_queue_source_changed">Источник недоступен или изменился размер: %1$s ← %2$s. Выбери образ заново.</string>
     <string name="rev18_history_previous">Предыдущая команда</string>
     <string name="rev18_history_next">Следующая команда</string>
     <string name="rev18_workspace_busy">Дождись завершения USB-операции перед удалением её файлов.</string>
@@ -538,4 +537,11 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev21_preparing_plan">Подготовка плана Fastboot</string>
     <string name="rev23_preparing_image">Подготовка образа: %1$s</string>
     <string name="rev23_image_part">Часть %1$d/%2$d</string>
+    <string name="rev24_source_checking">Проверка образа: %1$s</string>
+    <string name="rev24_source_unavailable">Образ недоступен: %1$s. %2$s. Выбери его заново или импортируй в рабочую папку.</string>
+    <string name="rev24_source_transient">Провайдер файла не сохранил доступ после перезапуска. Если доступ пропадёт, выбери файл заново.</string>
+    <string name="rev24_source_save_failed">Не удалось сохранить или восстановить выбранный образ: %1$s</string>
+    <string name="rev24_queue_checking">Проверка файлов очереди: %1$s</string>
+    <string name="rev24_queue_add_failed">Не удалось добавить %1$s в очередь: %2$s. Выбери доступный образ или импортируй его в рабочую папку.</string>
+    <string name="rev24_picker_target_missing">Раздел для этого выбора не сохранился. Выбери раздел и образ заново.</string>
 </resources>

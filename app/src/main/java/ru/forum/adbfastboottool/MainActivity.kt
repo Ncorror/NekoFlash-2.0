@@ -124,7 +124,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var importFileLauncher: ActivityResultLauncher<Intent>
     private lateinit var sideloadZipLauncher: ActivityResultLauncher<Intent>
     private lateinit var quickImageLauncher: ActivityResultLauncher<Intent>
-    private var quickFlashSource: FirmwareSource? = null
+    private lateinit var massImageLauncher: ActivityResultLauncher<Intent>
+    private var pendingMassPartition: String? = null
     private lateinit var miLoginLauncher: ActivityResultLauncher<Intent>
     private var miAuth: MiAccountClient.AuthResult? = null
     private var miAuthExchangeJob: Job? = null
@@ -224,6 +225,7 @@ class MainActivity : AppCompatActivity() {
         applySavedLanguage()
         super.onCreate(savedInstanceState)
         selectedFastbootSection = savedInstanceState?.getInt("fastboot_section", 0) ?: 0
+        pendingMassPartition = savedInstanceState?.getString("mass_picker_partition")
 
         // Never trust exported Intent extras as an onboarding bypass. This
         // check also covers ACTION_USB_DEVICE_ATTACHED, activity recreation,
@@ -397,6 +399,7 @@ class MainActivity : AppCompatActivity() {
         registerImportLauncher()
         registerDirectSideloadLauncher()
         registerQuickImageLauncher()
+        registerMassImageLauncher()
         registerMiLoginLauncher()
         setupButtons()
         setupFastbootWorkflowUi()
@@ -453,6 +456,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("fastboot_section", selectedFastbootSection)
+        outState.putString("mass_picker_partition", pendingMassPartition)
         outState.putString(STATE_SELECTED_WINDOW, selectedWindow)
         outState.putBoolean(STATE_HIDE_STORED_OPERATION_PROGRESS, operationStoredProgressHidden)
         outState.putString(STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT, operationHiddenProgressFingerprint)
@@ -1746,77 +1750,74 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun imageSourceFromResult(data: Intent?): FirmwareSource.SafDocument? {
+        val uri = data?.data ?: run {
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev13_picker_no_document))
+            return null
+        }
+        runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            .onFailure {
+                viewModel.log(getString(R.string.rev24_source_transient))
+                viewModel.logFileOnly("Image document permission: ${it.javaClass.simpleName}")
+            }
+        val name = WorkspaceImportNaming.sanitizeImportedFileName(queryDisplayName(uri) ?: getString(R.string.rev13_unnamed_image))
+        return FirmwareSource.SafDocument(uri, name, queryFileSize(uri))
+    }
+
     private fun registerQuickImageLauncher() {
-        quickImageLauncher = registerForActivityResult(
-            ActivityResultContracts.StartActivityForResult()
-        ) { result ->
+        quickImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) imageSourceFromResult(result.data)?.let {
+                viewModel.selectQuickFlashSource(it)
+                viewModel.log(getString(R.string.rev13_image_selected, it.displayName))
+            }
+        }
+    }
+
+    private fun registerMassImageLauncher() {
+        massImageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            val partition = pendingMassPartition
+            pendingMassPartition = null
             if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
-            val uri = result.data?.data ?: run {
-                viewModel.log(
-                    DiagnosticLogPolicy.Level.ERROR,
-                    getString(R.string.rev13_picker_no_document)
-                )
+            if (partition == null || !PARTITION_NAME_PATTERN.matches(partition)) {
+                viewModel.log(getString(R.string.rev24_picker_target_missing))
                 return@registerForActivityResult
             }
-            runCatching {
-                contentResolver.takePersistableUriPermission(
-                    uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            }.onFailure { error ->
-                viewModel.logFileOnly(
-                    "Fastboot SAF read permission is transient: ${error.javaClass.simpleName}"
-                )
-            }
-            val name = WorkspaceImportNaming.sanitizeImportedFileName(
-                queryDisplayName(uri) ?: getString(R.string.rev13_unnamed_image)
-            )
-            quickFlashSource = FirmwareSource.SafDocument(uri, name, queryFileSize(uri))
-            findViewById<TextView>(R.id.tvQuickSelectedImage).text =
-                getString(R.string.flash_rev7_file_chosen, name)
-            viewModel.log(getString(R.string.rev13_image_selected, name))
+            imageSourceFromResult(result.data)?.let { viewModel.addFlashQueueSource(partition, it) }
         }
+    }
+
+    private fun imageDocumentIntent() = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = "*/*"
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
     }
 
     private fun startQuickImageDocumentPicker() {
-        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(Intent.CATEGORY_OPENABLE)
-            type = "*/*"
-            addFlags(
-                Intent.FLAG_GRANT_READ_URI_PERMISSION or
-                    Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION
-            )
+        runCatching { quickImageLauncher.launch(imageDocumentIntent()) }.onFailure {
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_picker_open_failed, it.message ?: it.javaClass.simpleName))
         }
-        runCatching { quickImageLauncher.launch(intent) }
-            .onFailure { error ->
-                viewModel.log(
-                    DiagnosticLogPolicy.Level.ERROR,
-                    getString(
-                        R.string.rev11_picker_open_failed,
-                        error.message ?: error.javaClass.simpleName
-                    )
-                )
-            }
     }
 
-    private fun chooseQuickImageSource() {
+    private fun startMassImageDocumentPicker(partition: String) {
+        pendingMassPartition = partition
+        runCatching { massImageLauncher.launch(imageDocumentIntent()) }.onFailure {
+            pendingMassPartition = null
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_picker_open_failed, it.message ?: it.javaClass.simpleName))
+        }
+    }
+
+    private fun chooseImageSource(document: () -> Unit, workspace: (File) -> Unit) {
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.rev13_image_source_title)
-            .setItems(arrayOf(
-                getString(R.string.rev13_image_source_android),
-                getString(R.string.rev13_image_source_workspace)
-            )) { _, which ->
-                if (which == 0) {
-                    startQuickImageDocumentPicker()
-                } else {
-                    showFileSelector { file ->
-                        quickFlashSource = FirmwareSource.WorkspaceFile(file)
-                        findViewById<TextView>(R.id.tvQuickSelectedImage).text =
-                            getString(R.string.flash_rev7_file_chosen, file.name)
-                    }
-                }
+            .setItems(arrayOf(getString(R.string.rev13_image_source_android), getString(R.string.rev13_image_source_workspace))) { _, which ->
+                if (which == 0) document() else showFileSelector(workspace)
             }
             .setNegativeButton(R.string.cancel_upper, null)
             .show()
+    }
+
+    private fun chooseQuickImageSource() = chooseImageSource(::startQuickImageDocumentPicker) {
+        viewModel.selectQuickFlashSource(FirmwareSource.WorkspaceFile(it))
     }
 
     private fun registerImportLauncher() {
@@ -2020,6 +2021,7 @@ class MainActivity : AppCompatActivity() {
             return
         }
         enableOverlayProtection()
+        viewModel.refreshQuickFlashSource()
         updateOtgStatus()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             if (Environment.isExternalStorageManager() && !::workspacePath.isInitialized) {
@@ -2883,7 +2885,9 @@ class MainActivity : AppCompatActivity() {
         fun partitionSelector(spinnerId: Int, manualId: Int, onChanged: () -> Unit = {}): () -> String? {
             val spinner = findViewById<Spinner>(spinnerId)
             val manual = findViewById<EditText>(manualId)
-            spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+            spinner.adapter = ArrayAdapter(this, R.layout.item_fastboot_selection, labels).apply {
+                setDropDownViewResource(R.layout.item_fastboot_dropdown)
+            }
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: AdapterView<*>?) = Unit
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -2916,7 +2920,9 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.flash_rev7_slot_b),
             getString(R.string.flash_rev7_slot_all)
         )
-        slotSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, slotNames)
+        slotSpinner.adapter = ArrayAdapter(this, R.layout.item_fastboot_selection, slotNames).apply {
+            setDropDownViewResource(R.layout.item_fastboot_dropdown)
+        }
         val targetLabel = findViewById<TextView>(R.id.tvQuickTarget)
         fun updateTargetLabel() {
             val selected = findViewById<Spinner>(R.id.spinQuickPartition).selectedItemPosition
@@ -2945,9 +2951,18 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnQuickSelectImage).setOnClickListener {
             chooseQuickImageSource()
         }
+        viewModel.quickFlashSource.observe(this) { state ->
+            findViewById<TextView>(R.id.tvQuickSelectedImage).text = when {
+                state.checking -> getString(R.string.rev24_source_checking, state.selection?.displayName.orEmpty())
+                state.error != null -> state.error
+                state.selection != null -> getString(R.string.flash_rev7_file_chosen, state.selection.displayName)
+                else -> getString(R.string.flash_rev7_no_image)
+            }
+            findViewById<View>(R.id.btnQuickExecute).isEnabled = state.ready
+        }
         findViewById<View>(R.id.btnQuickExecute).setOnClickListener {
             val partition = getQuickPartition() ?: return@setOnClickListener
-            val source = quickFlashSource ?: run {
+            val selection = viewModel.currentQuickFlashSelection() ?: run {
                 Toast.makeText(this, R.string.flash_rev7_no_file_error, Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
@@ -2972,7 +2987,7 @@ class MainActivity : AppCompatActivity() {
                 else -> null
             }
             autoShowGuiOperation = true
-            viewModel.runFlash(partition, source, chosenSlot)
+            viewModel.runFlash(partition, selection.source(), chosenSlot, expectedSizeBytes = selection.expectedSizeBytes)
         }
         findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
 
@@ -2984,7 +2999,10 @@ class MainActivity : AppCompatActivity() {
             queueHeading.text = if (draft.items.isEmpty()) {
                 getString(R.string.flash_rev7_queue_empty)
             } else getString(R.string.flash_rev7_queue_count, draft.items.size)
-            queueExecute.isEnabled = draft.items.isNotEmpty()
+            val sources = viewModel.queueSourceState.value ?: QueueSourceState()
+            if (sources.pending.isNotEmpty()) queueHeading.append("\n" + getString(R.string.rev24_queue_checking, sources.pending.joinToString()))
+            sources.error?.let { queueHeading.append("\n" + it) }
+            queueExecute.isEnabled = draft.items.isNotEmpty() && sources.pending.isEmpty()
             draft.items.forEachIndexed { index, item ->
                 val row = LinearLayout(this).apply {
                     orientation = LinearLayout.VERTICAL
@@ -3022,9 +3040,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         viewModel.flashOperationDraft.observe(this) { renderQueue(it) }
+        viewModel.queueSourceState.observe(this) { renderQueue(viewModel.currentFlashOperationDraft()) }
         findViewById<View>(R.id.btnMassSelectImage).setOnClickListener {
             val partition = getMassPartition() ?: return@setOnClickListener
-            showFileSelector { file -> viewModel.addFlashQueueFile(partition, file) }
+            chooseImageSource({ startMassImageDocumentPicker(partition) }) { file -> viewModel.addFlashQueueFile(partition, file) }
         }
         queueExecute.setOnClickListener {
             if (viewModel.currentFlashOperationDraft().items.isNotEmpty()) {
