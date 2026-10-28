@@ -10,5 +10,4 @@
     android:singleLine="true"
     android:ellipsize="end"
     android:textSize="16sp"
-    android:textColor="@color/text_primary"
-    android:background="?attr/selectableItemBackground" />
+    android:textColor="@color/text_primary" />
