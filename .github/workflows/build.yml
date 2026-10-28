@@ -467,7 +467,7 @@ jobs:
           sudo chmod 666 /dev/kvm
           sudo apt-get update -qq
           sudo apt-get install -y e2fsprogs f2fs-tools
-      - name: Run installed-app filesystem tests without root
+      - name: Run installed-app filesystem and interface tests without root
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -480,7 +480,6 @@ jobs:
             adb logcat -c || true
             adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/androidx.test.runner.AndroidJUnitRunner | tee android-mkfs-tests.txt
             adb logcat -d > android-instrumentation-logcat.txt 2>&1 || true
-            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (13 tests)' in s and 'FAILURES' not in s, s"
             mkdir -p android-source-ui
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-restored.png > android-source-ui/quick-restored.png
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-unavailable.png > android-source-ui/quick-unavailable.png
@@ -488,6 +487,7 @@ jobs:
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/mass-saf-queue.png > android-source-ui/mass-saf-queue.png
             python3 -c "from pathlib import Path; p=Path('android-source-ui'); assert all((p/n).stat().st_size > 0 for n in ('quick-restored.png', 'quick-unavailable.png', 'quick-partition-menu.png', 'mass-saf-queue.png'))"
             python3 tests/collect_android_ui.py --output android-interface-ui
+            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (13 tests)' in s and 'FAILURES' not in s, s"
             python3 tests/verify_android_filesystems.py --output android-mkfs-images
       - name: Upload Android filesystem evidence
         if: always()

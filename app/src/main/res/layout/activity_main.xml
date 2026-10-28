@@ -67,7 +67,7 @@
                 android:maxLines="1"
                 android:text="@string/otg_status_checking"
                 android:textColor="@color/text_secondary"
-                android:textSize="10sp" />
+                android:textSize="11sp" />
         </LinearLayout>
 
         <!-- A single-line, fixed-size terminal trigger; MaterialButton had

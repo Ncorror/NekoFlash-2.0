@@ -13,11 +13,16 @@ names = ['mass-1000-header', 'mass-999-restored'] + [
     for configuration in ('portrait', 'large', 'landscape-large')
     for page in ('home', 'quick', 'sideload', 'unlock', 'settings', 'mass-empty', 'tools')
 ]
+missing = []
 for name in names:
-    data = subprocess.check_output([
+    result = subprocess.run([
         'adb', 'exec-out', 'run-as', 'ru.forum.adbfastboottool.dev',
         'cat', f'files/ui-test-output/{name}.png'
-    ], timeout=30)
-    assert data.startswith(b'\x89PNG\r\n\x1a\n') and len(data) > 1000, name
+    ], timeout=30, capture_output=True)
+    data = result.stdout
+    if result.returncode or not data.startswith(b'\x89PNG\r\n\x1a\n') or len(data) <= 1000:
+        missing.append(name)
+        continue
     (args.output / f'{name}.png').write_bytes(data)
+assert not missing, f'Missing UI captures: {missing}'
 print(f'PASS: collected {len(names)} real interface captures')

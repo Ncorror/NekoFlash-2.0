@@ -23,7 +23,10 @@ internal class MassFlashQueueUi(
     onMove: (String, Int) -> Unit,
     onRemove: (String) -> Unit
 ) {
-    private val list: RecyclerView = activity.findViewById(R.id.rvMassQueue)
+    // Inflation asks the RecyclerView parent for LayoutParams immediately.
+    private val list: RecyclerView = activity.findViewById<RecyclerView>(R.id.rvMassQueue).apply {
+        layoutManager = LinearLayoutManager(activity)
+    }
     val header: View = activity.layoutInflater.inflate(R.layout.view_mass_flash_header, list, false)
     val execute: MaterialButton = activity.findViewById(R.id.btnMassExecute)
     private val heading: TextView = header.findViewById(R.id.tvMassQueueTitle)
@@ -36,7 +39,6 @@ internal class MassFlashQueueUi(
         // This form can be recycled offscreen. Save it explicitly, even when detached.
         header.isSaveFromParentEnabled = false
         list.apply {
-            layoutManager = LinearLayoutManager(activity)
             adapter = ConcatAdapter(HeaderAdapter(header), rows)
             itemAnimator = null
             setHasFixedSize(true)

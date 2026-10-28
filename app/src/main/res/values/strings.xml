@@ -443,7 +443,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="flash_rev7_slot_all">All slots</string>
     <string name="flash_rev7_file_chosen">Image: %1$s</string>
     <string name="flash_rev7_target_display">Target: %1$s · %2$s</string>
-    <string name="flash_rev7_row_title">%1$s ← %2$s</string>
     <string name="flash_rev7_queue_count">Queue: %1$d</string>
     <string name="flash_rev7_row_up">Up</string>
     <string name="flash_rev7_row_down">Down</string>

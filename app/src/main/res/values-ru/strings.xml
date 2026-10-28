@@ -447,7 +447,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="flash_rev7_slot_all">Все слоты</string>
     <string name="flash_rev7_file_chosen">Образ: %1$s</string>
     <string name="flash_rev7_target_display">Цель записи: %1$s · %2$s</string>
-    <string name="flash_rev7_row_title">%1$s ← %2$s</string>
     <string name="flash_rev7_queue_count">Операций: %1$d</string>
     <string name="flash_rev7_row_up">Вверх</string>
     <string name="flash_rev7_row_down">Вниз</string>
