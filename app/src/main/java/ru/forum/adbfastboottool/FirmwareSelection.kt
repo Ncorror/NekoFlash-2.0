@@ -1,7 +1,7 @@
 package ru.forum.adbfastboottool
 
 import android.content.ContentResolver
-import android.net.Uri
+import androidx.core.net.toUri
 import java.io.File
 import java.io.IOException
 import java.net.URI
@@ -26,7 +26,7 @@ internal data class FirmwareSelection(
             }
             "content" -> {
                 require(!uri.authority.isNullOrBlank())
-                FirmwareSource.SafDocument(Uri.parse(sourceUri), displayName, expectedSizeBytes)
+                FirmwareSource.SafDocument(sourceUri.toUri(), displayName, expectedSizeBytes)
             }
             else -> throw IOException("Unsupported image source")
         }

@@ -477,11 +477,14 @@ jobs:
           script: |
             adb install emulator-apk/NekoFlash-*-debug.apk
             adb install emulator-test-apk/app-debug-androidTest.apk
+            adb logcat -c
             adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/androidx.test.runner.AndroidJUnitRunner | tee android-mkfs-tests.txt
+            adb logcat -d > android-instrumentation-logcat.txt
+            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (10 tests)' in s and 'FAILURES' not in s, s"
             mkdir -p android-source-ui
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-restored.png > android-source-ui/quick-restored.png
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-unavailable.png > android-source-ui/quick-unavailable.png
-            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (10 tests)' in s and 'FAILURES' not in s, s; assert all(p.stat().st_size > 0 for p in Path('android-source-ui').glob('*.png'))"
+            python3 -c "from pathlib import Path; p=Path('android-source-ui'); assert all((p/n).stat().st_size > 0 for n in ('quick-restored.png', 'quick-unavailable.png'))"
             python3 tests/verify_android_filesystems.py --output android-mkfs-images
       - name: Upload Android filesystem evidence
         if: always()
@@ -490,6 +493,7 @@ jobs:
           name: NekoFlash-${{ github.sha }}-mkfs-api${{ matrix.api }}
           path: |
             android-mkfs-tests.txt
+            android-instrumentation-logcat.txt
             android-mkfs-images/
             android-source-ui/
           if-no-files-found: ignore
