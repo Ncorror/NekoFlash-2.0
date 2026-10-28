@@ -2885,7 +2885,9 @@ class MainActivity : AppCompatActivity() {
         fun partitionSelector(spinnerId: Int, manualId: Int, onChanged: () -> Unit = {}): () -> String? {
             val spinner = findViewById<Spinner>(spinnerId)
             val manual = findViewById<EditText>(manualId)
-            spinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, labels)
+            spinner.adapter = ArrayAdapter(this, R.layout.item_fastboot_selection, labels).apply {
+                setDropDownViewResource(R.layout.item_fastboot_dropdown)
+            }
             spinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
                 override fun onNothingSelected(parent: AdapterView<*>?) = Unit
                 override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
@@ -2918,7 +2920,9 @@ class MainActivity : AppCompatActivity() {
             getString(R.string.flash_rev7_slot_b),
             getString(R.string.flash_rev7_slot_all)
         )
-        slotSpinner.adapter = ArrayAdapter(this, android.R.layout.simple_spinner_dropdown_item, slotNames)
+        slotSpinner.adapter = ArrayAdapter(this, R.layout.item_fastboot_selection, slotNames).apply {
+            setDropDownViewResource(R.layout.item_fastboot_dropdown)
+        }
         val targetLabel = findViewById<TextView>(R.id.tvQuickTarget)
         fun updateTargetLabel() {
             val selected = findViewById<Spinner>(R.id.spinQuickPartition).selectedItemPosition

@@ -3,6 +3,7 @@ package ru.forum.adbfastboottool
 import android.app.Application
 import android.graphics.Bitmap
 import android.net.Uri
+import android.view.KeyEvent
 import android.view.View
 import android.widget.Spinner
 import android.widget.TextView
@@ -136,6 +137,11 @@ class FirmwareSourcesAndroidTest {
                     assertFalse(vm[0]!!.operationActive.value!!)
                 }
                 screenshot("quick-restored.png")
+                scenario.onActivity { it.findViewById<Spinner>(R.id.spinQuickPartition).performClick() }
+                instrumentation.waitForIdleSync()
+                screenshot("quick-partition-menu.png")
+                instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
+                instrumentation.waitForIdleSync()
                 assertTrue(image.delete())
                 scenario.onActivity { vm[0]!!.refreshQuickFlashSource() }
                 instrumentation.waitForIdleSync(); waitForCheck()
@@ -144,10 +150,31 @@ class FirmwareSourcesAndroidTest {
                     assertNotNull(vm[0]!!.quickFlashSource.value!!.error)
                 }
                 screenshot("quick-unavailable.png")
+                scenario.onActivity { activity ->
+                    activity.findViewById<View>(R.id.btnFastbootSectionMass).performClick()
+                    vm[0]!!.addFlashQueueSource("vendor_boot_b", source())
+                }
+                val queueDeadline = System.nanoTime() + 10_000_000_000L
+                while (vm[0]!!.queueSourceState.value!!.pending.isNotEmpty()) {
+                    check(System.nanoTime() < queueDeadline) { "Queue document check did not finish" }
+                    Thread.sleep(10)
+                }
+                instrumentation.waitForIdleSync()
+                scenario.onActivity { activity ->
+                    val item = vm[0]!!.currentFlashOperationDraft().items.single()
+                    assertEquals("vendor_boot_b", item.partition)
+                    assertEquals(uri.toString(), item.sourceUri)
+                    assertTrue(activity.findViewById<View>(R.id.btnMassExecute).isEnabled)
+                    assertFalse(vm[0]!!.operationActive.value!!)
+                }
+                screenshot("mass-saf-queue.png")
             }
         } finally {
             image.delete()
-            instrumentation.runOnMainSync { DeviceSessionStore.viewModelStore.clear() }
+            instrumentation.runOnMainSync {
+                vm[0]?.clearFlashQueueDraft()
+                DeviceSessionStore.viewModelStore.clear()
+            }
         }
     }
 }

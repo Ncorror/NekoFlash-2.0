@@ -38,7 +38,7 @@ assert 'val cancelButton = cardOperationCenter.findViewById' in activity
 assert 'switchTab("home")' not in activity.split('private fun openOperationCenter()')[1].split('private fun requestOperationCancelFromUi()')[0]
 flash_path = root/'app/src/main/res/layout/page_fastboot.xml'
 raw_flash = flash_path.read_bytes()
-expected_flash_blob = 'f6dab35e88705f70a564e31e0e60c86444620431'
+expected_flash_blob = '844e7af5eb86eb1e12b4b27b8ff72e6afd9b00d4'
 assert hashlib.sha1(b'blob ' + str(len(raw_flash)).encode() + b'\0' + raw_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
 flash = ET.parse(flash_path).getroot()
 flash_ids = [node.attrib.get(a+'id','') for node in flash.iter()]
