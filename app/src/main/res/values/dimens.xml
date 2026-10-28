@@ -11,4 +11,5 @@
     <dimen name="welcome_primary_button_height">46dp</dimen>
     <dimen name="console_collapsed_height">0dp</dimen>
     <dimen name="usb_panel_height">68dp</dimen>
+    <dimen name="navigation_min_height">64dp</dimen>
 </resources>

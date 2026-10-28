@@ -24,7 +24,7 @@ assert 'testImplementation(\'junit:junit:4.13.2\')' in (root/'app/build.gradle')
 # Stable, reviewed Home replacement; all other original page/protocol hashes stay guarded.
 home_path = root/'app/src/main/res/layout/page_home.xml'
 raw_home = home_path.read_bytes()
-expected_home_blob = '4c2dca5acbc7a699c7e86447849f0552d6d18875'
+expected_home_blob = '575c48b6d74a9d0b86fb6a60bd1180847d05c06c'
 assert hashlib.sha1(b'blob ' + str(len(raw_home)).encode() + b'\0' + raw_home).hexdigest() == expected_home_blob, 'Unexpected Home layout change'
 from xml.etree import ElementTree as ET
 home = ET.parse(home_path).getroot()
@@ -38,7 +38,7 @@ assert 'val cancelButton = cardOperationCenter.findViewById' in activity
 assert 'switchTab("home")' not in activity.split('private fun openOperationCenter()')[1].split('private fun requestOperationCancelFromUi()')[0]
 flash_path = root/'app/src/main/res/layout/page_fastboot.xml'
 raw_flash = flash_path.read_bytes()
-expected_flash_blob = '844e7af5eb86eb1e12b4b27b8ff72e6afd9b00d4'
+expected_flash_blob = 'fa65edc5278b38e3df479aa411aae4a4fba7fd6e'
 assert hashlib.sha1(b'blob ' + str(len(raw_flash)).encode() + b'\0' + raw_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
 flash = ET.parse(flash_path).getroot()
 flash_ids = [node.attrib.get(a+'id','') for node in flash.iter()]

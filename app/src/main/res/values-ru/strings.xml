@@ -120,12 +120,9 @@
     <string name="layout_status_no_device">● Нет устройства</string>
     <string name="layout_icon_scan">🔌</string>
     <string name="layout_icon_cancel">✕</string>
-    <string name="layout_icon_home">⌂
-Главная</string>
-    <string name="layout_icon_fastboot">⚡
-Прошить</string>
-    <string name="layout_icon_adb">↯
-Sideload</string>
+    <string name="layout_icon_home">Главная</string>
+    <string name="layout_icon_fastboot">Прошить</string>
+    <string name="layout_icon_adb">Sideload</string>
     <string name="layout_device_title">ИНФОРМАЦИЯ ОБ УСТРОЙСТВЕ</string>
     <string name="layout_mode_empty">Режим: —</string>
     <string name="layout_model_empty">Модель: —</string>
@@ -220,8 +217,7 @@ Sideload</string>
 Используйте на свой риск. Прошивка может превратить устройство в кирпич.
 
 Android robot attribution: The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License. Android is a trademark of Google LLC.</string>
-    <string name="layout_icon_settings_tab">⚙
-Настр.</string>
+    <string name="layout_icon_settings_tab">Настр.</string>
     <string name="layout_flash_reboot_mode">Перезагрузка</string>
     <string name="flash_progress_writing">Запись…</string>
     <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
@@ -230,8 +226,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="otg_status_active">🔌 OTG: активен · устройство найдено</string>
     <string name="otg_status_no_device">🔌 OTG: нет устройств · проверьте кабель или включите OTG в настройках</string>
     <string name="perm_open_settings_manually">Не удалось открыть настройки автоматически. Выдайте NekoFlash доступ «Ко всем файлам» вручную: Настройки → Приложения.</string>
-    <string name="layout_icon_unlock_tab">🔓
-Разблок.</string>
+    <string name="layout_icon_unlock_tab">Unlock</string>
     <string name="mi_login_continue">Продолжить</string>
     <string name="mi_login_logout">Выйти</string>
     <string name="mi_login_already">Уже выполнен вход, ID: %1$s</string>
@@ -544,4 +539,12 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev24_queue_checking">Проверка файлов очереди: %1$s</string>
     <string name="rev24_queue_add_failed">Не удалось добавить %1$s в очередь: %2$s. Выбери доступный образ или импортируй его в рабочую папку.</string>
     <string name="rev24_picker_target_missing">Раздел для этого выбора не сохранился. Выбери раздел и образ заново.</string>
+    <string name="rev25_queue_empty_hint">Выбери раздел и добавь образ. Очередь выполняется сверху вниз; порядок можно изменить стрелками.</string>
+    <string name="rev25_queue_target">%1$d · %2$s</string>
+    <plurals name="rev25_flash_queue">
+        <item quantity="one">Прошить %1$d раздел</item>
+        <item quantity="few">Прошить %1$d раздела</item>
+        <item quantity="many">Прошить %1$d разделов</item>
+        <item quantity="other">Прошить %1$d раздела</item>
+    </plurals>
 </resources>

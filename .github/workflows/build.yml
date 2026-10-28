@@ -48,7 +48,7 @@ jobs:
 
       - name: REV24 structural and source-guard tests
         run: |
-          python3 tests/check_rev24.py
+          python3 tests/check_rev25.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
@@ -480,13 +480,14 @@ jobs:
             adb logcat -c || true
             adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/androidx.test.runner.AndroidJUnitRunner | tee android-mkfs-tests.txt
             adb logcat -d > android-instrumentation-logcat.txt 2>&1 || true
-            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (10 tests)' in s and 'FAILURES' not in s, s"
+            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (13 tests)' in s and 'FAILURES' not in s, s"
             mkdir -p android-source-ui
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-restored.png > android-source-ui/quick-restored.png
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-unavailable.png > android-source-ui/quick-unavailable.png
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-partition-menu.png > android-source-ui/quick-partition-menu.png
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/mass-saf-queue.png > android-source-ui/mass-saf-queue.png
             python3 -c "from pathlib import Path; p=Path('android-source-ui'); assert all((p/n).stat().st_size > 0 for n in ('quick-restored.png', 'quick-unavailable.png', 'quick-partition-menu.png', 'mass-saf-queue.png'))"
+            python3 tests/collect_android_ui.py --output android-interface-ui
             python3 tests/verify_android_filesystems.py --output android-mkfs-images
       - name: Upload Android filesystem evidence
         if: always()
@@ -498,6 +499,7 @@ jobs:
             android-instrumentation-logcat.txt
             android-mkfs-images/
             android-source-ui/
+            android-interface-ui/
           if-no-files-found: ignore
           retention-days: 30
 

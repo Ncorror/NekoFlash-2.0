@@ -9,4 +9,6 @@
     <dimen name="welcome_risk_row_height">44dp</dimen>
     <dimen name="welcome_status_height">34dp</dimen>
     <dimen name="welcome_primary_button_height">48dp</dimen>
+    <dimen name="navigation_min_height">52dp</dimen>
+    <dimen name="usb_panel_height">52dp</dimen>
 </resources>

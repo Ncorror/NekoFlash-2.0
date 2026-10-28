@@ -24,13 +24,13 @@ assert 'generation != quickSourceGeneration' in vm
 queue = vm.split('private fun runFlashQueue(')[1].split('private fun formatBytesShort(')[0]
 assert queue.index('item.selection.verify(') < queue.index('flashImage(proto, item.partition, item.selection.source()')
 assert 'expectedSizeBytes = item.selection.expectedSizeBytes' in queue
-assert 'queueExecute.isEnabled = draft.items.isNotEmpty() && sources.pending.isEmpty()' in main
+assert 'execute.isEnabled = draft.items.isNotEmpty() && sources.pending.isEmpty()' in (java / 'MassFlashQueueUi.kt').read_text()
 assert '.copyTo(' not in selection
 assert (root / 'app/src/androidTest/AndroidManifest.xml').is_file()
 assert 'FirmwareFixtureProvider' not in (root / 'app/src/main/AndroidManifest.xml').read_text()
 for name in ('FirmwareSelectionTest', 'FirmwareSelectionLifecycleTest'):
     assert (root / f'app/src/test/java/ru/forum/adbfastboottool/{name}.kt').is_file()
 for name in ('build.yml', 'release.yml'):
-    assert 'tests/check_rev24.py' in (root / '.github/workflows' / name).read_text()
-assert 'OK (10 tests)' in (root / '.github/workflows/build.yml').read_text()
+    assert 'tests/check_rev25.py' in (root / '.github/workflows' / name).read_text()
+assert 'OK (13 tests)' in (root / '.github/workflows/build.yml').read_text()
 print('PASS REV24: durable checked Quick source, mixed File/SAF queue, stale-result guards, no automatic replay')

@@ -120,12 +120,9 @@ Not requested:
     <string name="layout_status_no_device">● No device</string>
     <string name="layout_icon_scan">🔌</string>
     <string name="layout_icon_cancel">✕</string>
-    <string name="layout_icon_home">⌂
-Home</string>
-    <string name="layout_icon_fastboot">⚡
-Flash</string>
-    <string name="layout_icon_adb">↯
-Sideload</string>
+    <string name="layout_icon_home">Home</string>
+    <string name="layout_icon_fastboot">Flash</string>
+    <string name="layout_icon_adb">Sideload</string>
     <string name="layout_device_title">DEVICE INFORMATION</string>
     <string name="layout_mode_empty">Mode: —</string>
     <string name="layout_model_empty">Model: —</string>
@@ -216,8 +213,7 @@ Flash without a PC — phone flashes phone.
 Use at your own risk. Flashing can brick a device.
 
 Android robot attribution: The Android robot is reproduced or modified from work created and shared by Google and used according to terms described in the Creative Commons 3.0 Attribution License. Android is a trademark of Google LLC.</string>
-    <string name="layout_icon_settings_tab">⚙
-Settings</string>
+    <string name="layout_icon_settings_tab">Settings</string>
     <string name="layout_flash_reboot_mode">Reboot</string>
     <string name="flash_progress_writing">Writing…</string>
     <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
@@ -226,8 +222,7 @@ Settings</string>
     <string name="otg_status_active">🔌 OTG: active · device detected</string>
     <string name="otg_status_no_device">🔌 OTG: no devices · check cable or enable OTG in settings</string>
     <string name="perm_open_settings_manually">Could not open settings automatically. Grant "All files access" to NekoFlash manually in Settings → Apps.</string>
-    <string name="layout_icon_unlock_tab">🔓
-Unlock</string>
+    <string name="layout_icon_unlock_tab">Unlock</string>
     <string name="mi_login_continue">Continue</string>
     <string name="mi_login_logout">Log out</string>
     <string name="mi_login_already">Already logged in as ID: %1$s</string>
@@ -396,7 +391,7 @@ Unlock</string>
     <string name="shell_usb_no">not granted</string>
     <string name="shell_usb_refresh">Refresh / scan devices</string>
     <string name="shell_usb_diagnostics">Logs and diagnostics</string>
-    <string name="home_device_image_placeholder">Device image not available; NekoFlash placeholder</string>
+    <string name="home_device_image_placeholder">Neutral device illustration</string>
     <string name="home_actual_device_facts">DEVICE INFORMATION</string>
     <string name="home_codename_unknown">Codename: unavailable</string>
     <string name="home_codename_value">Codename: %1$s</string>
@@ -540,4 +535,10 @@ Unlock</string>
     <string name="rev24_queue_checking">Checking queue sources: %1$s</string>
     <string name="rev24_queue_add_failed">Could not add %1$s to the queue: %2$s. Select a readable image or import it into the workspace.</string>
     <string name="rev24_picker_target_missing">The partition for this selection was lost. Select the partition and image again.</string>
+    <string name="rev25_queue_empty_hint">Choose a partition and add an image. The queue runs from top to bottom; use the arrows to change the order.</string>
+    <string name="rev25_queue_target">%1$d · %2$s</string>
+    <plurals name="rev25_flash_queue">
+        <item quantity="one">Flash %1$d partition</item>
+        <item quantity="other">Flash %1$d partitions</item>
+    </plurals>
 </resources>

@@ -73,6 +73,9 @@ class TabController(private val activity: Activity) {
                     if (selected) R.color.accent else R.color.text_secondary
                 )
             )
+            button.iconTint = ColorStateList.valueOf(
+                ContextCompat.getColor(activity, if (selected) R.color.accent else R.color.text_secondary)
+            )
             button.backgroundTintList = ColorStateList.valueOf(
                 ContextCompat.getColor(
                     activity,
