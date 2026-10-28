@@ -32,7 +32,12 @@ internal class MassFlashQueueUi(
     private val heading: TextView = header.findViewById(R.id.tvMassQueueTitle)
     private val empty: View = header.findViewById(R.id.tvMassQueueEmpty)
     private val sourcesText: TextView = header.findViewById(R.id.tvMassSourceStatus)
-    private val rows = FlashQueueRowsAdapter(onMove, onRemove)
+    private var moveGeneration = 0L
+    private var pendingReveal: Pair<Long, String>? = null
+    private val rows = FlashQueueRowsAdapter({ partition, direction ->
+        pendingReveal = ++moveGeneration to partition
+        onMove(partition, direction)
+    }, onRemove)
     private var shownItems: List<FlashQueueDraftItem>? = null
 
     init {
@@ -48,9 +53,17 @@ internal class MassFlashQueueUi(
     fun render(draft: FlashOperationDraft, sources: QueueSourceState) {
         if (shownItems !== draft.items) {
             shownItems = draft.items
+            val reveal = pendingReveal
             rows.submitList(draft.items.mapIndexed { index, item ->
                 FlashQueueRow(item, index + 1, index == draft.items.lastIndex)
-            })
+            }) {
+                if (reveal != null && pendingReveal == reveal) {
+                    pendingReveal = null
+                    val index = rows.currentList.indexOfFirst { it.item.partition == reveal.second }
+                    // Keep the moved row visible when RecyclerView preserves another row's anchor.
+                    if (index >= 0) list.scrollToPosition(index + 1) // form header occupies position 0
+                }
+            }
         }
         val context = heading.context
         heading.text = if (draft.isEmpty) context.getString(R.string.flash_rev7_queue_empty)

@@ -1,10 +1,13 @@
 package ru.forum.adbfastboottool
 
 import android.app.Application
+import android.app.LocaleManager
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.os.Build
+import android.os.LocaleList
 import android.view.View
 import android.widget.EditText
 import android.widget.Spinner
@@ -30,6 +33,7 @@ class InterfacePolishAndroidTest {
     private val context get() = instrumentation.targetContext
     private val prefs get() = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private var previousLanguage: String? = null
+    private var previousPlatformLanguage = ""
     private val state get() = File(context.filesDir, "execution-state")
     private val fixture get() = File(context.filesDir, "ui-queue-fixture.img")
     private val tabs = listOf(
@@ -42,11 +46,14 @@ class InterfacePolishAndroidTest {
 
     @Before fun prepareEmulator() {
         previousLanguage = prefs.getString("language_tag", null)
+        if (Build.VERSION.SDK_INT >= 33) {
+            previousPlatformLanguage = context.getSystemService(LocaleManager::class.java).applicationLocales.toLanguageTags()
+        }
         prefs.edit().putString("language_tag", "ru").commit()
         instrumentation.runOnMainSync {
             OnboardingGate.complete()
             DeviceSessionStore.viewModelStore.clear()
-            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags("ru"))
+            setTestLocale("ru")
         }
         state.deleteRecursively()
     }
@@ -54,7 +61,7 @@ class InterfacePolishAndroidTest {
     @After fun clearEmulatorFixtures() {
         instrumentation.runOnMainSync {
             DeviceSessionStore.viewModelStore.clear()
-            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(previousLanguage.orEmpty()))
+            setTestLocale(if (Build.VERSION.SDK_INT >= 33) previousPlatformLanguage else previousLanguage.orEmpty())
         }
         prefs.edit().putString("language_tag", previousLanguage).commit()
         state.deleteRecursively()
@@ -62,6 +69,14 @@ class InterfacePolishAndroidTest {
     }
 
     private fun vm() = DeviceSessionStore.get(context.applicationContext as Application)
+    private fun setTestLocale(tag: String) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            // No active AppCompatActivity exists in setup; use the framework's per-app locale API.
+            context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(tag)
+        } else {
+            AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
+        }
+    }
     private fun list(activity: MainActivity) = activity.findViewById<RecyclerView>(R.id.rvMassQueue)
     private fun waitUi(scenario: ActivityScenario<MainActivity>, condition: (MainActivity) -> Boolean) {
         val deadline = System.nanoTime() + 10_000_000_000L
@@ -150,6 +165,7 @@ class InterfacePolishAndroidTest {
     }
 
     private fun capturePages(scenario: ActivityScenario<MainActivity>, prefix: String) {
+        waitUi(scenario) { it.resources.configuration.locales[0].language == "ru" }
         tabs.forEach { (tab, page, name) ->
             scenario.onActivity {
                 it.findViewById<View>(tab).performClick()
@@ -158,6 +174,7 @@ class InterfacePolishAndroidTest {
             AndroidUiCapture.save(scenario, "$prefix-$name.png")
             scenario.onActivity {
                 assertEquals(View.VISIBLE, it.findViewById<View>(page).visibility)
+                assertEquals("Главная", it.findViewById<TextView>(R.id.tabHome).text.toString())
                 tabs.forEach { (button, _, _) -> fullyVisible(it.findViewById(button)) }
                 assertFalse(vm().operationActive.value!!)
             }
