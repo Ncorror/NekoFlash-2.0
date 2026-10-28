@@ -184,6 +184,10 @@ class InterfacePolishAndroidTest {
         scenario.onActivity {
             assertFalse(it.findViewById<View>(R.id.btnMassExecute).isEnabled)
             fullyVisible(it.findViewById(R.id.btnMassExecute))
+            if (it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {
+                fullyVisible(it.findViewById(R.id.spinMassPartition))
+                fullyVisible(it.findViewById(R.id.btnMassSelectImage))
+            }
             it.findViewById<View>(R.id.btnFastbootSectionTools).performClick()
         }
         AndroidUiCapture.save(scenario, "$prefix-tools.png")

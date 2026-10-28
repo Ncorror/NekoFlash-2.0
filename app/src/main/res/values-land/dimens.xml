@@ -11,4 +11,6 @@
     <dimen name="welcome_primary_button_height">48dp</dimen>
     <dimen name="navigation_min_height">52dp</dimen>
     <dimen name="usb_panel_height">52dp</dimen>
+    <dimen name="flash_section_margin_top">0dp</dimen>
+    <dimen name="flash_section_margin_bottom">0dp</dimen>
 </resources>
