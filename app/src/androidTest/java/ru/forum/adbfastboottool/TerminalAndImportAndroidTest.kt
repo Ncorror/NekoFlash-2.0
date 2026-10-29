@@ -10,6 +10,7 @@ import android.graphics.Rect
 import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
+import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
 import android.widget.EditText
@@ -141,11 +142,33 @@ class TerminalAndImportAndroidTest {
             assertFalse(vm().operationActive.value!!)
         }
     }
+    /**
+     * Use the platform Settings API on Q+ to notify ActivityManager of the
+     * configuration change, then wait for the Activity's actual Resources.
+     * Writing the settings database just before launch can race with the
+     * configuration observer on API 34.
+     */
+    private fun setFontScaleForTest(value: Float) {
+        if (Build.VERSION.SDK_INT >= 29) {
+            val automation = instrumentation.uiAutomation
+            automation.adoptShellPermissionIdentity()
+            try {
+                assertTrue("Cannot set font scale", Settings.System.putFloat(
+                    instrumentation.context.contentResolver, Settings.System.FONT_SCALE, value))
+            } finally {
+                automation.dropShellPermissionIdentity()
+            }
+        } else {
+            shell("settings put system font_scale $value")
+        }
+    }
+
     @Test fun terminalControlsRemainReachableWithImeRotationAndLargeFont() {
-        val oldScale = shell("settings get system font_scale").toFloatOrNull() ?: 1f
-        try {
-            shell("settings put system font_scale 1.3")
-            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        val oldScale = Settings.System.getFloat(instrumentation.context.contentResolver,
+            Settings.System.FONT_SCALE, 1f)
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            try {
+                setFontScaleForTest(1.3f)
                 waitUi(scenario) { it.resources.configuration.fontScale >= 1.29f }
                 scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
                 waitUi(scenario) { expanded(it) && ViewCompat.getRootWindowInsets(it.findViewById(R.id.rootCoordinator))?.isVisible(WindowInsetsCompat.Type.ime()) == true }
@@ -166,8 +189,11 @@ class TerminalAndImportAndroidTest {
                 AndroidUiCapture.save(scenario, "terminal-landscape.png")
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
                 waitUi(scenario) { it.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }
+            } finally {
+                setFontScaleForTest(oldScale)
+                waitUi(scenario) { kotlin.math.abs(it.resources.configuration.fontScale - oldScale) < 0.02f }
             }
-        } finally { shell("settings put system font_scale $oldScale") }
+        }
     }
     @Test fun providerImportPreservesExistingFileAndCopiesExactBytes() {
         File(workspace, "provider_image.img").writeText("old image")
