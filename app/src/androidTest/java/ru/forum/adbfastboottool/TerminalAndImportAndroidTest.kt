@@ -104,6 +104,16 @@ class TerminalAndImportAndroidTest {
                 assertTrue("Operation activation collapsed terminal", expanded(it))
                 visible(it.findViewById(R.id.btnTerminalStop))
                 assertFalse((field(it, "operationCenterDialog") as BottomSheetDialog).isShowing)
+                it.findViewById<View>(R.id.btnConsoleClose).performClick()
+            }
+            waitUi(scenario) { BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel)).state == BottomSheetBehavior.STATE_COLLAPSED }
+            assertTrue("Closing the terminal cancelled the operation", active.value == true)
+            scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+            waitUi(scenario, ::expanded)
+            scenario.onActivity {
+                it.findViewById<View>(R.id.btnTerminalStop).performClick()
+                assertEquals(true, field(it, "operationCancelRequested"))
+                assertFalse(it.findViewById<View>(R.id.btnTerminalStop).isEnabled)
                 active.value = false
                 command(it, "adb shell id")
             }
@@ -117,6 +127,9 @@ class TerminalAndImportAndroidTest {
                 assertTrue(vm().terminalSnapshot().any { line -> line == "> adb shell id" })
                 assertTrue(vm().terminalSnapshot().any { line -> line.startsWith("❌") })
                 vm().log("Routine connection inventory fixture")
+                DeviceViewModel::class.java.getDeclaredMethod("notifyLogStorageFailure", Exception::class.java)
+                    .apply { isAccessible = true }.invoke(vm(), java.io.IOException("fixture full disk"))
+                assertTrue(vm().terminalSnapshot().any { line -> line.startsWith("❌ Diagnostic storage error:") })
             }
             assertFalse(vm().terminalSnapshot().contains("Routine connection inventory fixture"))
             assertTrue(vm().logSnapshot().contains("Routine connection inventory fixture"))

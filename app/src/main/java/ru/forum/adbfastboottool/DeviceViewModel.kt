@@ -228,6 +228,19 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         text(R.string.security_full_terminal_active)
     )
 
+    private var compactPublishScheduled = false
+    private val publishCompact = Runnable {
+        synchronized(logLock) {
+            compactPublishScheduled = false
+            _logLines.value = lines.toList()
+        }
+    }
+    private fun scheduleCompactPublishLocked() {
+        if (!compactPublishScheduled) {
+            compactPublishScheduled = true
+            mainHandler.postDelayed(publishCompact, CompactLogRenderPolicy.RENDER_DEBOUNCE_MS)
+        }
+    }
     private val _logLines = MutableLiveData(initialLines)
     val logLines: LiveData<List<String>> = _logLines
 
@@ -461,7 +474,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     ) {
         lines.add(message)
         while (lines.size > 600) lines.removeAt(0)
-        _logLines.postValue(lines.toList())
+        scheduleCompactPublishLocked()
         val classification = DiagnosticLogPolicy.classify(message, declaredLevel)
         diagnosticSessionTracker.recordCompact(message, classification)
         appendRawToLogFile(formatLogLine(message))
@@ -505,8 +518,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private fun notifyLogStorageFailure(error: Exception) {
         if (logStorageFailureNotified) return
         logStorageFailureNotified = true
-        lines.add("❌ Diagnostic storage error: ${error.javaClass.simpleName}. Check free space; saved logs may be incomplete.")
-        _logLines.postValue(lines.toList())
+        val message = "❌ Diagnostic storage error: ${error.javaClass.simpleName}. Check free space; saved logs may be incomplete."
+        lines.add(message)
+        appendTerminalLocked(message)
+        scheduleCompactPublishLocked()
     }
 
     private fun persistSessionSummary(): File? = try {
