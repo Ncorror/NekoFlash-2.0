@@ -1,7 +1,6 @@
 package ru.forum.adbfastboottool
 
 import android.app.Application
-import android.graphics.Bitmap
 import android.net.Uri
 import android.view.KeyEvent
 import android.view.View
@@ -107,12 +106,6 @@ class FirmwareSourcesAndroidTest {
             }
             instrumentation.waitForIdleSync()
         }
-        fun screenshot(name: String) {
-            val directory = File(context.filesDir, "source-test-output").also { it.mkdirs() }
-            val bitmap = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
-            try { File(directory, name).outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) } }
-            finally { bitmap.recycle() }
-        }
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 scenario.onActivity { activity ->
@@ -136,10 +129,10 @@ class FirmwareSourcesAndroidTest {
                         .apply { isAccessible = true }.get(activity))
                     assertFalse(vm[0]!!.operationActive.value!!)
                 }
-                screenshot("quick-restored.png")
+                AndroidUiCapture.save(scenario, "quick-restored.png", "source-test-output")
                 scenario.onActivity { it.findViewById<Spinner>(R.id.spinQuickPartition).performClick() }
                 instrumentation.waitForIdleSync()
-                screenshot("quick-partition-menu.png")
+                AndroidUiCapture.save(scenario, "quick-partition-menu.png", "source-test-output")
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                 instrumentation.waitForIdleSync()
                 assertTrue(image.delete())
@@ -149,7 +142,7 @@ class FirmwareSourcesAndroidTest {
                     assertFalse(activity.findViewById<View>(R.id.btnQuickExecute).isEnabled)
                     assertNotNull(vm[0]!!.quickFlashSource.value!!.error)
                 }
-                screenshot("quick-unavailable.png")
+                AndroidUiCapture.save(scenario, "quick-unavailable.png", "source-test-output")
                 scenario.onActivity { activity ->
                     activity.findViewById<View>(R.id.btnFastbootSectionMass).performClick()
                     vm[0]!!.addFlashQueueSource("vendor_boot_b", source())
@@ -167,7 +160,7 @@ class FirmwareSourcesAndroidTest {
                     assertTrue(activity.findViewById<View>(R.id.btnMassExecute).isEnabled)
                     assertFalse(vm[0]!!.operationActive.value!!)
                 }
-                screenshot("mass-saf-queue.png")
+                AndroidUiCapture.save(scenario, "mass-saf-queue.png", "source-test-output")
             }
         } finally {
             image.delete()

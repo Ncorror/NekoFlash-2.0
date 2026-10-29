@@ -191,6 +191,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private lateinit var massQueueUi: MassFlashQueueUi
+    private var restoredMassQueueState: Bundle? = null
+
     private val commandHistory = mutableListOf<String>()
     private var historyIndex = -1
 
@@ -226,6 +229,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         selectedFastbootSection = savedInstanceState?.getInt("fastboot_section", 0) ?: 0
         pendingMassPartition = savedInstanceState?.getString("mass_picker_partition")
+        restoredMassQueueState = savedInstanceState?.getBundle("mass_queue_ui")
 
         // Never trust exported Intent extras as an onboarding bypass. This
         // check also covers ACTION_USB_DEVICE_ATTACHED, activity recreation,
@@ -457,6 +461,7 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         outState.putInt("fastboot_section", selectedFastbootSection)
         outState.putString("mass_picker_partition", pendingMassPartition)
+        if (::massQueueUi.isInitialized) outState.putBundle("mass_queue_ui", massQueueUi.saveFormState())
         outState.putString(STATE_SELECTED_WINDOW, selectedWindow)
         outState.putBoolean(STATE_HIDE_STORED_OPERATION_PROGRESS, operationStoredProgressHidden)
         outState.putString(STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT, operationHiddenProgressFingerprint)
@@ -2629,11 +2634,14 @@ class MainActivity : AppCompatActivity() {
         if (auth == null) {
             container.addView(card().apply {
                 addView(body(getString(R.string.mi_unlock_sign_in_hint), "#F3F6FA"))
-                addView(android.widget.Button(this@MainActivity).apply {
+                addView(MaterialButton(this@MainActivity).apply {
+                    minHeight = dp(48)
+                    cornerRadius = dp(12)
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
                     text = getString(R.string.mi_unlock_sign_in_button)
                     isAllCaps = false
                     setTextColor("#080D13".toColorInt())
-                    setBackgroundColor("#E98B49".toColorInt())
+                    backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_primary_action_background)
                     setOnClickListener { startMiLogin() }
                 })
             })
@@ -2654,11 +2662,14 @@ class MainActivity : AppCompatActivity() {
                     visibility = View.GONE
                 }
                 advanced.addView(body(getString(R.string.mi_unlock_region_zone, auth.region, auth.dataCenterZone, auth.zoneSource), "#AEB8C5"))
-                advanced.addView(android.widget.Button(this@MainActivity).apply {
+                advanced.addView(MaterialButton(this@MainActivity).apply {
+                    minHeight = dp(48)
+                    cornerRadius = dp(12)
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
                     text = getString(R.string.mi_unlock_change_zone_button)
                     isAllCaps = false
                     setTextColor("#F3F6FA".toColorInt())
-                    setBackgroundColor("#192431".toColorInt())
+                    backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_action_tile_background)
                     setOnClickListener {
                         val zoneItems = MiAccountClient.dataCenterZones().toTypedArray()
                         val checked = zoneItems.indexOf(auth.dataCenterZone).coerceAtLeast(0)
@@ -2675,21 +2686,27 @@ class MainActivity : AppCompatActivity() {
                             .show()
                     }
                 })
-                addView(android.widget.Button(this@MainActivity).apply {
+                addView(MaterialButton(this@MainActivity).apply {
+                    minHeight = dp(48)
+                    cornerRadius = dp(12)
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
                     text = getString(R.string.mi_unlock_advanced_options)
                     isAllCaps = false
                     setTextColor("#F3F6FA".toColorInt())
-                    setBackgroundColor("#192431".toColorInt())
+                    backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_action_tile_background)
                     setOnClickListener {
                         advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
                     }
                 })
                 addView(advanced)
-                addView(android.widget.Button(this@MainActivity).apply {
+                addView(MaterialButton(this@MainActivity).apply {
+                    minHeight = dp(48)
+                    cornerRadius = dp(12)
+                    setPadding(dp(16), dp(8), dp(16), dp(8))
                     text = getString(R.string.mi_unlock_sign_out_switch)
                     isAllCaps = false
                     setTextColor("#F3F6FA".toColorInt())
-                    setBackgroundColor("#192431".toColorInt())
+                    backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_action_tile_background)
                     setOnClickListener {
                         MaterialAlertDialogBuilder(this@MainActivity)
                             .setTitle(getString(R.string.mi_unlock_sign_out_title))
@@ -2715,7 +2732,10 @@ class MainActivity : AppCompatActivity() {
                     addView(body(getString(R.string.mi_unlock_fastboot_requirement), "#F3F6FA"))
                     addView(body(unlockStatusSummary(), if (fastbootReady) "#AEB8C5" else "#F2B766"))
                     addView(body(getString(R.string.mi_unlock_data_warning_short), "#F2B766"))
-                    addView(android.widget.Button(this@MainActivity).apply {
+                    addView(MaterialButton(this@MainActivity).apply {
+                        minHeight = dp(48)
+                        cornerRadius = dp(12)
+                        setPadding(dp(16), dp(8), dp(16), dp(8))
                         val canRunUnlock = fastbootReady && lockStateVerified && !operationActive
                         text = when {
                             operationActive -> getString(R.string.mi_unlock_operation_running)
@@ -2725,9 +2745,10 @@ class MainActivity : AppCompatActivity() {
                         }
                         isAllCaps = false
                         isEnabled = canRunUnlock
-                        alpha = if (canRunUnlock) 1.0f else 0.55f
+                        alpha = 1.0f
                         setTextColor("#080D13".toColorInt())
-                        setBackgroundColor(if (canRunUnlock) "#E9782B".toColorInt() else "#5D6570".toColorInt())
+                        backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_primary_action_background)
+                        setTextColor(androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_primary_action_text))
                         setOnClickListener {
                             if (canRunUnlock) runMiUnlockFromUi(auth)
                         }
@@ -2882,9 +2903,9 @@ class MainActivity : AppCompatActivity() {
         )
         val labels = namedPartitions + getString(R.string.flash_rev7_partition_manual)
 
-        fun partitionSelector(spinnerId: Int, manualId: Int, onChanged: () -> Unit = {}): () -> String? {
-            val spinner = findViewById<Spinner>(spinnerId)
-            val manual = findViewById<EditText>(manualId)
+        fun partitionSelector(spinnerId: Int, manualId: Int, root: View = window.decorView, onChanged: () -> Unit = {}): () -> String? {
+            val spinner = root.findViewById<Spinner>(spinnerId)
+            val manual = root.findViewById<EditText>(manualId)
             spinner.adapter = ArrayAdapter(this, R.layout.item_fastboot_selection, labels).apply {
                 setDropDownViewResource(R.layout.item_fastboot_dropdown)
             }
@@ -2911,7 +2932,10 @@ class MainActivity : AppCompatActivity() {
 
         var onQuickPartitionChanged: () -> Unit = {}
         val getQuickPartition = partitionSelector(R.id.spinQuickPartition, R.id.edQuickManualPartition) { onQuickPartitionChanged() }
-        val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition)
+        massQueueUi = MassFlashQueueUi(this, viewModel::moveFlashQueueDraftItem, viewModel::removeFlashQueueDraftItem)
+        val getMassPartition = partitionSelector(R.id.spinMassPartition, R.id.edMassManualPartition, massQueueUi.header)
+        massQueueUi.restoreFormState(restoredMassQueueState)
+        restoredMassQueueState = null
         val slotSpinner = findViewById<Spinner>(R.id.spinQuickSlot)
         val slotNames = listOf(
             getString(R.string.flash_rev7_slot_current),
@@ -2991,57 +3015,14 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
 
-        val queueRows = findViewById<LinearLayout>(R.id.llMassQueueRows)
-        val queueHeading = findViewById<TextView>(R.id.tvMassQueueTitle)
-        val queueExecute = findViewById<MaterialButton>(R.id.btnMassExecute)
-        fun renderQueue(draft: FlashOperationDraft) {
-            queueRows.removeAllViews()
-            queueHeading.text = if (draft.items.isEmpty()) {
-                getString(R.string.flash_rev7_queue_empty)
-            } else getString(R.string.flash_rev7_queue_count, draft.items.size)
-            val sources = viewModel.queueSourceState.value ?: QueueSourceState()
-            if (sources.pending.isNotEmpty()) queueHeading.append("\n" + getString(R.string.rev24_queue_checking, sources.pending.joinToString()))
-            sources.error?.let { queueHeading.append("\n" + it) }
-            queueExecute.isEnabled = draft.items.isNotEmpty() && sources.pending.isEmpty()
-            draft.items.forEachIndexed { index, item ->
-                val row = LinearLayout(this).apply {
-                    orientation = LinearLayout.VERTICAL
-                    setPadding(dp(2), dp(8), dp(2), dp(8))
-                }
-                row.addView(TextView(this).apply {
-                    text = getString(R.string.flash_rev7_row_title, item.partition, item.displayName)
-                    setTextColor(getColor(R.color.text_primary))
-                    textSize = 14f
-                    typeface = android.graphics.Typeface.MONOSPACE
-                })
-                val actions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-                fun action(label: Int, enabled: Boolean = true, onClick: () -> Unit) {
-                    actions.addView(MaterialButton(this).apply {
-                        text = getString(label)
-                        isAllCaps = false
-                        textSize = 12f
-                        minHeight = dp(48)
-                        contentDescription = getString(label) + ": " + item.partition
-                        isEnabled = enabled
-                        setOnClickListener { onClick() }
-                    }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
-                }
-                action(R.string.flash_rev7_row_up, index > 0) {
-                    viewModel.moveFlashQueueDraftItem(item.partition, -1)
-                }
-                action(R.string.flash_rev7_row_down, index + 1 < draft.items.size) {
-                    viewModel.moveFlashQueueDraftItem(item.partition, 1)
-                }
-                action(R.string.flash_rev7_row_remove) {
-                    viewModel.removeFlashQueueDraftItem(item.partition)
-                }
-                row.addView(actions)
-                queueRows.addView(row)
-            }
-        }
+        val queueExecute = massQueueUi.execute
+        fun renderQueue(draft: FlashOperationDraft) = massQueueUi.render(
+            draft, viewModel.queueSourceState.value ?: QueueSourceState()
+        )
+        renderQueue(viewModel.currentFlashOperationDraft())
         viewModel.flashOperationDraft.observe(this) { renderQueue(it) }
         viewModel.queueSourceState.observe(this) { renderQueue(viewModel.currentFlashOperationDraft()) }
-        findViewById<View>(R.id.btnMassSelectImage).setOnClickListener {
+        massQueueUi.header.findViewById<View>(R.id.btnMassSelectImage).setOnClickListener {
             val partition = getMassPartition() ?: return@setOnClickListener
             chooseImageSource({ startMassImageDocumentPicker(partition) }) { file -> viewModel.addFlashQueueFile(partition, file) }
         }

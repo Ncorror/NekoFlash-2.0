@@ -37,7 +37,7 @@
                         android:layout_width="96dp"
                         android:layout_height="116dp"
                         android:padding="16dp"
-                        android:src="@mipmap/ic_launcher"
+                        android:src="@drawable/ic_device_placeholder"
                         android:scaleType="fitCenter"
                         android:background="@drawable/bg_otg_strip"
                         android:contentDescription="@string/home_device_image_placeholder" />
@@ -70,7 +70,7 @@
                             android:layout_marginTop="4dp"
                             android:text="@string/device_transport_placeholder"
                             android:textColor="@color/text_muted"
-                            android:textSize="10sp"
+                            android:textSize="12sp"
                             android:maxLines="2"
                             android:ellipsize="end" />
                     </LinearLayout>

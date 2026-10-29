@@ -177,7 +177,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/check_rev24.py
+          python3 tests/check_rev25.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests

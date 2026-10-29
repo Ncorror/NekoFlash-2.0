@@ -31,8 +31,8 @@ class FirmwareSelectionLifecycleTest {
     class Screen : ComponentActivity() {
         lateinit var session: DeviceViewModel
         internal var seen: QuickFlashSourceState? = null
-        override fun onCreate(state: Bundle?) {
-            super.onCreate(state)
+        override fun onCreate(savedInstanceState: Bundle?) {
+            super.onCreate(savedInstanceState)
             session = DeviceSessionStore.attachUi(application)
             session.quickFlashSource.observe(this) { seen = it }
         }

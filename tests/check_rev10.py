@@ -44,7 +44,7 @@ assert terminal.tag.endswith('TextView'), 'MaterialButton min insets wrapped the
 assert terminal.attrib[a+'singleLine'] == 'true'
 assert terminal.attrib[a+'gravity'] == 'center'
 assert by_id(main,'bottomNavigation').attrib[a+'layout_height'] == 'wrap_content'
-assert by_id(main,'bottomNavigation').attrib[a+'minHeight'] == '62dp'
+assert by_id(main,'bottomNavigation').attrib[a+'minHeight'] == '@dimen/navigation_min_height'
 title = [x for x in by_id(main,'consoleHeader') if x.attrib.get(a+'text') == '@string/layout_console_title']
 assert len(title) == 1 and title[0].attrib.get(a+'layout_weight') == '1'
 for key in ('btnHistoryUp','btnHistoryDown'):
@@ -57,7 +57,7 @@ tab = tab_path.read_text()
 assert 'button.alpha = 1.0f' in tab
 assert 'if (selected) R.color.accent else R.color.text_secondary' in tab
 raw_tab = tab_path.read_bytes()
-assert hashlib.sha1(b'blob '+str(len(raw_tab)).encode()+b'\0'+raw_tab).hexdigest() == '8fa8b34e44d21316fc39c258d2bac0c28e1bccc4'
+assert hashlib.sha1(b'blob '+str(len(raw_tab)).encode()+b'\0'+raw_tab).hexdigest() == '0aa32a943be777a49d77b5b1ba525fca11ce2859'
 
 for locale in ('values','values-ru'):
     names = {item.attrib['name']:item.text for item in ET.parse(res/locale/'strings.xml').getroot().findall('string')}
