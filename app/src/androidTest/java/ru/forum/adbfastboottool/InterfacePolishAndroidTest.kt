@@ -175,7 +175,17 @@ class InterfacePolishAndroidTest {
             scenario.onActivity {
                 assertEquals(View.VISIBLE, it.findViewById<View>(page).visibility)
                 assertEquals("Главная", it.findViewById<TextView>(R.id.tabHome).text.toString())
-                tabs.forEach { (button, _, _) -> fullyVisible(it.findViewById(button)) }
+                tabs.forEach { (button, _, _) ->
+                    val label = it.findViewById<TextView>(button)
+                    fullyVisible(label)
+                    assertEquals("Navigation label wraps: ${label.text}", 1, label.lineCount)
+                }
+                if (page == R.id.containerFastboot) {
+                    listOf(R.id.btnFastbootSectionQuick, R.id.btnFastbootSectionMass, R.id.btnFastbootSectionTools).forEach { id ->
+                        val label = it.findViewById<TextView>(id)
+                        assertEquals("Section label wraps: ${label.text}", 1, label.lineCount)
+                    }
+                }
                 assertFalse(vm().operationActive.value!!)
             }
         }
