@@ -164,8 +164,9 @@ class TerminalAndImportAndroidTest {
     }
 
     @Test fun terminalControlsRemainReachableWithImeRotationAndLargeFont() {
-        val oldScale = Settings.System.getFloat(instrumentation.context.contentResolver,
-            Settings.System.FONT_SCALE, 1f)
+        // Reading Settings through the instrumentation package throws a UID
+        // ownership SecurityException on API 26; shell is valid across APIs.
+        val oldScale = shell("settings get system font_scale").toFloatOrNull() ?: 1f
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             try {
                 setFontScaleForTest(1.3f)
