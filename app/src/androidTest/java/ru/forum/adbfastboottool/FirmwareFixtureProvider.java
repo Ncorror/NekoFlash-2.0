@@ -21,6 +21,8 @@ import java.util.Objects;
  */
 public final class FirmwareFixtureProvider extends ContentProvider {
     private volatile boolean deny;
+    private volatile java.util.concurrent.CountDownLatch slowRelease = new java.util.concurrent.CountDownLatch(1);
+    private final java.util.concurrent.atomic.AtomicInteger opens = new java.util.concurrent.atomic.AtomicInteger();
 
     private File image() {
         return new File(Objects.requireNonNull(getContext()).getCacheDir(), "fixture.img");
@@ -40,7 +42,9 @@ public final class FirmwareFixtureProvider extends ContentProvider {
 
     @Override public Bundle call(String method, String arg, Bundle extras) {
         switch (method) {
-            case "reset": deny = false; reset(8192); break;
+            case "reset": deny = false; slowRelease.countDown(); slowRelease = new java.util.concurrent.CountDownLatch(1); opens.set(0); reset(8192); break;
+            case "release": slowRelease.countDown(); break;
+            case "stats": Bundle stats = new Bundle(); stats.putInt("opens", opens.get()); return stats;
             case "deny": deny = true; break;
             case "resize": reset(Integer.parseInt(Objects.requireNonNull(arg))); break;
             default: throw new IllegalArgumentException("Unknown fixture command");
@@ -51,6 +55,23 @@ public final class FirmwareFixtureProvider extends ContentProvider {
     @Override public ParcelFileDescriptor openFile(Uri uri, String mode) throws FileNotFoundException {
         if (!"r".equals(mode)) throw new FileNotFoundException("Read-only fixture");
         if (deny) throw new SecurityException("Fixture provider revoked read access");
+        opens.incrementAndGet();
+        if ("slow".equals(uri.getLastPathSegment())) {
+            try {
+                ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
+                java.util.concurrent.CountDownLatch release = slowRelease;
+                new Thread(() -> {
+                    try (FileOutputStream out = new ParcelFileDescriptor.AutoCloseOutputStream(pipe[1])) {
+                        out.write(new byte[4096]); out.flush();
+                        release.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                    } catch (IOException | InterruptedException ignored) { }
+                }, "rev26-slow-provider").start();
+                return pipe[0];
+            } catch (IOException error) {
+                FileNotFoundException failure = new FileNotFoundException("Cannot create slow pipe");
+                failure.initCause(error); throw failure;
+            }
+        }
         if ("pipe".equals(uri.getLastPathSegment())) {
             try {
                 ParcelFileDescriptor[] pipe = ParcelFileDescriptor.createPipe();
@@ -70,7 +91,9 @@ public final class FirmwareFixtureProvider extends ContentProvider {
         MatrixCursor cursor = new MatrixCursor(columns);
         Object[] row = new Object[columns.length];
         for (int i = 0; i < columns.length; i++) {
-            row[i] = OpenableColumns.DISPLAY_NAME.equals(columns[i]) ? "provider image.img" : 1L;
+            if (OpenableColumns.DISPLAY_NAME.equals(columns[i])) row[i] = "provider image.img";
+            else if ("slow".equals(uri.getLastPathSegment())) row[i] = null;
+            else row[i] = "import".equals(uri.getLastPathSegment()) ? image().length() : 1L;
         }
         cursor.addRow(row);
         return cursor;

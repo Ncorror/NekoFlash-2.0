@@ -89,9 +89,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val _operationActive   = MutableLiveData(false)
     val operationActive: LiveData<Boolean> = _operationActive
 
+    internal val workspaceImport = WorkspaceImportController(application) { log(it) }
+    internal fun importWorkspaceFile(uri: android.net.Uri, workspace: File): Boolean = synchronized(operationLaunchLock) {
+        if (viewModelCleared.get()) false else workspaceImport.start(uri, workspace)
+    }
+
     /** Share the launch lock so workspace cleanup cannot race a new USB job. */
     fun runWorkspaceMaintenanceIfIdle(action: () -> Unit): Boolean = synchronized(operationLaunchLock) {
-        if (operationJob != null || connectionJob?.isCompleted == false ||
+        if (workspaceImport.isBusy || operationJob != null || connectionJob?.isCompleted == false ||
             NativeUsbfsBackend.hasActiveTransfer || NativeUsbfsBackend.backendState().nativeTransferActive
         ) return@synchronized false
         action()
@@ -225,6 +230,41 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     private val _logLines = MutableLiveData(initialLines)
     val logLines: LiveData<List<String>> = _logLines
+
+    private val transcript = TerminalTranscript().apply { append(initialLines.first()) }
+    private val _terminalLines = MutableLiveData(transcript.snapshot())
+    internal val terminalLines: LiveData<List<String>> = _terminalLines
+    private val terminalSubmission = ThreadLocal<Boolean>()
+    @Volatile private var terminalOperationId: String? = null
+    internal val isTerminalOperation: Boolean get() = terminalOperationId != null
+    private var terminalPublishScheduled = false
+    private val publishTerminal = Runnable {
+        synchronized(logLock) {
+            terminalPublishScheduled = false
+            _terminalLines.value = transcript.snapshot()
+        }
+    }
+
+    internal fun <T> withTerminalCommand(action: () -> T): T {
+        val previous = terminalSubmission.get()
+        terminalSubmission.set(true)
+        return try { action() } finally { terminalSubmission.set(previous) }
+    }
+
+    private fun appendTerminalLocked(message: String) {
+        transcript.append(message)
+        if (!terminalPublishScheduled) {
+            terminalPublishScheduled = true
+            mainHandler.postDelayed(publishTerminal, CompactLogRenderPolicy.RENDER_DEBOUNCE_MS)
+        }
+    }
+    internal fun terminalSnapshot(): List<String> = synchronized(logLock) { transcript.snapshot() }
+    internal fun clearTerminal() {
+        synchronized(logLock) {
+            transcript.clear()
+            appendTerminalLocked(text(R.string.log_cleared))
+        }
+    }
 
     private val lines    = initialLines.toMutableList()
     private val logLock  = Any()
@@ -368,8 +408,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         logInternal(message, declaredLevel = level)
     }
 
-    private fun logInternal(message: String, declaredLevel: DiagnosticLogPolicy.Level?) {
+    private fun logInternal(message: String, declaredLevel: DiagnosticLogPolicy.Level?, protocol: Boolean = false) {
         synchronized(logLock) {
+            TerminalTranscript.select(message, declaredLevel, terminalSubmission.get() == true,
+                protocol, isTerminalOperation)?.let(::appendTerminalLocked)
             val now = System.currentTimeMillis()
             val duplicate = message == lastCompactMessage &&
                 declaredLevel == lastCompactDeclaredLevel &&
@@ -608,7 +650,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             val proto = FastbootProtocol(
                 usbManager = usbManager,
                 device = device,
-                onLog = { msg -> log(msg) },
+                onLog = { msg -> logInternal(msg, declaredLevel = null, protocol = true) },
                 onLogVerbose = { msg -> logFileOnly(msg) },
                 onProgress = { percent, detail ->
                     val currentProgress = operationProgressSnapshot
@@ -673,7 +715,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 usbManager = usbManager,
                 device = device,
                 keyDirectory = adbKeyDir,
-                onLog = { msg -> log(msg) },
+                onLog = { msg -> logInternal(msg, declaredLevel = null, protocol = true) },
                 onProgress = { percent, detail ->
                     val currentProgress = operationProgressSnapshot
                     postOperationProgress(
@@ -1367,7 +1409,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install ${packageFile.name}")) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.installPackage(packageFile, options)) failOperation("APK installation failed")
+            val context = kotlinx.coroutines.currentCoroutineContext()
+            if (!proto.installPackage(packageFile, options) { context.ensureActive() }) failOperation("APK installation failed")
         }
     }
 
@@ -2112,6 +2155,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     log(text(R.string.operation_error, message))
                 }
             }
+            terminalOperationId = id.takeIf { terminalSubmission.get() == true }
             activeServiceOperation = task
             operationJob = task.job
             synchronized(checkpointLock) { persistedOperation = pending }
@@ -2172,6 +2216,16 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                         .onFailure { log(text(R.string.rev20_state_save_failed, it.message ?: it.javaClass.simpleName)) }
                 }
             }
+            if (terminalOperationId == task.id) {
+                val terminalResult = when (kind) {
+                    OperationOutcomeKind.SUCCESS -> text(R.string.rev26_terminal_completed)
+                    OperationOutcomeKind.CANCELLED -> text(R.string.operation_cancelled)
+                    OperationOutcomeKind.VERIFY_PENDING -> message
+                    else -> null // Failure is emitted by the journal below.
+                }
+                synchronized(logLock) { terminalResult?.let(::appendTerminalLocked) }
+                terminalOperationId = null
+            }
             postOperationProgress(OperationProgress(task.title, percent, message, finished = true, success = successful, outcome = kind))
             if (kind == OperationOutcomeKind.FAILED || kind == OperationOutcomeKind.INTERRUPTED) log("❌ $message")
             diagnosticSessionTracker.recordOperationFinished(task.title, kind.name)
@@ -2190,7 +2244,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "NekoFlash:FlashOperation")
                 .apply { setReferenceCounted(false); acquire(WAKE_LOCK_TIMEOUT_MS) }
             operationWakeLock = wl
-            log(text(R.string.wake_lock_acquired))
+            logFileOnly(text(R.string.wake_lock_acquired))
         } catch (e: Exception) {
             operationWakeLock = null
             log(text(R.string.wake_lock_error, e.message ?: e.javaClass.simpleName))
@@ -2202,7 +2256,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         operationWakeLock = null
         try {
             if (wl.isHeld) wl.release()
-            if (logRelease) log(text(R.string.wake_lock_released))
+            if (logRelease) logFileOnly(text(R.string.wake_lock_released))
         } catch (e: Exception) {
             if (logRelease) log(text(R.string.wake_lock_release_error, e.message ?: e.javaClass.simpleName))
         }
@@ -2241,6 +2295,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     override fun onCleared() {
+        workspaceImport.close()
         mainHandler.removeCallbacksAndMessages(null)
         flushDiagnostics("VIEWMODEL_CLEARED", terminal = true)
         viewModelCleared.set(true)

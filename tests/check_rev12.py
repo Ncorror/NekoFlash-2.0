@@ -18,7 +18,7 @@ main = (base/'MainActivity.kt').read_text()
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-assert git_blob == '5c4b2144a594044e06577b4014a55126e6742e9b', 'Unreviewed AdbProtocol change'
+assert git_blob == '7acf241d15e112d7fdc49c917c69661b437321df', 'Unreviewed AdbProtocol change'
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb

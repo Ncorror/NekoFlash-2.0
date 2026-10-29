@@ -34,6 +34,6 @@ assert len(tabs) == 5 and all(node.get(app+'icon') for node in tabs)
 assert all(node.get(app+'iconGravity') == 'textTop' for node in tabs)
 assert 'iconTint' in (java / 'TabController.kt').read_text()
 for workflow in ('build.yml', 'release.yml'):
-    assert 'tests/check_rev25.py' in (root / '.github/workflows' / workflow).read_text()
+    assert 'tests/check_rev26.py' in (root / '.github/workflows' / workflow).read_text()
 assert 'tests/collect_android_ui.py' in (root / '.github/workflows/build.yml').read_text()
 print('PASS REV25: recycled ordered queue, independent scrolling, explicit form restoration, five icon tabs')

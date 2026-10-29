@@ -20,7 +20,7 @@ assert "AdbPullPathPolicy.parseListing" in adb and "find . -type f -print0" in a
 assert "coverage.acknowledge(blockNum)" in adb
 assert "FastbootFetchPolicy.dataSize(dataPacket.payload, expectedChunkBytes)" in fastboot
 assert 'val normalized = partition.trim().lowercase()' not in fastboot
-assert "FilePublication.publishNew(staged, target)" in main
+assert "FilePublication.publishNew(staged, target)" in (java / "WorkspaceFileImporter.kt").read_text()
 assert "target.delete()" not in main.split("private fun importFirmwareFile")[1].split("private fun ")[0]
 assert 'to "reboot-fastboot"' in main and 'to "reboot:fastboot"' not in main
 assert "runWorkspaceMaintenanceIfIdle" in main and "synchronized(operationLaunchLock)" in vm

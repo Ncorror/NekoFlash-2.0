@@ -24,7 +24,7 @@ assert 'Image structure changed after preflight' in image
 assert 'override fun end(index: Long, bytes: Long, chunks: Long)' in image
 assert image.index('out.fd.sync(); out.close()') < image.index('!send(')
 for name in ('build.yml', 'release.yml'):
-    assert 'tests/check_rev25.py' in (root / '.github/workflows' / name).read_text()
+    assert 'tests/check_rev26.py' in (root / '.github/workflows' / name).read_text()
 instrumentation = (root / 'app/src/androidTest/java/ru/forum/adbfastboottool/BundledFilesystemToolsTest.kt').read_text()
 assert 'plan.forEachPart(' in instrumentation and '.parts.txt' in instrumentation
 independent = (root / 'tests/verify_android_filesystems.py').read_text()

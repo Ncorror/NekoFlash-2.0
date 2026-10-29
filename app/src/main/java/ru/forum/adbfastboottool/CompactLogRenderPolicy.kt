@@ -77,29 +77,16 @@ object CompactLogRenderPolicy {
     }
 
     fun format(line: String): FormattedLine {
-        val (tone, emoji) = when {
-            line.contains("ERROR") || line.contains("LOCKED") || line.contains("❌") ->
-                Tone.ERROR to "🙀 "
-
-            line.startsWith("💡") -> Tone.HINT to ""
-            line.contains("✅") || line.contains("===") || line.contains("COMPLETED") ->
-                Tone.SUCCESS to "✨ "
-
-            line.startsWith(">") || line.startsWith("->") || line.startsWith("<-") ->
-                Tone.COMMAND to "😸 "
-
-            line.startsWith("⏳") || line.startsWith("⚠") -> Tone.WARNING to "💤 "
-            line.startsWith("[") -> Tone.SYSTEM to "🐾 "
-            else -> Tone.INFO to "🐾 "
+        val level = DiagnosticLogPolicy.classify(line).level
+        val tone = when {
+            line.startsWith("> ") -> Tone.COMMAND
+            line.startsWith("💡") -> Tone.HINT
+            level == DiagnosticLogPolicy.Level.ERROR -> Tone.ERROR
+            level == DiagnosticLogPolicy.Level.WARNING -> Tone.WARNING
+            level == DiagnosticLogPolicy.Level.SUCCESS -> Tone.SUCCESS
+            else -> Tone.INFO
         }
-
-        // Preserve explicit emoji/markers already supplied by the transport.
-        val prefix = if (emoji.isNotEmpty() && line.firstOrNull()?.isLetterOrDigit() != false) {
-            emoji
-        } else {
-            ""
-        }
-        return FormattedLine(prefix + line, tone)
+        return FormattedLine(line, tone)
     }
 
     /**

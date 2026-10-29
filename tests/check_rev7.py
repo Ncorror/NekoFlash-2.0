@@ -15,7 +15,7 @@ import hashlib
 # Git blob identity pins the narrow orchestrator change; protocol files remain
 # guarded by LEGACY-SOURCE-SHA256.json in REV5.
 raw_vm = (root/'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt').read_bytes()
-expected_blob = '2c9da88e2b64ab0b13ade4aa10892f058c8c723c'
+expected_blob = 'b6c276ef11eb0ac49ac2131bfa7e69a23bd2fb4d'
 assert hashlib.sha1(b'blob ' + str(len(raw_vm)).encode() + b'\0' + raw_vm).hexdigest() == expected_blob, 'Unexpected change to DeviceViewModel'
 assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm

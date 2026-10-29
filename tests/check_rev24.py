@@ -31,6 +31,6 @@ assert 'FirmwareFixtureProvider' not in (root / 'app/src/main/AndroidManifest.xm
 for name in ('FirmwareSelectionTest', 'FirmwareSelectionLifecycleTest'):
     assert (root / f'app/src/test/java/ru/forum/adbfastboottool/{name}.kt').is_file()
 for name in ('build.yml', 'release.yml'):
-    assert 'tests/check_rev25.py' in (root / '.github/workflows' / name).read_text()
-assert 'OK (13 tests)' in (root / '.github/workflows/build.yml').read_text()
+    assert 'tests/check_rev26.py' in (root / '.github/workflows' / name).read_text()
+assert 'OK (18 tests)' in (root / '.github/workflows/build.yml').read_text()
 print('PASS REV24: durable checked Quick source, mixed File/SAF queue, stale-result guards, no automatic replay')

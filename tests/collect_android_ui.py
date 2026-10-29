@@ -13,6 +13,7 @@ names = ['mass-1000-header', 'mass-999-restored'] + [
     for configuration in ('portrait', 'large', 'landscape-large')
     for page in ('home', 'quick', 'sideload', 'unlock', 'settings', 'mass-empty', 'tools')
 ]
+names += ['terminal-command', 'terminal-keyboard', 'terminal-landscape', 'import-copying', 'import-cancelled']
 missing = []
 for name in names:
     result = subprocess.run([

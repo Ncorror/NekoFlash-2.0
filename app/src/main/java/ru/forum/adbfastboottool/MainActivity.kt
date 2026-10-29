@@ -259,6 +259,14 @@ class MainActivity : AppCompatActivity() {
         )
         consoleDockController = ConsoleDockController(this, rvConsoleOutput).also { it.initialize() }
         findViewById<View>(R.id.btnConsoleLogs).setOnClickListener { showLogsMenu() }
+        findViewById<View>(R.id.btnConsoleClose).setOnClickListener { consoleDockController.collapse() }
+        findViewById<View>(R.id.btnTerminalStop).setOnClickListener { requestOperationCancelFromUi() }
+        findViewById<View>(R.id.terminalOperationStatus).setOnClickListener { openOperationCenter() }
+        savedInstanceState?.getStringArrayList("rev26.terminal.history")?.let { commandHistory.addAll(it) }
+        historyIndex = savedInstanceState?.getInt("rev26.terminal.historyIndex", commandHistory.size) ?: commandHistory.size
+        if (savedInstanceState?.getBoolean("rev26.terminal.open") == true) {
+            rvConsoleOutput.post { consoleDockController.open() }
+        }
         tvStatus = findViewById(R.id.tvStatus)
         tvOtgStatus = findViewById(R.id.tvOtgStatus)
         updateOtgStatus()
@@ -299,9 +307,11 @@ class MainActivity : AppCompatActivity() {
         enableOverlayProtection()
 
         viewModel.logLines.observe(this) { lines ->
-            renderLog(lines)
             updateOperationCenter(lines)
         }
+
+        viewModel.terminalLines.observe(this) { renderLog(it) }
+        viewModel.workspaceImport.state.observe(this) { renderWorkspaceImport(it) }
 
         viewModel.connectionState.observe(this) {
             refreshConnectionStatusLabel()
@@ -353,11 +363,11 @@ class MainActivity : AppCompatActivity() {
                 // Operations never force Console over the active task screen.
                 // If it was left open, return it to the persistent compact dock;
                 // the user can still reopen it explicitly while work is running.
-                consoleDockController.collapse()
+                // Commands never close the terminal; its visibility belongs to the user.
                 window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
                 // Авто-снижение яркости на время записи: экономит энергию
                 // и снижает нагрев/троттлинг при долгой прошивке.
-                applyReducedBrightness()
+                if (!viewModel.isTerminalOperation) applyReducedBrightness()
             } else {
                 if (operationRunObservedActive && !operationRunTracksProgress) {
                     // A lightweight operation has no result object of its own.
@@ -467,6 +477,9 @@ class MainActivity : AppCompatActivity() {
         outState.putString(STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT, operationHiddenProgressFingerprint)
         outState.putBoolean(STATE_OPERATION_CANCEL_REQUESTED, operationCancelRequested)
         outState.putString(STATE_OPERATION_STRIP_DISMISSED_SIGNATURE, operationStripDismissedSignature)
+        if (::consoleDockController.isInitialized) outState.putBoolean("rev26.terminal.open", consoleDockController.isExpanded)
+        outState.putStringArrayList("rev26.terminal.history", ArrayList(commandHistory))
+        outState.putInt("rev26.terminal.historyIndex", historyIndex)
         super.onSaveInstanceState(outState)
     }
 
@@ -898,7 +911,9 @@ class MainActivity : AppCompatActivity() {
 
     // ─── КОМАНДЫ ─────────────────────────────────────────────────────────────
 
-    private fun handleCommandInput() {
+    private fun handleCommandInput() = viewModel.withTerminalCommand { handleTerminalCommandInput() }
+
+    private fun handleTerminalCommandInput() {
         val raw = etCommand.text.toString().trim()
         if (raw.isEmpty()) return
         // Terminal commands never inherit a pending GUI Operation Center
@@ -1928,44 +1943,55 @@ class MainActivity : AppCompatActivity() {
 
     private fun importFirmwareFile(uri: Uri) {
         if (!ensureWorkspaceReady()) return
-        val displayName = WorkspaceImportNaming.sanitizeImportedFileName(queryDisplayName(uri) ?: "imported-${System.currentTimeMillis()}")
-        var target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
-        val expectedSize = queryFileSize(uri)
-        viewModel.log(getString(R.string.rev11_import_started, displayName, "${workspaceDisplayPath()}/${target.name}"))
-        expectedSize?.let { viewModel.log(getString(R.string.rev11_import_expected_size, it)) }
-        lifecycleScope.launch(Dispatchers.IO) {
-            var temp: File? = null
-            try {
-                val staged = FilePublication.temporarySibling(target)
-                temp = staged
-                val copied = contentResolver.openInputStream(uri)?.use { input ->
-                    staged.outputStream().use { output ->
-                        val bytes = input.copyTo(output, 1024 * 1024)
-                        output.fd.sync()
-                        bytes
-                    }
-                } ?: throw IllegalStateException("could not open input stream")
-                if (expectedSize != null && expectedSize >= 0L && copied != expectedSize) {
-                    throw IllegalStateException("source size changed: expected $expectedSize, copied $copied")
-                }
-                if (copied <= 0L || staged.length() != copied) {
-                    throw IllegalStateException("imported file is empty or incomplete")
-                }
-                while (true) {
-                    try {
-                        FilePublication.publishNew(staged, target)
-                        break
-                    } catch (_: java.nio.file.FileAlreadyExistsException) {
-                        target = WorkspaceImportNaming.uniqueTargetFile(workspacePath, displayName)
-                    }
-                }
-                viewModel.log("✅ " + getString(R.string.rev11_import_finished, "${workspaceDisplayPath()}/${target.name}", formatFileSize(target.length())))
-            } catch (e: Exception) {
-                viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_import_failed, e.message ?: e.javaClass.simpleName))
-            } finally {
-                temp?.delete()
+        if (!viewModel.importWorkspaceFile(uri, workspacePath)) Toast.makeText(this, R.string.rev26_import_busy, Toast.LENGTH_LONG).show()
+    }
+
+    private var importDialog: androidx.appcompat.app.AlertDialog? = null
+    private var importMessage: TextView? = null
+    private var importProgress: ProgressBar? = null
+
+    private fun renderWorkspaceImport(state: WorkspaceImportController.State?) {
+        if (state == null) { importDialog?.dismiss(); importDialog = null; return }
+        if (importDialog == null) {
+            val content = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(24), dp(12), dp(24), dp(8))
             }
+            importMessage = TextView(this).apply { textSize = 14f; setTextColor(getColor(R.color.text_primary)) }
+            importProgress = ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal)
+            content.addView(importMessage)
+            content.addView(importProgress, LinearLayout.LayoutParams(-1, dp(12)).apply { topMargin = dp(20) })
+            importDialog = MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.layout_sideload_import).setView(content).setCancelable(false)
+                .setNegativeButton(R.string.cancel_upper, null).setPositiveButton(R.string.close_upper, null)
+                .create().also { dialog ->
+                    dialog.show()
+                    dialog.getButton(android.content.DialogInterface.BUTTON_NEGATIVE).setOnClickListener { viewModel.workspaceImport.cancel() }
+                    dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener { viewModel.workspaceImport.dismissResult() }
+                }
         }
+        val detail = when (state.phase) {
+            WorkspaceImportController.Phase.COPYING -> if (state.expected != null) {
+                getString(R.string.rev26_import_progress_known, formatFileSize(state.copied), formatFileSize(state.expected))
+            } else getString(R.string.rev26_import_progress_unknown, formatFileSize(state.copied))
+            WorkspaceImportController.Phase.CANCELLING -> getString(R.string.rev26_import_cancelling)
+            WorkspaceImportController.Phase.COMPLETED -> getString(R.string.rev11_import_finished, state.target.orEmpty(), formatFileSize(state.copied))
+            WorkspaceImportController.Phase.CANCELLED -> getString(R.string.rev26_import_cancelled)
+            WorkspaceImportController.Phase.FAILED -> if (state.required != null && state.available != null) {
+                getString(R.string.rev26_import_space, formatFileSize(state.required), formatFileSize(state.available))
+            } else getString(R.string.rev11_import_failed, state.error.orEmpty())
+        }
+        importMessage?.text = listOf(state.name, detail).filter { it.isNotBlank() }.joinToString("\n\n")
+        importProgress?.apply {
+            visibility = if (state.finished) View.GONE else View.VISIBLE
+            isIndeterminate = state.expected == null || state.expected == 0L || state.phase == WorkspaceImportController.Phase.CANCELLING
+            if (!isIndeterminate) progress = (state.copied.toDouble() * 100 / state.expected!!).toInt().coerceIn(0, 100)
+        }
+        importDialog?.getButton(android.content.DialogInterface.BUTTON_NEGATIVE)?.apply {
+            visibility = if (state.finished) View.GONE else View.VISIBLE
+            isEnabled = state.phase == WorkspaceImportController.Phase.COPYING
+        }
+        importDialog?.getButton(android.content.DialogInterface.BUTTON_POSITIVE)?.visibility = if (state.finished) View.VISIBLE else View.GONE
     }
 
     private fun queryFileSize(uri: Uri): Long? = runCatching {
@@ -2233,7 +2259,12 @@ class MainActivity : AppCompatActivity() {
         }
         actions += "${getString(R.string.logs_history)} (${entries.size})" to { showLogHistoryDialog() }
         actions += getString(R.string.logs_open_folder) to { openLogsFolder() }
-        actions += getString(R.string.logs_clear_console) to { viewModel.clearLog() }
+        actions += getString(R.string.logs_clear_console) to { viewModel.clearTerminal() }
+        actions += getString(R.string.rev26_terminal_copy) to {
+            val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            clipboard.setPrimaryClip(android.content.ClipData.newPlainText("NekoFlash terminal", viewModel.terminalSnapshot().joinToString("\n")))
+            Toast.makeText(this, R.string.rev26_terminal_copied, Toast.LENGTH_SHORT).show()
+        }
         if (oldCount > 0) {
             actions += "${getString(R.string.logs_delete_old)} ($oldCount)" to { confirmDeleteOldLogs() }
         }
@@ -4183,6 +4214,15 @@ class MainActivity : AppCompatActivity() {
         tvOperationCenterLastEvent.visibility = if (showLastEvent) View.VISIBLE else View.GONE
 
         val canRequestCancel = active && !operationCancelRequested
+        findViewById<View>(R.id.terminalOperationStatus).visibility = if (active) View.VISIBLE else View.GONE
+        findViewById<TextView>(R.id.tvTerminalOperation).text = if (operationCancelRequested) {
+            getString(R.string.layout_operation_cancelling_action)
+        } else effectiveProgress?.detail?.takeIf { it.isNotBlank() }
+            ?: getString(R.string.layout_operation_center_running)
+        findViewById<View>(R.id.btnTerminalStop).apply {
+            isEnabled = canRequestCancel
+            alpha = if (canRequestCancel) 1f else 0.42f
+        }
         val cancelButton = cardOperationCenter.findViewById<Button>(R.id.btnOperationCenterCancel)
         cancelButton.isEnabled = canRequestCancel
         cancelButton.text = getString(
@@ -4450,6 +4490,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        importDialog?.dismiss()
+        importDialog = null
+        if (!isChangingConfigurations && viewModelReady) viewModel.workspaceImport.cancel()
         if (!isChangingConfigurations && viewModelReady) {
             viewModel.flushDiagnostics("ACTIVITY_DESTROY", terminal = false)
         }

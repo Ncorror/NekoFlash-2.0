@@ -4,7 +4,7 @@ import android.hardware.usb.*
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.ArrayDeque
-import java.util.zip.ZipFile
+import java.util.concurrent.CancellationException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.concurrent.atomic.AtomicLong
@@ -984,7 +984,8 @@ class AdbProtocol(
         }
     }
 
-    fun installPackage(packageFile: File, options: List<String>): Boolean {
+    fun installPackage(packageFile: File, options: List<String>, checkCancelled: () -> Unit = {}): Boolean {
+        checkCancelled()
         if (!packageFile.exists() || !packageFile.isFile || !packageFile.canRead()) {
             onLog("❌ adb install: file is unavailable: ${packageFile.absolutePath}")
             return false
@@ -992,7 +993,7 @@ class AdbProtocol(
 
         return when (packageFile.extension.lowercase()) {
             "apk" -> installApk(packageFile, options)
-            "apks", "xapk" -> installPackageArchive(packageFile, options)
+            "apks", "xapk" -> installPackageArchive(packageFile, options, checkCancelled)
             else -> {
                 onLog("⚠️ adb install: unknown extension .${packageFile.extension}. Trying as APK.")
                 installApk(packageFile, options)
@@ -1023,115 +1024,73 @@ class AdbProtocol(
         return runShellCommand(command)
     }
 
-    private fun installPackageArchive(archiveFile: File, options: List<String>): Boolean {
+    private fun installPackageArchive(archiveFile: File, options: List<String>, operationCheck: () -> Unit): Boolean {
         if (!isConnected) return false
+        operationCheck()
         cancelled = false
-
+        val check = { operationCheck(); checkArchiveCancellation() }
         val cacheRoot = File(keyDirectory.parentFile ?: keyDirectory, "adb-package-cache")
-        if (!cacheRoot.exists() && !cacheRoot.mkdirs()) {
-            onLog("❌ adb install: could not create temporary folder: ${cacheRoot.absolutePath}")
-            return false
-        }
-        val workDir = File(cacheRoot, "pkg-${System.currentTimeMillis()}")
-        if (!workDir.mkdirs()) {
-            onLog("❌ adb install: could not create temporary folder: ${workDir.absolutePath}")
-            return false
-        }
-
         onLog("-> adb install ${options.joinToString(" ")} ${archiveFile.name}".trim())
         onLog("ℹ️ Container ${archiveFile.extension.uppercase()}: extracting APK files")
-
-        try {
-            val contents = extractPackageArchiveContents(archiveFile, workDir)
-            val extracted = contents.apks
-            if (extracted.isEmpty()) {
-                onLog("❌ No APK files found in the container: ${archiveFile.name}")
-                return false
+        return try {
+            PackageArchiveExtractor.withWorkspace(cacheRoot) { workDir ->
+                val contents = extractPackageArchiveContents(archiveFile, workDir, check)
+                val extracted = contents.apks
+                if (extracted.isEmpty()) {
+                    onLog("❌ No APK files found in the container: ${archiveFile.name}")
+                    return@withWorkspace false
+                }
+                if (contents.obbs.isNotEmpty()) onLog("ℹ️ Found OBB files in the container: ${contents.obbs.size}")
+                val selected = selectArchiveApksForInstall(extracted)
+                onLog("ℹ️ Selected APKs for installation: ${selected.size}")
+                selected.forEachIndexed { index, item -> onLog("   ${index + 1}. ${item.file.name} ← ${item.entryName}") }
+                check()
+                val installOk = if (selected.size == 1) installApk(selected.first().file, options)
+                    else installMultipleApks(selected.map { it.file }, options)
+                if (!installOk) return@withWorkspace false
+                check()
+                pushArchiveObbs(contents.obbs, contents.manifestPackageName)
             }
-            if (contents.obbs.isNotEmpty()) {
-                onLog("ℹ️ Found OBB files in the container: ${contents.obbs.size}")
-            }
-
-            val selected = selectArchiveApksForInstall(extracted)
-            onLog("ℹ️ Selected APKs for installation: ${selected.size}")
-            selected.forEachIndexed { index, item ->
-                onLog("   ${index + 1}. ${item.file.name} ← ${item.entryName}")
-            }
-
-            val installOk = if (selected.size == 1) {
-                installApk(selected.first().file, options)
-            } else {
-                installMultipleApks(selected.map { it.file }, options)
-            }
-            if (!installOk) return false
-
-            return pushArchiveObbs(contents.obbs, contents.manifestPackageName)
+        } catch (cancelled: CancellationException) {
+            onLog("⚠️ Package preparation cancelled; installation was not continued")
+            throw cancelled
         } catch (e: Exception) {
             onLog("❌ adb install: container processing error ${archiveFile.name}: ${e.message ?: e.javaClass.simpleName}")
-            return false
-        } finally {
-            deleteRecursivelyQuietly(workDir)
+            false
         }
     }
 
-    private fun extractPackageArchiveContents(archiveFile: File, workDir: File): PackageArchiveContents {
-        val apks = mutableListOf<ExtractedArchiveApk>()
-        val obbs = mutableListOf<ExtractedArchiveObb>()
+    private fun checkArchiveCancellation() {
+        if (cancelled) throw CancellationException("Package extraction cancelled")
+    }
+
+    private fun extractPackageArchiveContents(archiveFile: File, workDir: File, checkCancelled: () -> Unit): PackageArchiveContents {
         var manifestPackageName: String? = null
-
-        ZipFile(archiveFile).use { zip ->
-            val entries = zip.entries()
-            var apkIndex = 0
-            var obbIndex = 0
-            while (entries.hasMoreElements()) {
-                if (cancelled) break
-                val entry = entries.nextElement()
-                if (entry.isDirectory) continue
-                val normalizedName = entry.name.replace('\\', '/')
-                val lowerName = normalizedName.lowercase()
-                if (!isValidArchiveEntryName(normalizedName)) {
-                    onLog("⚠️ Skipped unsafe path in archive: $normalizedName")
-                    continue
+        var lastProgressAt = 0L
+        val extracted = PackageArchiveExtractor.extract(archiveFile, workDir,
+            checkCancelled = checkCancelled,
+            onManifest = { input ->
+                val text = input.readBytesLimited(2 * 1024 * 1024, checkCancelled).toString(Charsets.UTF_8)
+                manifestPackageName = extractPackageNameFromManifestText(text) ?: manifestPackageName
+            },
+            onSkipped = { onLog("⚠️ Skipped unsafe path in archive: $it") },
+            onProgress = { copied, total ->
+                val now = android.os.SystemClock.elapsedRealtime()
+                if (copied == 0L || copied == total || now - lastProgressAt >= 250L) {
+                    val percent = if (total > 0) (copied.toDouble() * 100 / total).toInt().coerceIn(0, 100) else -1
+                    onProgress(percent, "Extracting APK/OBB: $copied / $total bytes")
+                    lastProgressAt = now
                 }
-
-                if (lowerName == "manifest.json" || lowerName.endsWith("/manifest.json")) {
-                    zip.getInputStream(entry).use { input ->
-                        val text = input.readBytesLimited(2 * 1024 * 1024).toString(Charsets.UTF_8)
-                        manifestPackageName = extractPackageNameFromManifestText(text) ?: manifestPackageName
-                    }
-                    continue
-                }
-
-                when {
-                    lowerName.endsWith(".apk") -> {
-                        val baseName = normalizedName.substringAfterLast('/').ifBlank { "entry-$apkIndex.apk" }
-                        val outputName = "${apkIndex.toString().padStart(3, '0')}-${baseName.replace(Regex("[^A-Za-z0-9._-]"), "_")}"
-                        val outFile = File(workDir, outputName)
-                        zip.getInputStream(entry).use { input ->
-                            outFile.outputStream().use { output -> input.copyTo(output) }
-                        }
-                        apks.add(ExtractedArchiveApk(outFile, normalizedName))
-                        apkIndex++
-                    }
-                    lowerName.endsWith(".obb") -> {
-                        val baseName = normalizedName.substringAfterLast('/').ifBlank { "entry-$obbIndex.obb" }
-                        val outputName = "obb-${obbIndex.toString().padStart(3, '0')}-${baseName.replace(Regex("[^A-Za-z0-9._-]"), "_")}"
-                        val outFile = File(workDir, outputName)
-                        zip.getInputStream(entry).use { input ->
-                            outFile.outputStream().use { output -> input.copyTo(output) }
-                        }
-                        obbs.add(ExtractedArchiveObb(outFile, normalizedName, extractObbPackageNameFromPath(normalizedName)))
-                        obbIndex++
-                    }
-                }
-            }
-        }
+            },
+            availableSpace = { android.os.StatFs(it.absolutePath).availableBytes })
+        checkCancelled()
+        val apks = extracted.filterNot { it.obb }.map { ExtractedArchiveApk(it.file, it.entryName) }
+        val obbs = extracted.filter { it.obb }.map { ExtractedArchiveObb(it.file, it.entryName, extractObbPackageNameFromPath(it.entryName)) }
         onLog("ℹ️ Found APK files in the container: ${apks.size}")
         manifestPackageName?.let { onLog("ℹ️ package_name from manifest.json: $it") }
         return PackageArchiveContents(apks, obbs, manifestPackageName)
     }
 
-    @Suppress("SdCardPath")
     private fun pushArchiveObbs(obbs: List<ExtractedArchiveObb>, manifestPackageName: String?): Boolean {
         if (obbs.isEmpty()) return true
         var ok = true
@@ -1189,12 +1148,14 @@ class AdbProtocol(
     private fun isValidPackageName(value: String): Boolean =
         Regex("^[A-Za-z][A-Za-z0-9_]*(\\.[A-Za-z][A-Za-z0-9_]*)+$").matches(value)
 
-    private fun java.io.InputStream.readBytesLimited(limit: Int): ByteArray {
+    private fun java.io.InputStream.readBytesLimited(limit: Int, checkCancelled: () -> Unit): ByteArray {
         val buffer = ByteArray(8192)
         val out = java.io.ByteArrayOutputStream()
         var total = 0
         while (true) {
+            checkCancelled()
             val read = read(buffer)
+            checkCancelled()
             if (read <= 0) break
             total += read
             if (total > limit) break
@@ -1275,22 +1236,6 @@ class AdbProtocol(
     private fun isConfigSplitLike(item: ExtractedArchiveApk): Boolean {
         val name = item.entryName.substringAfterLast('/').lowercase()
         return name.startsWith("split_config.") || name.startsWith("config.") || name.contains("split_config")
-    }
-
-    private fun isValidArchiveEntryName(name: String): Boolean {
-        if (name.startsWith("/") || name.startsWith("../") || name.contains("/../")) return false
-        if (name.contains('\u0000')) return false
-        return true
-    }
-
-    private fun deleteRecursivelyQuietly(file: File) {
-        runCatching {
-            if (file.exists() && !file.deleteRecursively()) {
-                onLog("ℹ️ Could not fully delete the temporary directory")
-            }
-        }.onFailure { error ->
-            onLog("ℹ️ Temporary directory cleanup skipped (${error.javaClass.simpleName})")
-        }
     }
 
     fun installMultipleApks(apkFiles: List<File>, options: List<String>): Boolean {

@@ -20,8 +20,9 @@ for hard_safety_contract in (
     assert hard_safety_contract in vm, "Safety boundary accidentally removed: " + hard_safety_contract
 main = (root / "app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt").read_text()
 naming = (root / "app/src/main/java/ru/forum/adbfastboottool/WorkspaceImportNaming.kt").read_text()
-assert "WorkspaceImportNaming.sanitizeImportedFileName(" in main
-assert "WorkspaceImportNaming.uniqueTargetFile(workspacePath," in main
+importer = (root / "app/src/main/java/ru/forum/adbfastboottool/WorkspaceFileImporter.kt").read_text()
+assert "WorkspaceImportNaming.sanitizeImportedFileName(" in importer
+assert "WorkspaceImportNaming.uniqueTargetFile(workspace," in importer
 assert "private fun sanitizeImportedFileName(" not in main
 assert "private fun uniqueTargetFile(" not in main
 assert ".take(160)" not in naming, "Artificial silent filename truncation reintroduced"

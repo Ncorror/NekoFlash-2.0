@@ -801,7 +801,7 @@ class FastbootProtocol(
         onLog("Max download size: ${d.maxDownloadSizeRaw ?: "unknown"}${d.maxDownloadSizeBytes?.let { " ($it bytes)" } ?: ""}")
         d.maxFetchSizeRaw?.let { onLog("Max fetch size: $it${d.maxFetchSizeBytes?.let { bytes -> " ($bytes bytes)" } ?: ""}") }
         if (d.unlocked?.equals("no", ignoreCase = true) == true) {
-            onLog("⚠️ WARNING: bootloader reports unlocked=no. Full terminal is available, but fastboot flash will be blocked by the app.")
+            onLog("⚠️ Bootloader reports unlocked=no. The device may reject commands that require an unlocked bootloader.")
         }
     }
 

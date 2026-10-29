@@ -7,4 +7,4 @@
     android:includeFontPadding="false"
     android:lineSpacingExtra="1dp"
     android:textColor="@color/log_info"
-    android:textSize="11sp" />
+    android:textSize="12sp" />

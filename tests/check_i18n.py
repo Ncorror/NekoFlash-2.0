@@ -94,9 +94,10 @@ required_localized_messages = (
     "rev11_fastboot_logical_info_failed",
 )
 vm = (ROOT/"app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt").read_text()
+import_controller = (ROOT/"app/src/main/java/ru/forum/adbfastboottool/WorkspaceImportController.kt").read_text()
 for key in required_localized_messages:
     assert key in en and key in ru, key
-    assert "R.string." + key in (main + vm), "Unreferenced translation: " + key
+    assert "R.string." + key in (main + vm + import_controller), "Unreferenced translation: " + key
 
 # Guard against reintroducing the known fixed English-only messages.
 for literal in (

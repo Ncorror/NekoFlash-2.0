@@ -173,11 +173,11 @@ jobs:
           test -x gradlew
           ls -l gradlew
 
-      - name: REV24 structural, source-guard and bilingual checks
+      - name: REV26 structural, source-guard and bilingual checks
         shell: bash
         run: |
           set -euo pipefail
-          python3 tests/check_rev25.py
+          python3 tests/check_rev26.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests

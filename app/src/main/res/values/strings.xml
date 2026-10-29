@@ -540,4 +540,14 @@ Android robot attribution: The Android robot is reproduced or modified from work
         <item quantity="one">Flash %1$d partition</item>
         <item quantity="other">Flash %1$d partitions</item>
     </plurals>
+    <string name="rev26_terminal_close">Close terminal</string>
+    <string name="rev26_terminal_completed">Completed.</string>
+    <string name="rev26_terminal_copy">Copy terminal output</string>
+    <string name="rev26_terminal_copied">Terminal output copied</string>
+    <string name="rev26_import_busy">An import is already running.</string>
+    <string name="rev26_import_cancelled">Import cancelled. Temporary file removed.</string>
+    <string name="rev26_import_cancelling">Cancelling and removing temporary data…</string>
+    <string name="rev26_import_progress_known">Copied %1$s of %2$s</string>
+    <string name="rev26_import_progress_unknown">Copied %1$s · source size unknown</string>
+    <string name="rev26_import_space">Not enough free space. Required: %1$s; available: %2$s.</string>
 </resources>

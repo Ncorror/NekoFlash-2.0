@@ -46,9 +46,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
-      - name: REV24 structural and source-guard tests
+      - name: REV26 structural and source-guard tests
         run: |
-          python3 tests/check_rev25.py
+          python3 tests/check_rev26.py
           python3 tests/check_i18n.py
 
       - name: Native transfer deadline regression tests
@@ -487,7 +487,7 @@ jobs:
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/mass-saf-queue.png > android-source-ui/mass-saf-queue.png
             python3 -c "from pathlib import Path; p=Path('android-source-ui'); assert all((p/n).stat().st_size > 0 for n in ('quick-restored.png', 'quick-unavailable.png', 'quick-partition-menu.png', 'mass-saf-queue.png'))"
             python3 tests/collect_android_ui.py --output android-interface-ui
-            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (13 tests)' in s and 'FAILURES' not in s, s"
+            python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (18 tests)' in s and 'FAILURES' not in s, s"
             python3 tests/verify_android_filesystems.py --output android-mkfs-images
       - name: Upload Android filesystem evidence
         if: always()

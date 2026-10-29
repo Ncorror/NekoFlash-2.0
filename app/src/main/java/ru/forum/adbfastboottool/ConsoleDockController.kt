@@ -132,7 +132,7 @@ internal class ConsoleDockController(
      * Handles the Console-specific part of Back navigation.
      *
      * Priority is deliberately local and predictable: hide the IME first,
-     * then step the sheet from expanded to half-expanded and finally collapsed.
+     * then close the terminal.
      * Returning false delegates the remaining Back action to [MainActivity].
      */
     fun handleBack(): Boolean {
@@ -225,7 +225,7 @@ internal class ConsoleDockController(
     private fun focusPendingCommandInput() {
         if (!focusCommandWhenExpanded) return
         panel.post {
-            if (!commandInput.isShown || !commandInput.isEnabled) {
+            if (!focusCommandWhenExpanded || behavior.state != BottomSheetBehavior.STATE_EXPANDED || !commandInput.isShown || !commandInput.isEnabled) {
                 focusCommandWhenExpanded = false
                 return@post
             }

@@ -546,4 +546,14 @@ Android robot attribution: The Android robot is reproduced or modified from work
         <item quantity="many">Прошить %1$d разделов</item>
         <item quantity="other">Прошить %1$d раздела</item>
     </plurals>
+    <string name="rev26_terminal_close">Закрыть терминал</string>
+    <string name="rev26_terminal_completed">Выполнено.</string>
+    <string name="rev26_terminal_copy">Копировать вывод терминала</string>
+    <string name="rev26_terminal_copied">Вывод терминала скопирован</string>
+    <string name="rev26_import_busy">Импорт уже выполняется.</string>
+    <string name="rev26_import_cancelled">Импорт отменён. Временный файл удалён.</string>
+    <string name="rev26_import_cancelling">Отмена и удаление временных данных…</string>
+    <string name="rev26_import_progress_known">Скопировано %1$s из %2$s</string>
+    <string name="rev26_import_progress_unknown">Скопировано %1$s · размер источника неизвестен</string>
+    <string name="rev26_import_space">Недостаточно места. Нужно: %1$s; доступно: %2$s.</string>
 </resources>
