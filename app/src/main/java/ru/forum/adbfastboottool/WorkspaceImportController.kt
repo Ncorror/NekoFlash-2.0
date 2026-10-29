@@ -83,7 +83,9 @@ internal class WorkspaceImportController(private val application: Application, p
                         }
                         try { cancellation.attachInputAbort { try { signal.cancel() } finally { owned.close() } } }
                         catch (error: Throwable) { owned.close(); throw error }
-                        owned
+                        // Poll the underlying provider FD before each read. On API 26,
+                        // closing a blocked pipe read from another thread may not wake it.
+                        CancellableProviderInputStream(owned, descriptor.fileDescriptor, cancellation::check)
                     },
                     onProgress = { copied ->
                         current = current.copy(copied = copied)
