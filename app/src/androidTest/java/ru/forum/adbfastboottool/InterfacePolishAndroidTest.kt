@@ -153,7 +153,15 @@ class InterfacePolishAndroidTest {
                 list(it).findViewHolderForAdapterPosition(251)!!.itemView.findViewById<View>(R.id.btnQueueRemove).performClick()
                 assertEquals(items.filter { item -> item.partition != "p0250" }, vm().currentFlashOperationDraft().items)
             }
-            waitUi(scenario) { list(it).adapter!!.itemCount == 1000 }
+            // Wait for the removed-row diff AND the actual layout frame;
+            // adapter count alone can update before API 26 attaches row views.
+            waitUi(scenario) {
+                val queue = list(it)
+                val position = (queue.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
+                queue.adapter!!.itemCount == 1000 && position > 1 &&
+                    !queue.hasPendingAdapterUpdates() &&
+                    queue.findViewHolderForAdapterPosition(position) != null
+            }
             scenario.onActivity {
                 val queue = list(it)
                 firstVisible = (queue.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
