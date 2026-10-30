@@ -35,6 +35,19 @@ Upstream license references:
 - kotlinx.coroutines: https://github.com/Kotlin/kotlinx.coroutines/blob/master/LICENSE.txt
 - Apache License 2.0: https://www.apache.org/licenses/LICENSE-2.0.txt
 
+## Bundled filesystem executables (distributed in the APK)
+
+**These components are included in NekoFlash APKs**, not just used as build-time references:
+
+- **e2fsprogs 1.47.0 / `mke2fs`** — upstream filesystem-creation utility, with GPL-2.0 and component-specific LGPL/BSD/MIT notices.
+- **f2fs-tools 1.16.0 / `mkfs.f2fs`** — upstream filesystem-creation utility, GPL-2.0 and its corresponding upstream notices.
+
+NekoFlash invokes these as separate executables. They are **not** relicensed under the project's Apache-2.0 license. Preserve upstream license and copyright notices: the APK packages them under `assets/filesystem-tools/`.
+
+**Corresponding source:** release distributions must retain the companion `filesystem-tools-source.tar.gz` containing the pinned upstream source archives, manifest and rebuild scripts. The [filesystem tools README](vendor/filesystems/README.md) and [pinned manifest](vendor/filesystems/manifest.json) describe versions, provenance and offline rebuild steps. Distributors should provide that corresponding-source archive alongside the APK; publishing only the APK is not the complete distribution described here.
+
+This summary does not replace the full upstream license texts and component notices bundled in the APK.
+
 ## Android Open Source Project
 
 NekoFlash implements ADB/Fastboot protocol behavior using Android platform APIs and public AOSP documentation/protocol behavior. No AOSP source tree is vendored into this repository.
