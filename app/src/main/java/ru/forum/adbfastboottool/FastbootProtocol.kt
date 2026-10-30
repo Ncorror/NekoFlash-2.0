@@ -377,25 +377,45 @@ class FastbootProtocol(
         if (!writeCommand(clean, timeout)) return@withLock false
         sessionState = SessionState.AWAITING_COMMAND_FINAL
 
-        val startedMs = System.currentTimeMillis()
+        // Driver read failures can return immediately. Use monotonic time
+        // for the 120-second deadline and a short cancellable backoff on empty
+        // responses; do not resend commands or alter raw response logging.
+        val startedNs = System.nanoTime()
         var infoLines = 0
         var lastWaitLogSec = 0L
 
         while (!cancelled) {
-            val elapsedMs = System.currentTimeMillis() - startedMs
-            if (elapsedMs >= 120_000L) {
+            val elapsedMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, System.nanoTime())
+            if (elapsedMs >= FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS) {
                 val message = "Terminal Fastboot command timed out: $clean"
                 onLog("❌ $message")
                 markSessionBroken(message)
                 return@withLock false
             }
 
+            val readStartedNs = System.nanoTime()
             val packet = readPacket(2000)
             if (packet == null) {
-                val elapsedSec = elapsedMs / 1000
+                val readFinishedNs = System.nanoTime()
+                val afterReadMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, readFinishedNs)
+                val elapsedSec = afterReadMs / 1000
                 if (elapsedSec / 10 != lastWaitLogSec / 10) {
                     onLog("⏳ Fastboot is waiting for a response... ${elapsedSec} sec")
                     lastWaitLogSec = elapsedSec
+                }
+                val remainingMs =
+                    (FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS - afterReadMs).coerceAtLeast(0L)
+                val backoffMs = FastbootTerminalWaitPolicy.retryDelayMs(
+                    readFinishedNs - readStartedNs, remainingMs
+                )
+                if (backoffMs > 0L && !cancelled) {
+                    try {
+                        Thread.sleep(backoffMs)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        onLog("⚠️ Fastboot terminal wait interrupted")
+                        return@withLock false
+                    }
                 }
                 continue
             }
