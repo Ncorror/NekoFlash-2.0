@@ -1,0 +1,10 @@
+# Security-critical paths: owner review should be requested for changes.
+# Do not enable mandatory code-owner approval in a single-maintainer repository
+# until a second trusted reviewer (or a documented PR-only owner bypass) exists.
+/.github/workflows/            @Ncorror
+/.github/CODEOWNERS            @Ncorror
+/app/build.gradle              @Ncorror
+/gradle/wrapper/               @Ncorror
+/scripts/                      @Ncorror
+/app/src/main/cpp/             @Ncorror
+/vendor/filesystems/           @Ncorror
