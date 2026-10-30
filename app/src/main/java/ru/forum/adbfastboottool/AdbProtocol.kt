@@ -1728,7 +1728,13 @@ class AdbProtocol(
         }
         if (logOutput) onLog("ℹ️ Raw ADB shell stdout/stderr: ${record.stdoutFile.absolutePath} / ${record.stderrFile.absolutePath}")
         var exitCode: Int? = null
+        // Packet boundaries do not align with UTF-8 code points or text lines.
+        // Raw binary evidence is written independently of these display views.
+        val stdoutDisplay = if (logOutput) ShellOutputTextRenderer(false, onLog) else null
+        val stderrDisplay = if (logOutput) ShellOutputTextRenderer(true, onLog) else null
         fun result(success: Boolean): ShellResult {
+            stdoutDisplay?.finish()
+            stderrDisplay?.finish()
             val (stdout, stderr) = record.finish(exitCode, success, captureOutput)
             return ShellResult(stdout, stderr, exitCode, success, record.stdoutFile)
         }
@@ -1744,12 +1750,12 @@ class AdbProtocol(
                     SHELL_ID_STDOUT -> {
                         val data = readAdbStreamExact(stream, header.length) ?: return result(false)
                         record.writeStdout(data)
-                        if (logOutput) logShellOutput(data, isStderr = false)
+                        stdoutDisplay?.accept(data)
                     }
                     SHELL_ID_STDERR -> {
                         val data = readAdbStreamExact(stream, header.length) ?: return result(false)
                         record.writeStderr(data)
-                        if (logOutput) logShellOutput(data, isStderr = true)
+                        stderrDisplay?.accept(data)
                     }
                     SHELL_ID_EXIT -> {
                         val data = readAdbStreamExact(stream, header.length) ?: EMPTY_PAYLOAD
@@ -1800,7 +1806,9 @@ class AdbProtocol(
             return ShellResult("", "", null, false)
         }
         if (logOutput) onLog("ℹ️ Raw ADB shell stdout: ${record.stdoutFile.absolutePath}")
+        val stdoutDisplay = if (logOutput) ShellOutputTextRenderer(false, onLog) else null
         fun result(success: Boolean): ShellResult {
+            stdoutDisplay?.finish()
             val (stdout, stderr) = record.finish(null, success, captureOutput)
             return ShellResult(stdout, stderr, null, success, record.stdoutFile)
         }
@@ -1813,7 +1821,7 @@ class AdbProtocol(
                         val data = readData(header.dataLength) ?: return result(false)
                         sendMessageInternal(A_OKAY, stream.localId, stream.remoteId, EMPTY_PAYLOAD)
                         record.writeStdout(data)
-                        if (logOutput) logShellOutput(data, isStderr = false)
+                        stdoutDisplay?.accept(data)
                     }
                     A_OKAY -> {
                         if (header.dataLength > 0) readData(header.dataLength)
