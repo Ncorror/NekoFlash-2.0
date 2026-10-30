@@ -69,6 +69,7 @@ internal class ShellOutputTextRenderer(
             val char = characters.get()
             when (char) {
                 '\u0000' -> Unit // Keep exact NUL in the raw record, not in terminal text.
+                '\r' -> emitLine(trimCr = false) // Progress updates may use CR without LF.
                 '\n' -> emitLine(trimCr = true)
                 else -> {
                     currentLine.append(char)
