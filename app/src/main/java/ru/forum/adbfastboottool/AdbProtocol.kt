@@ -1735,6 +1735,9 @@ class AdbProtocol(
         fun result(success: Boolean): ShellResult {
             stdoutDisplay?.finish()
             stderrDisplay?.finish()
+            // Emit the exit line after the final unterminated stdout/stderr
+            // fragment, never ahead of text still buffered in the decoder.
+            if (logOutput && exitCode != null) onLog("=== ADB SHELL EXIT: $exitCode ===")
             val (stdout, stderr) = record.finish(exitCode, success, captureOutput)
             return ShellResult(stdout, stderr, exitCode, success, record.stdoutFile)
         }
@@ -1760,7 +1763,7 @@ class AdbProtocol(
                     SHELL_ID_EXIT -> {
                         val data = readAdbStreamExact(stream, header.length) ?: EMPTY_PAYLOAD
                         exitCode = data.firstOrNull()?.toInt()?.and(0xFF) ?: 0
-                        if (logOutput) onLog("=== ADB SHELL EXIT: $exitCode ===")
+                        // The final decoder flush logs any trailing line before EXIT.
                     }
                     SHELL_ID_STDIN, SHELL_ID_CLOSE_STDIN -> {
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
