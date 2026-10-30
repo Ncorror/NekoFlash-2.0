@@ -49,6 +49,12 @@ internal class PtyInputEditText @JvmOverloads constructor(
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val base = super.onCreateInputConnection(outAttrs) ?: return null
+        // Android keyboards may replace a landscape EditText with a fullscreen
+        // extracted editor, which steals the terminal's visible input and Send
+        // controls. Keep command editing in this same inline widget for both
+        // host CLI and explicit remote PTY input.
+        outAttrs.imeOptions = outAttrs.imeOptions or
+            EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN
         return object : InputConnectionWrapper(base, true) {
             private var composing = ""
 
