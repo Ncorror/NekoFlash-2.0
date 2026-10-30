@@ -14,12 +14,14 @@ import android.provider.Settings
 import android.view.KeyEvent
 import android.view.View
 import android.widget.EditText
+import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.MutableLiveData
+import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -89,6 +91,48 @@ class TerminalAndImportAndroidTest {
     }
     private fun shell(command: String): String = instrumentation.uiAutomation.executeShellCommand(command).use {
         android.os.ParcelFileDescriptor.AutoCloseInputStream(it).bufferedReader().use { reader -> reader.readText().trim() }
+    }
+
+    @Test fun closedTerminalDefersOutputAndReopensWithNewestTranscript() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            var hiddenRows = -1
+            scenario.onActivity {
+                assertFalse(expanded(it))
+                hiddenRows = it.findViewById<RecyclerView>(R.id.rvConsoleOutput).adapter!!.itemCount
+            }
+            repeat(220) { vm().log("> rev27-hidden-$it") }
+            waitUntil { vm().terminalLines.value?.lastOrNull() == "> rev27-hidden-219" }
+            scenario.onActivity {
+                assertEquals("Closed Console must not bind hundreds of rows", hiddenRows,
+                    it.findViewById<RecyclerView>(R.id.rvConsoleOutput).adapter!!.itemCount)
+                assertTrue(it.findViewById<TextView>(R.id.tvConsolePeek).text.contains("rev27-hidden-219"))
+                it.findViewById<View>(R.id.btnTerminalOpen).performClick()
+            }
+            waitUi(scenario) {
+                expanded(it) && it.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                    .adapter!!.itemCount == vm().terminalSnapshot().size
+            }
+            scenario.onActivity { it.findViewById<View>(R.id.btnConsoleClose).performClick() }
+            waitUi(scenario) { !expanded(it) }
+            var beforeSecondBurst = -1
+            scenario.onActivity {
+                beforeSecondBurst = it.findViewById<RecyclerView>(R.id.rvConsoleOutput).adapter!!.itemCount
+            }
+            repeat(240) { vm().log("> rev27-second-$it") }
+            waitUntil { vm().terminalLines.value?.lastOrNull() == "> rev27-second-239" }
+            scenario.onActivity {
+                assertEquals(beforeSecondBurst,
+                    it.findViewById<RecyclerView>(R.id.rvConsoleOutput).adapter!!.itemCount)
+                // Reopen immediately after a new line, before LiveData debounce.
+                vm().log("> rev27-before-publish")
+                it.findViewById<View>(R.id.btnTerminalOpen).performClick()
+            }
+            waitUi(scenario) {
+                expanded(it) && it.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                    .adapter!!.itemCount == vm().terminalSnapshot().size
+            }
+            assertEquals("> rev27-before-publish", vm().terminalSnapshot().last())
+        }
     }
 
     @Test fun shellOperationCannotCollapseTerminalOrOpenProgressDialog() {
