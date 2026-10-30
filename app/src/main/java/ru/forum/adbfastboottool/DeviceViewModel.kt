@@ -733,7 +733,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 // The exact binary shell streams live beside the public
                 // compact/trace logs, so a tester can include them in a ZIP.
                 // No rotation, sanitization or automatic pruning of raw bytes.
-                rawShellLogsDir = File(workspaceRoot ?: application.filesDir, "logs"),
+                rawShellLogsDir = File(workspaceRoot ?: getApplication<Application>().filesDir, "logs"),
                 onLog = { msg -> logInternal(msg, declaredLevel = null, protocol = true) },
                 onProgress = { percent, detail ->
                     val currentProgress = operationProgressSnapshot
