@@ -230,11 +230,27 @@ internal class ConsoleDockController(
                 focusCommandWhenExpanded = false
                 return@post
             }
+            // Request IME against the actual editable view rather than the
+            // CoordinatorLayout. Some Android 14 emulator keyboards ignore the
+            // first request during the sheet's expansion animation.
             commandInput.requestFocus()
-            WindowInsetsControllerCompat(activity.window, root).show(
+            WindowInsetsControllerCompat(activity.window, commandInput).show(
                 WindowInsetsCompat.Type.ime(),
             )
             focusCommandWhenExpanded = false
+            // One bounded retry, only while the user still has the terminal
+            // open and the command editor focused. Never reopen after Close.
+            commandInput.postDelayed({
+                if (!activity.isFinishing && !activity.isDestroyed &&
+                    behavior.state == BottomSheetBehavior.STATE_EXPANDED &&
+                    commandInput.isShown && commandInput.hasFocus() &&
+                    ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+                ) {
+                    WindowInsetsControllerCompat(activity.window, commandInput).show(
+                        WindowInsetsCompat.Type.ime(),
+                    )
+                }
+            }, 180L)
         }
     }
 
