@@ -288,6 +288,32 @@ class TerminalAndImportAndroidTest {
                     assertEquals("Draft must not be cleared by Close",
                         "adb shell echo draft", it.findViewById<EditText>(R.id.etCommand).text.toString())
                 }
+
+                // Repeated explicit open/close immediately after rotation used
+                // to race with bottom-sheet layout and delayed IME callbacks.
+                // This is a state regression, not an emulator jank benchmark.
+                repeat(3) { cycle ->
+                    scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+                    waitUi(scenario, "REV34 terminal reopen cycle $cycle") { expanded(it) }
+                    scenario.onActivity {
+                        visible(it.findViewById(R.id.btnConsoleClose))
+                        visible(it.findViewById(R.id.etCommand))
+                        assertEquals("Draft changed on reopening", "adb shell echo draft",
+                            it.findViewById<EditText>(R.id.etCommand).text.toString())
+                        it.findViewById<View>(R.id.btnConsoleClose).performClick()
+                    }
+                    waitUi(scenario, "REV34 terminal close cycle $cycle") {
+                        BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel))
+                            .state == BottomSheetBehavior.STATE_COLLAPSED &&
+                            !it.findViewById<EditText>(R.id.etCommand).hasFocus()
+                    }
+                }
+                Thread.sleep(350)
+                scenario.onActivity {
+                    assertFalse("Late IME callback reopened terminal after repeated Close", expanded(it))
+                    assertEquals("Command draft changed after repeated Close", "adb shell echo draft",
+                        it.findViewById<EditText>(R.id.etCommand).text.toString())
+                }
             } finally {
                 setFontScaleForTest(oldScale)
                 waitUi(scenario) { kotlin.math.abs(it.resources.configuration.fontScale - oldScale) < 0.02f }
