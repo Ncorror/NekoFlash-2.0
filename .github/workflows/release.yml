@@ -17,12 +17,30 @@ jobs:
   release:
     name: Build, verify and publish signed APK
     runs-on: ubuntu-latest
+    # Secrets are available only after this protected environment approves the run.
+    environment: nekoflash-release
 
     steps:
       - name: Checkout tagged source
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
+
+      - name: Reject tags outside the approved main history
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          # A matching version string alone must not authorize an APK release.
+          # This check runs before any release signing secret is requested.
+          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
+          TAG_COMMIT="$(git rev-parse HEAD^{commit})"
+          MAIN_TIP="$(git rev-parse refs/remotes/origin/main^{commit})"
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_TIP"; then
+            echo "::error::Release tag is not based on approved main history"
+            exit 1
+          fi
+          echo "Release tag commit is part of main: $TAG_COMMIT"
+          echo "Main branch head: $MAIN_TIP"
 
       - name: Validate release tag and project version
         id: version
