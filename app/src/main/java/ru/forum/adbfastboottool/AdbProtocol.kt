@@ -25,7 +25,8 @@ class AdbProtocol(
     private val keyDirectory: File,
     private val onLog: (String) -> Unit,
     private val onProgress: (Int, String) -> Unit = { _, _ -> },
-    private val preferredInterfaceIndex: Int? = null
+    private val preferredInterfaceIndex: Int? = null,
+    private val rawShellLogsDir: File = File(keyDirectory.parentFile ?: keyDirectory, "diagnostics/adb-shell")
 ) {
     private val LOCAL_ADB_VERSION = AdbPacketChecksum.VERSION_WITH_CHECKSUM
 
@@ -1278,7 +1279,8 @@ class AdbProtocol(
                 if (!hasSessionSizeOption) append(" -S ").append(totalSize)
                 if (optionText.isNotBlank()) append(' ').append(optionText)
             }
-            val createResult = runShellCommandForResult(createCommand)
+            // install-create is an explicit metadata parser: retain its full text result.
+            val createResult = runShellCommandForResult(createCommand, captureOutput = true)
             if (!createResult.success) {
                 onLog("❌ install-multiple: pm install-create failed")
                 return false
@@ -1677,47 +1679,67 @@ class AdbProtocol(
     private fun runShellCommandForResult(
         command: String,
         logOutput: Boolean = true,
-        forceLegacy: Boolean = false
+        forceLegacy: Boolean = false,
+        captureOutput: Boolean = !logOutput
     ): ShellResult {
         val cleanCommand = command.trim()
         return if (!forceLegacy && supportsShellV2) {
-            runShellV2ForResult(cleanCommand, logOutput)
+            runShellV2ForResult(cleanCommand, logOutput, captureOutput)
         } else {
             if (logOutput) onLog("ℹ️ adb shell legacy: exit code is unavailable on this device/mode")
-            runLegacyShellForResult(cleanCommand, logOutput)
+            runLegacyShellForResult(cleanCommand, logOutput, captureOutput)
         }
     }
 
-    private fun runShellV2ForResult(command: String, logOutput: Boolean): ShellResult {
+    private fun newShellRecord(mode: String, command: String): AdbShellOutputRecord? =
+        try {
+            AdbShellOutputRecord(rawShellLogsDir, mode, command)
+        } catch (error: Exception) {
+            onLog("❌ ADB shell: cannot preserve raw output: ${error.message ?: error.javaClass.simpleName}")
+            null
+        }
+
+    private fun runShellV2ForResult(
+        command: String,
+        logOutput: Boolean,
+        captureOutput: Boolean
+    ): ShellResult {
         val service = "shell,v2,raw:$command"
         if (logOutput) onLog("-> adb shell/v2: $command")
         val stream = openAdbStream(service, logOpen = false) ?: run {
             if (logOutput) onLog("⚠️ shell_v2 could not open; trying legacy shell")
-            return runShellCommandForResult(command, logOutput = logOutput, forceLegacy = true)
+            return runShellCommandForResult(
+                command, logOutput = logOutput, forceLegacy = true, captureOutput = captureOutput
+            )
         }
 
-        val stdout = java.io.ByteArrayOutputStream()
-        val stderr = java.io.ByteArrayOutputStream()
+        val record = newShellRecord("shell_v2", command) ?: run {
+            closeAdbStream(stream)
+            return ShellResult("", "", null, false)
+        }
+        if (logOutput) onLog("ℹ️ Raw ADB shell stdout/stderr: ${record.stdoutFile.absolutePath} / ${record.stderrFile.absolutePath}")
         var exitCode: Int? = null
+        fun result(success: Boolean): ShellResult {
+            val (stdout, stderr) = record.finish(exitCode, success, captureOutput)
+            return ShellResult(stdout, stderr, exitCode, success)
+        }
         try {
-            // Непосредственно как в shell protocol: закрываем stdin для one-shot команд.
+            // Close stdin for one-shot shell/v2 commands.
             if (!writeShellPacket(stream, SHELL_ID_CLOSE_STDIN, EMPTY_PAYLOAD)) {
-                return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
+                return result(false)
             }
 
             while (!cancelled && !stream.closed) {
                 val header = readShellPacketHeader(stream) ?: break
                 when (header.id) {
                     SHELL_ID_STDOUT -> {
-                        val data = readAdbStreamExact(stream, header.length)
-                            ?: return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
-                        stdout.write(data)
+                        val data = readAdbStreamExact(stream, header.length) ?: return result(false)
+                        record.writeStdout(data)
                         if (logOutput) logShellOutput(data, isStderr = false)
                     }
                     SHELL_ID_STDERR -> {
-                        val data = readAdbStreamExact(stream, header.length)
-                            ?: return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
-                        stderr.write(data)
+                        val data = readAdbStreamExact(stream, header.length) ?: return result(false)
+                        record.writeStderr(data)
                         if (logOutput) logShellOutput(data, isStderr = true)
                     }
                     SHELL_ID_EXIT -> {
@@ -1727,42 +1749,61 @@ class AdbProtocol(
                     }
                     SHELL_ID_STDIN, SHELL_ID_CLOSE_STDIN -> {
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
-                            return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
+                            return result(false)
                         }
                     }
                     else -> {
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
-                            return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
+                            return result(false)
                         }
                         if (logOutput) onLog("⚠️ shell_v2: unknown packet id=${header.id}, length=${header.length}")
                     }
                 }
             }
-        } catch (e: Exception) {
-            if (logOutput) onLog("❌ adb shell/v2 error: ${e.message ?: e.javaClass.simpleName}")
-            return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, false)
+            if (exitCode == null && logOutput) onLog("⚠️ shell_v2 finished without an exit packet")
+            return result(exitCode == 0 && !cancelled)
+        } catch (error: Exception) {
+            onLog("❌ ADB shell/v2 failure or evidence storage error: ${error.message ?: error.javaClass.simpleName}")
+            return try {
+                result(false)
+            } catch (persistError: Exception) {
+                onLog("❌ ADB shell/v2 raw evidence incomplete: ${persistError.message ?: persistError.javaClass.simpleName}")
+                ShellResult("", "", exitCode, false)
+            }
         } finally {
+            runCatching { record.close() }.onFailure {
+                onLog("❌ ADB shell/v2 raw evidence close failed: ${it.message ?: it.javaClass.simpleName}")
+            }
             closeAdbStream(stream)
         }
-
-        if (exitCode == null && logOutput) onLog("⚠️ shell_v2 finished without an exit packet")
-        return ShellResult(stdout.toString("UTF-8"), stderr.toString("UTF-8"), exitCode, exitCode == 0)
     }
 
-    private fun runLegacyShellForResult(command: String, logOutput: Boolean): ShellResult {
+    private fun runLegacyShellForResult(
+        command: String,
+        logOutput: Boolean,
+        captureOutput: Boolean
+    ): ShellResult {
         if (logOutput) onLog("-> adb shell: $command")
         val stream = openAdbStream("shell:$command", logOpen = false)
             ?: return ShellResult("", "", null, false)
-        val stdout = java.io.ByteArrayOutputStream()
+        val record = newShellRecord("shell_legacy", command) ?: run {
+            closeAdbStream(stream)
+            return ShellResult("", "", null, false)
+        }
+        if (logOutput) onLog("ℹ️ Raw ADB shell stdout: ${record.stdoutFile.absolutePath}")
+        fun result(success: Boolean): ShellResult {
+            val (stdout, stderr) = record.finish(null, success, captureOutput)
+            return ShellResult(stdout, stderr, null, success)
+        }
         try {
             while (!cancelled && !stream.closed) {
                 val header = readHeader(timeoutMs = 30_000) ?: break
                 when (header.command) {
                     A_WRTE -> {
                         stream.remoteId = header.arg0
-                        val data = readData(header.dataLength) ?: return ShellResult(stdout.toString("UTF-8"), "", null, false)
+                        val data = readData(header.dataLength) ?: return result(false)
                         sendMessageInternal(A_OKAY, stream.localId, stream.remoteId, EMPTY_PAYLOAD)
-                        stdout.write(data)
+                        record.writeStdout(data)
                         if (logOutput) logShellOutput(data, isStderr = false)
                     }
                     A_OKAY -> {
@@ -1772,7 +1813,7 @@ class AdbProtocol(
                     A_CLSE -> {
                         if (header.dataLength > 0) readData(header.dataLength)
                         stream.closed = true
-                        return ShellResult(stdout.toString("UTF-8"), "", null, true)
+                        return result(true)
                     }
                     else -> {
                         if (header.dataLength > 0) readData(header.dataLength)
@@ -1780,13 +1821,21 @@ class AdbProtocol(
                     }
                 }
             }
-        } catch (e: Exception) {
-            if (logOutput) onLog("❌ adb shell legacy error: ${e.message ?: e.javaClass.simpleName}")
-            return ShellResult(stdout.toString("UTF-8"), "", null, false)
+            return result(!cancelled)
+        } catch (error: Exception) {
+            onLog("❌ ADB legacy shell failure or evidence storage error: ${error.message ?: error.javaClass.simpleName}")
+            return try {
+                result(false)
+            } catch (persistError: Exception) {
+                onLog("❌ ADB legacy shell raw evidence incomplete: ${persistError.message ?: persistError.javaClass.simpleName}")
+                ShellResult("", "", null, false)
+            }
         } finally {
+            runCatching { record.close() }.onFailure {
+                onLog("❌ ADB legacy shell raw evidence close failed: ${it.message ?: it.javaClass.simpleName}")
+            }
             closeAdbStream(stream)
         }
-        return ShellResult(stdout.toString("UTF-8"), "", null, !cancelled)
     }
 
     private class InteractiveShellSession {
