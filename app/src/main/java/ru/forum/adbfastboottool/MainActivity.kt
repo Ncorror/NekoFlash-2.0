@@ -2115,6 +2115,30 @@ class MainActivity : AppCompatActivity() {
      * в одну панель вместо разбросанных кнопок. Вызывает существующую логику —
      * скрытые кнопки btnReboot* остаются обработчиками той же команды.
      */
+    /**
+     * A one-time operator review for destructive GUI actions. This never
+     * intercepts expert terminal commands, changes protocol semantics,
+     * truncates output, or sanitizes the diagnostic journal.
+     */
+    private fun reviewProfessionalOperation(
+        action: ProfessionalOperationReviewPolicy.Action,
+        targets: String,
+        onConfirmed: () -> Unit,
+    ) {
+        val label = when (action) {
+            ProfessionalOperationReviewPolicy.Action.ERASE -> getString(R.string.pro_review_erase)
+            ProfessionalOperationReviewPolicy.Action.FORMAT -> getString(R.string.pro_review_format)
+            ProfessionalOperationReviewPolicy.Action.QUICK_FLASH -> getString(R.string.pro_review_flash)
+            ProfessionalOperationReviewPolicy.Action.MASS_FLASH -> getString(R.string.pro_review_queue)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.pro_review_title, label))
+            .setMessage(getString(R.string.pro_review_message, targets))
+            .setNegativeButton(R.string.cancel_upper, null)
+            .setPositiveButton(R.string.pro_review_execute) { _, _ -> onConfirmed() }
+            .show()
+    }
+
     private fun showRebootMenu() {
         if (viewModel.fastbootProtocol?.isConnected != true) {
             viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: No Fastboot connection for reboot")
@@ -3045,8 +3069,30 @@ class MainActivity : AppCompatActivity() {
                 4 -> "all"
                 else -> null
             }
-            autoShowGuiOperation = true
-            viewModel.runFlash(partition, selection.source(), chosenSlot, expectedSizeBytes = selection.expectedSizeBytes)
+            val startQuickFlash = {
+                // Re-check the source after the modal review; the executor
+                // retains its own independent source/size validation.
+                if (viewModel.currentQuickFlashSelection() != selection) {
+                    Toast.makeText(this, R.string.pro_review_source_changed, Toast.LENGTH_SHORT).show()
+                } else {
+                    autoShowGuiOperation = true
+                    viewModel.runFlash(partition, selection.source(), chosenSlot, expectedSizeBytes = selection.expectedSizeBytes)
+                }
+            }
+            if (ProfessionalOperationReviewPolicy.requiresReview(
+                    ProfessionalOperationReviewPolicy.Action.QUICK_FLASH, listOf(partition), chosenSlot
+                )
+            ) {
+                val displayedSlot = if (quickFlashPartitionAlreadySuffixed(partition)) null
+                    else chosenSlot ?: getString(R.string.pro_review_slot_default)
+                val summary = ProfessionalOperationReviewPolicy.displayTarget(partition, displayedSlot) +
+                    "\n" + selection.displayName + " (" + selection.expectedSizeBytes + " bytes)"
+                reviewProfessionalOperation(
+                    ProfessionalOperationReviewPolicy.Action.QUICK_FLASH, summary, startQuickFlash
+                )
+            } else {
+                startQuickFlash()
+            }
         }
         findViewById<View>(R.id.btnQuickReboot).setOnClickListener { showRebootMenu() }
 
@@ -3062,9 +3108,36 @@ class MainActivity : AppCompatActivity() {
             chooseImageSource({ startMassImageDocumentPicker(partition) }) { file -> viewModel.addFlashQueueFile(partition, file) }
         }
         queueExecute.setOnClickListener {
-            if (viewModel.currentFlashOperationDraft().items.isNotEmpty()) {
-                autoShowGuiOperation = true
-                viewModel.executeFlashQueueDraft()
+            val draft = viewModel.currentFlashOperationDraft()
+            if (draft.items.isNotEmpty()) {
+                val runQueue = {
+                    val current = viewModel.currentFlashOperationDraft()
+                    if (current != draft) {
+                        Toast.makeText(this, R.string.pro_review_source_changed, Toast.LENGTH_SHORT).show()
+                    } else {
+                        autoShowGuiOperation = true
+                        viewModel.executeFlashQueueDraft()
+                    }
+                }
+                val partitions = draft.items.map { it.partition }
+                if (ProfessionalOperationReviewPolicy.requiresReview(
+                        ProfessionalOperationReviewPolicy.Action.MASS_FLASH, partitions
+                    )
+                ) {
+                    val shown = draft.items.take(12).joinToString("\n") {
+                        it.partition + " ← " + it.displayName
+                    }
+                    val more = if (draft.items.size > 12) {
+                        "\n" + getString(R.string.pro_review_additional_targets, draft.items.size - 12)
+                    } else ""
+                    reviewProfessionalOperation(
+                        ProfessionalOperationReviewPolicy.Action.MASS_FLASH,
+                        getString(R.string.pro_review_queue_count, draft.items.size) + "\n" + shown + more,
+                        runQueue,
+                    )
+                } else {
+                    runQueue()
+                }
             }
         }
 
@@ -3099,15 +3172,25 @@ class MainActivity : AppCompatActivity() {
             viewModel.refreshFastbootDiagnostics()
         }
         findViewById<View>(R.id.btnToolErase).setOnClickListener {
-            toolPartition(R.id.edToolPartition)?.let {
-                autoShowGuiOperation = true
-                viewModel.runFastbootPartitionCommand("erase", it)
+            toolPartition(R.id.edToolPartition)?.let { partition ->
+                reviewProfessionalOperation(
+                    ProfessionalOperationReviewPolicy.Action.ERASE,
+                    partition,
+                ) {
+                    autoShowGuiOperation = true
+                    viewModel.runFastbootPartitionCommand("erase", partition)
+                }
             }
         }
         findViewById<View>(R.id.btnToolFormat).setOnClickListener {
-            toolPartition(R.id.edToolPartition)?.let {
-                autoShowGuiOperation = true
-                viewModel.runFastbootTerminalPlan(listOf(FastbootExecutionStep.Format(it)))
+            toolPartition(R.id.edToolPartition)?.let { partition ->
+                reviewProfessionalOperation(
+                    ProfessionalOperationReviewPolicy.Action.FORMAT,
+                    partition,
+                ) {
+                    autoShowGuiOperation = true
+                    viewModel.runFastbootTerminalPlan(listOf(FastbootExecutionStep.Format(partition)))
+                }
             }
         }
         findViewById<View>(R.id.btnToolBoot).setOnClickListener {
