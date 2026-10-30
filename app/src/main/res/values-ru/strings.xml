@@ -5,7 +5,7 @@
     <string name="pro_review_message">Проверь точный раздел и источник перед запуском:\n\n%1$s\n\nОперация может необратимо изменить разделы устройства. NekoFlash не удаляет и не скрывает данные диагностических журналов.</string>
     <string name="pro_review_erase">erase</string>
     <string name="pro_review_format">format</string>
-    <string name="pro_review_flash">прошивка критичного раздела</string>
+    <string name="pro_review_flash">прошивка чувствительного раздела</string>
     <string name="pro_review_queue">очередь прошивки</string>
     <string name="pro_review_execute">ВЫПОЛНИТЬ</string>
     <string name="pro_review_slot_default">по умолчанию / активный</string>
