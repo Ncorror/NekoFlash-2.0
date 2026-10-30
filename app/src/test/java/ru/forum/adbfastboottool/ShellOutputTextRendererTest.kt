@@ -54,7 +54,7 @@ class ShellOutputTextRendererTest {
         }
         renderer.finish()
         assertTrue("Expected multiple bounded display fragments", events.size >= 3)
-        assertTrue(events.all { it.removePrefix("│ ").length <= 8192 })
+        assertTrue(events.all { it.removePrefix("│ ").length <= 8193 }) // surrogate pair may add one UTF-16 code unit
         assertEquals(text, events.joinToString("") { it.removePrefix("│ ") })
     }
 
