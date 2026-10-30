@@ -18,7 +18,13 @@ main = (base/'MainActivity.kt').read_text()
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-assert git_blob == '7acf241d15e112d7fdc49c917c69661b437321df', 'Unreviewed AdbProtocol change'
+# Two byte-exact, audited variants only. REV31 adds disk-backed shell/v2
+# and legacy output recording; the original SAF/sideload transport invariants
+# remain covered by the rest of this and the older source guards.
+assert git_blob in {
+    '7acf241d15e112d7fdc49c917c69661b437321df',  # REV12 baseline
+    '9b80d7a5aa0aa7b0e5e2dd8b1e54958f88f607c7',  # REV31 exact reviewed blob
+}, 'Unreviewed AdbProtocol change'
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb
