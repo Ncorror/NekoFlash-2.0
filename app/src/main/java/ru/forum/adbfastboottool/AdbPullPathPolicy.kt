@@ -1,25 +1,72 @@
 package ru.forum.adbfastboottool
 
 import java.io.File
+import java.io.Reader
+import java.io.StringReader
 import java.nio.file.Files
 
 internal object AdbPullPathPolicy {
     /** NUL-delimited find records preserve newlines, spaces and backslashes. */
-    fun parseListing(output: String): Pair<List<String>, List<String>> {
-        val records = output.split('\u0000')
-        require(records.firstOrNull() == "AFT_DIRS_BEGIN" && records.lastOrNull() == "") {
-            "Incomplete directory listing"
+    fun parseListing(output: String): Pair<List<String>, List<String>> =
+        parseListing(StringReader(output))
+
+    /**
+     * Parse a potentially large remote directory listing without materializing
+     * the entire stdout as a String. Only individual paths and the resulting
+     * entry index remain in memory; the exact binary stdout is already on disk.
+     */
+    fun parseListing(reader: Reader): Pair<List<String>, List<String>> {
+        val dirs = LinkedHashSet<String>()
+        val files = LinkedHashSet<String>()
+        val entry = StringBuilder()
+        val buffer = CharArray(8192)
+        // 0: expecting first marker, 1: directories, 2: files, 3: complete.
+        var section = 0
+        var terminated = false
+
+        fun add(record: String) {
+            when (section) {
+                0 -> {
+                    require(record == "AFT_DIRS_BEGIN") { "Incomplete directory listing" }
+                    section = 1
+                }
+                1 -> {
+                    if (record == "AFT_FILES_BEGIN") {
+                        section = 2
+                    } else {
+                        normalize(record)
+                        dirs.add(record)
+                    }
+                }
+                2 -> {
+                    if (record == "AFT_DONE") {
+                        section = 3
+                    } else {
+                        require(normalize(record).isNotEmpty()) { "Invalid file entry" }
+                        files.add(record)
+                    }
+                }
+                else -> throw IllegalArgumentException("Unexpected data after listing terminator")
+            }
         }
-        val filesAt = records.indexOf("AFT_FILES_BEGIN")
-        val doneAt = records.indexOf("AFT_DONE")
-        require(filesAt > 0 && doneAt > filesAt && doneAt == records.lastIndex - 1) {
-            "Invalid directory listing sections"
+
+        while (true) {
+            val size = reader.read(buffer)
+            if (size < 0) break
+            for (index in 0 until size) {
+                val character = buffer[index]
+                if (character == '\u0000') {
+                    add(entry.toString())
+                    entry.setLength(0)
+                    terminated = true
+                } else {
+                    entry.append(character)
+                    terminated = false
+                }
+            }
         }
-        val dirs = records.subList(1, filesAt)
-        val files = records.subList(filesAt + 1, doneAt)
-        (dirs + files).forEach { normalize(it) }
-        require(files.none { normalize(it).isEmpty() }) { "Invalid file entry" }
-        return dirs.distinct() to files.distinct()
+        require(terminated && section == 3) { "Incomplete directory listing" }
+        return dirs.toList() to files.toList()
     }
 
     fun normalize(path: String): String {
