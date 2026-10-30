@@ -41,6 +41,11 @@ internal class MassFlashQueueUi(
     private var shownItems: List<FlashQueueDraftItem>? = null
 
     init {
+        // ConcatAdapter always has one header item, even while the asynchronous
+        // ListAdapter has no rows. Without gating on the ROW adapter, the
+        // RecyclerView can consume a saved deep scroll position against only
+        // the header during Activity recreation, then jump to the top.
+        rows.stateRestorationPolicy = RecyclerView.Adapter.StateRestorationPolicy.PREVENT_WHEN_EMPTY
         // This form can be recycled offscreen. Save it explicitly, even when detached.
         header.isSaveFromParentEnabled = false
         list.apply {
