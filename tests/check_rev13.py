@@ -22,7 +22,21 @@ def git_blob(path):
     data = path.read_bytes()
     return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 
-assert git_blob(fastboot_file) == '2b824e0ae6df1ef6dea7f608d5c048dec17a70bf'
+# Preserve REV13's byte-exact Fastboot transfer safety: REV29 permits ONE
+# exact, narrowly scoped terminal empty-read-wait change only. Restore the
+# original terminal block in memory and compare the full blob to REV13 SHA.
+# Any other FastbootProtocol change (especially DATA/USB paths) still fails.
+if git_blob(fastboot_file) != '2b824e0ae6df1ef6dea7f608d5c048dec17a70bf':
+    rev29_block = "        // Driver read failures can return immediately. Use monotonic time\n        // for the 120-second deadline and a short cancellable backoff on empty\n        // responses; do not resend commands or alter raw response logging.\n        val startedNs = System.nanoTime()\n        var infoLines = 0\n        var lastWaitLogSec = 0L\n\n        while (!cancelled) {\n            val elapsedMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, System.nanoTime())\n            if (elapsedMs >= FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS) {\n                val message = \"Terminal Fastboot command timed out: $clean\"\n                onLog(\"❌ $message\")\n                markSessionBroken(message)\n                return@withLock false\n            }\n\n            val readStartedNs = System.nanoTime()\n            val packet = readPacket(2000)\n            if (packet == null) {\n                val readFinishedNs = System.nanoTime()\n                val afterReadMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, readFinishedNs)\n                val elapsedSec = afterReadMs / 1000\n                if (elapsedSec / 10 != lastWaitLogSec / 10) {\n                    onLog(\"⏳ Fastboot is waiting for a response... ${elapsedSec} sec\")\n                    lastWaitLogSec = elapsedSec\n                }\n                val remainingMs =\n                    (FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS - afterReadMs).coerceAtLeast(0L)\n                val backoffMs = FastbootTerminalWaitPolicy.retryDelayMs(\n                    readFinishedNs - readStartedNs, remainingMs\n                )\n                if (backoffMs > 0L && !cancelled) {\n                    try {\n                        Thread.sleep(backoffMs)\n                    } catch (_: InterruptedException) {\n                        Thread.currentThread().interrupt()\n                        onLog(\"⚠️ Fastboot terminal wait interrupted\")\n                        return@withLock false\n                    }\n                }\n                continue\n            }\n\n"
+    rev13_block = "        val startedMs = System.currentTimeMillis()\n        var infoLines = 0\n        var lastWaitLogSec = 0L\n\n        while (!cancelled) {\n            val elapsedMs = System.currentTimeMillis() - startedMs\n            if (elapsedMs >= 120_000L) {\n                val message = \"Terminal Fastboot command timed out: $clean\"\n                onLog(\"❌ $message\")\n                markSessionBroken(message)\n                return@withLock false\n            }\n\n            val packet = readPacket(2000)\n            if (packet == null) {\n                val elapsedSec = elapsedMs / 1000\n                if (elapsedSec / 10 != lastWaitLogSec / 10) {\n                    onLog(\"⏳ Fastboot is waiting for a response... ${elapsedSec} sec\")\n                    lastWaitLogSec = elapsedSec\n                }\n                continue\n            }\n\n"
+    assert fastboot.count(rev29_block) == 1, "Unexpected Fastboot terminal patch"
+    protected_source = fastboot.replace(rev29_block, rev13_block, 1).encode("utf-8")
+    protected_hash = hashlib.sha1(
+        b"blob " + str(len(protected_source)).encode() + b"\0" + protected_source
+    ).hexdigest()
+    assert protected_hash == '2b824e0ae6df1ef6dea7f608d5c048dec17a70bf', (
+        "FastbootProtocol changed outside the audited REV29 terminal wait block"
+    )
 assert git_blob(native_file) == 'fa4d1fc97e39c7ef598037281bae39fba0c48d97'
 assert git_blob(backend_file) == '9cb1de4aebdf9a680f2a468c739d2324e4f59dfd'
 

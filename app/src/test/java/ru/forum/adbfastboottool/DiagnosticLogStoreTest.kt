@@ -28,6 +28,47 @@ class DiagnosticLogStoreTest {
         }
     }
 
+
+    @Test fun longProtocolTraceAndCompactEventsAreByteExactAcrossRotation() {
+        val folder = Files.createTempDirectory("nekoflash-lossless-trace").toFile()
+        try {
+            val store = DiagnosticLogStore(
+                logsDir = folder,
+                stamp = "rev29-trace",
+                compactSegmentBytes = 64L * 1024L,
+                traceSegmentBytes = 64L * 1024L
+            )
+            val trace = buildString {
+                repeat(140) { index ->
+                    append("[fastboot-timing] phase=in-empty seq=").append(index)
+                        .append(" serial=REAL-SERIAL-").append(index)
+                        .append(" return=-1 elapsed_us=0 ")
+                        .append("wire=").append("A".repeat(600)).append('\n')
+                }
+            }
+            val events = buildString {
+                repeat(140) { index ->
+                    append("event-").append(index).append(" partition=system_a ")
+                        .append("B".repeat(600)).append('\n')
+                }
+            }
+            // Append in small independent blocks to model long-running sessions;
+            // the source bytes, including serials and errors, are never redacted.
+            trace.chunked(900).forEach(store::appendTrace)
+            events.chunked(900).forEach(store::appendCompact)
+            assertTrue(store.traceFiles().size >= 2)
+            assertTrue(store.compactFiles().size >= 2)
+            assertEquals(trace, store.traceFiles().joinToString("") { it.readText(Charsets.UTF_8) })
+            assertEquals(events, store.compactFiles().joinToString("") { it.readText(Charsets.UTF_8) })
+            @Suppress("DEPRECATION")
+            DiagnosticLogStore.pruneDirectory(folder, maxFiles = 1, maxTotalBytes = 1)
+            assertEquals(trace, store.traceFiles().joinToString("") { it.readText(Charsets.UTF_8) })
+            assertEquals(events, store.compactFiles().joinToString("") { it.readText(Charsets.UTF_8) })
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
     @Test fun startupNeverDeletesPriorSessions() {
         val folder = Files.createTempDirectory("nekoflash-history").toFile()
         try {
