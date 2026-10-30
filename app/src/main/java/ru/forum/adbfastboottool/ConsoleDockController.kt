@@ -21,6 +21,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 internal class ConsoleDockController(
     private val activity: AppCompatActivity,
     private val consoleOutput: RecyclerView,
+    private val onExpanded: () -> Unit = {},
 ) {
     private val root: View by lazy { activity.findViewById(R.id.rootCoordinator) }
     private val panel: View by lazy { activity.findViewById(R.id.consolePanel) }
@@ -188,6 +189,9 @@ internal class ConsoleDockController(
         if (!isExpanded) peek.text = compactPeekText()
 
         if (state == BottomSheetBehavior.STATE_EXPANDED) {
+            // Catch the RecyclerView up only when the user opens the terminal.
+            // Offscreen bursts must not keep reformatting and notifying rows.
+            onExpanded()
             scrollOutputToBottom()
             focusPendingCommandInput()
         }

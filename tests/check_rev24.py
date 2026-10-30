@@ -2,6 +2,7 @@
 """Metadata/permission separation and shared-source wiring; runtime checks cover real FDs."""
 from pathlib import Path
 import subprocess
+import re
 
 root = Path(__file__).resolve().parents[1]
 subprocess.run(['python3', str(root / 'tests/check_rev23.py')], cwd=root, check=True)
@@ -32,5 +33,8 @@ for name in ('FirmwareSelectionTest', 'FirmwareSelectionLifecycleTest'):
     assert (root / f'app/src/test/java/ru/forum/adbfastboottool/{name}.kt').is_file()
 for name in ('build.yml', 'release.yml'):
     assert 'tests/check_rev26.py' in (root / '.github/workflows' / name).read_text()
-assert 'OK (18 tests)' in (root / '.github/workflows/build.yml').read_text()
+# Later revisions may add tests; never regress below REV24's 18-test floor.
+workflow = (root / '.github/workflows/build.yml').read_text()
+required = re.search(r"OK \((\d+) tests\)", workflow)
+assert required is not None and int(required.group(1)) >= 18
 print('PASS REV24: durable checked Quick source, mixed File/SAF queue, stale-result guards, no automatic replay')
