@@ -28,7 +28,7 @@ if git_blob_sha(raw_vm) != expected_blob:
         b'                // The exact binary shell streams live beside the public\n'
         b'                // compact/trace logs, so a tester can include them in a ZIP.\n'
         b'                // No rotation, sanitization or automatic pruning of raw bytes.\n'
-        b'                rawShellLogsDir = File(workspaceRoot ?: application.filesDir, "logs"),\n'
+        b'                rawShellLogsDir = File(workspaceRoot ?: getApplication<Application>().filesDir, "logs"),\n'
     )
     original = b'                keyDirectory = adbKeyDir,\n'
     assert raw_vm.count(reviewed_change) == 1, 'Unreviewed ADB evidence path change'
