@@ -117,7 +117,13 @@ class InterfacePolishAndroidTest {
                 activity.findViewById<EditText>(R.id.edMassManualPartition).setText("vendor_boot_b")
             }
             AndroidUiCapture.save(scenario, "mass-1000-header.png")
-            scenario.onActivity { (list(it).layoutManager as LinearLayoutManager).scrollToPositionWithOffset(250, 0) }
+            // The first RecyclerView layout may still be consuming a queued
+            // layout pass on API 26. Request scroll after that frame, then
+            // require the *actual* adapter row 251 before changing its order.
+            scenario.onActivity {
+                val queue = list(it)
+                queue.post { (queue.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(250, 0) }
+            }
             waitUi(scenario) { list(it).findViewHolderForAdapterPosition(251) != null }
             scenario.onActivity { activity ->
                 assertNull(activity.findViewById<View>(R.id.spinMassPartition))
@@ -172,6 +178,17 @@ class InterfacePolishAndroidTest {
                 if (tab == R.id.tabFastboot) it.findViewById<View>(R.id.btnFastbootSectionQuick).performClick()
             }
             AndroidUiCapture.save(scenario, "$prefix-$name.png")
+            // An animation-free emulator can still deliver a final system-bar
+            // resize after the captured frame. Keep the exact full visibility
+            // requirement, but wait for stable window insets before asserting.
+            waitUi(scenario) { activity ->
+                tabs.all { (button, _, _) ->
+                    val label = activity.findViewById<TextView>(button)
+                    val rect = Rect()
+                    label.isShown && label.getGlobalVisibleRect(rect) &&
+                        rect.width() == label.width && rect.height() == label.height
+                }
+            }
             scenario.onActivity {
                 assertEquals(View.VISIBLE, it.findViewById<View>(page).visibility)
                 assertEquals("Главная", it.findViewById<TextView>(R.id.tabHome).text.toString())
