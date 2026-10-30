@@ -12,6 +12,7 @@ import android.os.Build
 import android.os.LocaleList
 import android.provider.Settings
 import android.view.KeyEvent
+import android.view.inputmethod.EditorInfo
 import android.view.View
 import android.widget.EditText
 import android.widget.TextView
@@ -71,12 +72,19 @@ class TerminalAndImportAndroidTest {
         if (Build.VERSION.SDK_INT >= 33) context.getSystemService(LocaleManager::class.java).applicationLocales = LocaleList.forLanguageTags(tag)
         else AppCompatDelegate.setApplicationLocales(LocaleListCompat.forLanguageTags(tag))
     }
-    private fun waitUntil(condition: () -> Boolean) {
-        val deadline = System.nanoTime() + 10_000_000_000L
-        while (!condition()) { check(System.nanoTime() < deadline) { "REV26 state did not settle" }; Thread.sleep(20) }
+    private fun waitUntil(stage: String = "REV30 asynchronous state", condition: () -> Boolean) {
+        val deadline = System.nanoTime() + 15_000_000_000L
+        while (!condition()) {
+            check(System.nanoTime() < deadline) { "$stage did not settle within 15s" }
+            Thread.sleep(20)
+        }
         instrumentation.waitForIdleSync()
     }
-    private fun waitUi(scenario: ActivityScenario<MainActivity>, condition: (MainActivity) -> Boolean) = waitUntil {
+    private fun waitUi(
+        scenario: ActivityScenario<MainActivity>,
+        stage: String = "REV30 UI",
+        condition: (MainActivity) -> Boolean
+    ) = waitUntil(stage) {
         var ready = false; scenario.onActivity { ready = condition(it) }; ready
     }
     private fun expanded(activity: MainActivity) = BottomSheetBehavior.from(activity.findViewById<View>(R.id.consolePanel)).state == BottomSheetBehavior.STATE_EXPANDED
@@ -141,7 +149,7 @@ class TerminalAndImportAndroidTest {
     @Test fun shellOperationCannotCollapseTerminalOrOpenProgressDialog() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
-            waitUi(scenario, ::expanded)
+            waitUi(scenario, "terminal expanded") { expanded(it) }
             // Keep activation observable: immediate no-device failure can coalesce true/false.
             @Suppress("UNCHECKED_CAST")
             val active = DeviceViewModel::class.java.getDeclaredField("_operationActive").apply { isAccessible = true }.get(vm()) as MutableLiveData<Boolean>
@@ -157,7 +165,7 @@ class TerminalAndImportAndroidTest {
             waitUi(scenario) { BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel)).state == BottomSheetBehavior.STATE_COLLAPSED }
             assertTrue("Closing the terminal cancelled the operation", active.value == true)
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
-            waitUi(scenario, ::expanded)
+            waitUi(scenario, "terminal expanded") { expanded(it) }
             scenario.onActivity {
                 it.findViewById<View>(R.id.btnTerminalStop).performClick()
                 assertEquals(true, field(it, "operationCancelRequested"))
@@ -219,24 +227,67 @@ class TerminalAndImportAndroidTest {
                 setFontScaleForTest(1.3f)
                 waitUi(scenario) { it.resources.configuration.fontScale >= 1.29f }
                 scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
-                waitUi(scenario) { expanded(it) && ViewCompat.getRootWindowInsets(it.findViewById(R.id.rootCoordinator))?.isVisible(WindowInsetsCompat.Type.ime()) == true }
+                waitUi(scenario, "terminal expanded with visible IME") {
+                    expanded(it) && ViewCompat.getRootWindowInsets(it.findViewById(R.id.rootCoordinator))
+                        ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                }
                 scenario.onActivity {
                     visible(it.findViewById(R.id.btnConsoleClose)); visible(it.findViewById(R.id.etCommand)); visible(it.findViewById(R.id.btnSend))
-                    it.findViewById<EditText>(R.id.etCommand).setText("adb shell echo draft")
+                    val editor = it.findViewById<PtyInputEditText>(R.id.etCommand)
+                    val info = EditorInfo()
+                    assertNotNull("Command input connection missing", editor.onCreateInputConnection(info))
+                    assertTrue("IME must not open a separate fullscreen editor",
+                        info.imeOptions and EditorInfo.IME_FLAG_NO_EXTRACT_UI != 0)
+                    assertTrue("IME must remain inline on rotation",
+                        info.imeOptions and EditorInfo.IME_FLAG_NO_FULLSCREEN != 0)
+                    editor.setText("adb shell echo draft")
                 }
                 AndroidUiCapture.save(scenario, "terminal-keyboard.png")
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                 waitUi(scenario) { ViewCompat.getRootWindowInsets(it.findViewById(R.id.rootCoordinator))?.isVisible(WindowInsetsCompat.Type.ime()) != true }
-                scenario.recreate(); waitUi(scenario, ::expanded)
+                scenario.recreate(); waitUi(scenario, "terminal expanded") { expanded(it) }
                 scenario.onActivity {
                     assertEquals("adb shell echo draft", it.findViewById<EditText>(R.id.etCommand).text.toString())
                     it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
                 }
-                waitUi(scenario) { expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE }
-                scenario.onActivity { visible(it.findViewById(R.id.btnConsoleClose)); visible(it.findViewById(R.id.etCommand)) }
+                waitUi(scenario, "expanded landscape terminal") {
+                    expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+                }
+                scenario.onActivity {
+                    visible(it.findViewById(R.id.btnConsoleClose))
+                    val editor = it.findViewById<PtyInputEditText>(R.id.etCommand)
+                    visible(editor)
+                    assertEquals("Draft must survive rotation", "adb shell echo draft", editor.text.toString())
+                    val info = EditorInfo()
+                    assertNotNull(editor.onCreateInputConnection(info))
+                    assertTrue(info.imeOptions and EditorInfo.IME_FLAG_NO_EXTRACT_UI != 0)
+                    assertTrue(info.imeOptions and EditorInfo.IME_FLAG_NO_FULLSCREEN != 0)
+                }
                 AndroidUiCapture.save(scenario, "terminal-landscape.png")
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
-                waitUi(scenario) { it.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT }
+                waitUi(scenario, "portrait restored") {
+                    it.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+                }
+                // Regression: a focused command editor must not reopen the
+                // collapsed sheet from a delayed focus/insets notification.
+                scenario.onActivity {
+                    val editor = it.findViewById<EditText>(R.id.etCommand)
+                    assertEquals("adb shell echo draft", editor.text.toString())
+                    editor.requestFocus()
+                    it.findViewById<View>(R.id.btnConsoleClose).performClick()
+                }
+                waitUi(scenario, "explicit terminal close") {
+                    BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel))
+                        .state == BottomSheetBehavior.STATE_COLLAPSED
+                }
+                Thread.sleep(350)
+                scenario.onActivity {
+                    assertFalse("Terminal reopened after IME focus callback", expanded(it))
+                    assertFalse("Close must relinquish editor focus",
+                        it.findViewById<EditText>(R.id.etCommand).hasFocus())
+                    assertEquals("Draft must not be cleared by Close",
+                        "adb shell echo draft", it.findViewById<EditText>(R.id.etCommand).text.toString())
+                }
             } finally {
                 setFontScaleForTest(oldScale)
                 waitUi(scenario) { kotlin.math.abs(it.resources.configuration.fontScale - oldScale) < 0.02f }

@@ -111,13 +111,22 @@ class InterfacePolishAndroidTest {
             openMass(scenario)
             scenario.onActivity { activity ->
                 assertEquals(1001, list(activity).adapter!!.itemCount)
+                assertEquals("Populated ConcatAdapter must allow saved scroll restoration",
+                    RecyclerView.Adapter.StateRestorationPolicy.ALLOW,
+                    list(activity).adapter!!.stateRestorationPolicy)
                 assertTrue("Queue inflated too many views", list(activity).childCount < 30)
                 val spinner = activity.findViewById<Spinner>(R.id.spinMassPartition)
                 spinner.setSelection(spinner.count - 1)
                 activity.findViewById<EditText>(R.id.edMassManualPartition).setText("vendor_boot_b")
             }
             AndroidUiCapture.save(scenario, "mass-1000-header.png")
-            scenario.onActivity { (list(it).layoutManager as LinearLayoutManager).scrollToPositionWithOffset(250, 0) }
+            // The first RecyclerView layout may still be consuming a queued
+            // layout pass on API 26. Request scroll after that frame, then
+            // require the *actual* adapter row 251 before changing its order.
+            scenario.onActivity {
+                val queue = list(it)
+                queue.post { (queue.layoutManager as LinearLayoutManager).scrollToPositionWithOffset(250, 0) }
+            }
             waitUi(scenario) { list(it).findViewHolderForAdapterPosition(251) != null }
             scenario.onActivity { activity ->
                 assertNull(activity.findViewById<View>(R.id.spinMassPartition))
@@ -139,14 +148,35 @@ class InterfacePolishAndroidTest {
                     ?.findViewById<TextView>(R.id.tvQueuePartition)?.text?.contains("p0250") == true
             }
             var firstVisible = -1
+            var anchorText = ""
             scenario.onActivity {
                 list(it).findViewHolderForAdapterPosition(251)!!.itemView.findViewById<View>(R.id.btnQueueRemove).performClick()
                 assertEquals(items.filter { item -> item.partition != "p0250" }, vm().currentFlashOperationDraft().items)
             }
-            waitUi(scenario) { list(it).adapter!!.itemCount == 1000 }
-            scenario.onActivity { firstVisible = (list(it).layoutManager as LinearLayoutManager).findFirstVisibleItemPosition() }
+            // Wait for the removed-row diff AND the actual layout frame;
+            // adapter count alone can update before API 26 attaches row views.
+            waitUi(scenario) {
+                val queue = list(it)
+                val position = (queue.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
+                queue.adapter!!.itemCount == 1000 && position > 1 &&
+                    !queue.hasPendingAdapterUpdates() &&
+                    queue.findViewHolderForAdapterPosition(position) != null
+            }
+            scenario.onActivity {
+                val queue = list(it)
+                firstVisible = (queue.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition()
+                assertTrue("Queue lost its deep scroll anchor before recreation", firstVisible > 1)
+                anchorText = queue.findViewHolderForAdapterPosition(firstVisible)!!
+                    .itemView.findViewById<TextView>(R.id.tvQueuePartition).text.toString()
+            }
             scenario.recreate()
-            waitUi(scenario) { (list(it).layoutManager as LinearLayoutManager).findFirstVisibleItemPosition() == firstVisible }
+            waitUi(scenario) {
+                val queue = list(it)
+                queue.adapter!!.itemCount == 1000 &&
+                    (queue.layoutManager as LinearLayoutManager).findFirstVisibleItemPosition() == firstVisible &&
+                    queue.findViewHolderForAdapterPosition(firstVisible)?.itemView
+                        ?.findViewById<TextView>(R.id.tvQueuePartition)?.text?.toString() == anchorText
+            }
             scenario.onActivity {
                 assertEquals(View.VISIBLE, it.findViewById<View>(R.id.fastbootMassSection).visibility)
                 fullyVisible(it.findViewById(R.id.btnMassExecute))
@@ -172,6 +202,17 @@ class InterfacePolishAndroidTest {
                 if (tab == R.id.tabFastboot) it.findViewById<View>(R.id.btnFastbootSectionQuick).performClick()
             }
             AndroidUiCapture.save(scenario, "$prefix-$name.png")
+            // An animation-free emulator can still deliver a final system-bar
+            // resize after the captured frame. Keep the exact full visibility
+            // requirement, but wait for stable window insets before asserting.
+            waitUi(scenario) { activity ->
+                tabs.all { (button, _, _) ->
+                    val label = activity.findViewById<TextView>(button)
+                    val rect = Rect()
+                    label.isShown && label.getGlobalVisibleRect(rect) &&
+                        rect.width() == label.width && rect.height() == label.height
+                }
+            }
             scenario.onActivity {
                 assertEquals(View.VISIBLE, it.findViewById<View>(page).visibility)
                 assertEquals("Главная", it.findViewById<TextView>(R.id.tabHome).text.toString())
@@ -192,6 +233,9 @@ class InterfacePolishAndroidTest {
         openMass(scenario)
         AndroidUiCapture.save(scenario, "$prefix-mass-empty.png")
         scenario.onActivity {
+            assertEquals("Header alone must not permit queue state restoration",
+                RecyclerView.Adapter.StateRestorationPolicy.PREVENT,
+                list(it).adapter!!.stateRestorationPolicy)
             assertFalse(it.findViewById<View>(R.id.btnMassExecute).isEnabled)
             fullyVisible(it.findViewById(R.id.btnMassExecute))
             if (it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE) {

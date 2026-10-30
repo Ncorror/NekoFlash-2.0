@@ -16,7 +16,26 @@ import hashlib
 # guarded by LEGACY-SOURCE-SHA256.json in REV5.
 raw_vm = (root/'app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt').read_bytes()
 expected_blob = 'b80db90bf4aa40edaa29d0dd6a70a698c5a06d45'
-assert hashlib.sha1(b'blob ' + str(len(raw_vm)).encode() + b'\0' + raw_vm).hexdigest() == expected_blob, 'Unexpected change to DeviceViewModel'
+def git_blob_sha(data):
+    return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+
+# REV31 allows ONE exact raw-shell evidence directory argument in the ADB
+# constructor. Rebuild the old blob in memory; unrelated orchestration edits
+# and changes elsewhere in DeviceViewModel must continue to fail this guard.
+if git_blob_sha(raw_vm) != expected_blob:
+    reviewed_change = (
+        b'                keyDirectory = adbKeyDir,\n'
+        b'                // The exact binary shell streams live beside the public\n'
+        b'                // compact/trace logs, so a tester can include them in a ZIP.\n'
+        b'                // No rotation, sanitization or automatic pruning of raw bytes.\n'
+        b'                rawShellLogsDir = File(workspaceRoot ?: getApplication<Application>().filesDir, "logs"),\n'
+    )
+    original = b'                keyDirectory = adbKeyDir,\n'
+    assert raw_vm.count(reviewed_change) == 1, 'Unreviewed ADB evidence path change'
+    protected_vm = raw_vm.replace(reviewed_change, original, 1)
+    assert git_blob_sha(protected_vm) == expected_blob, (
+        'DeviceViewModel changed outside the reviewed REV31 evidence path'
+    )
 assert 'val ordered = queue' in vm and 'queue.sortedBy' not in vm
 assert 'ordered.forEachIndexed' in vm and 'ordered.mapIndexed' in vm
 assert 'fun moveFlashQueueDraftItem' in vm and 'fun removeFlashQueueDraftItem' in vm
