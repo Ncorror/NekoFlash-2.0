@@ -78,11 +78,9 @@ internal class ConsoleDockController(
         header.setOnClickListener(toggleSheet)
         handle.setOnClickListener(toggleSheet)
 
-        commandInput.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus && behavior.state != BottomSheetBehavior.STATE_EXPANDED) {
-                behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            }
-        }
+        // Only explicit UI actions open the sheet. IME focus callbacks can
+        // arrive after collapse or during Activity recreation; responding by
+        // expanding again makes the Close button feel stuck.
 
         bindWindowInsets()
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
@@ -120,10 +118,9 @@ internal class ConsoleDockController(
 
     /** Returns the Console to its compact persistent header. */
     fun collapse() {
-        focusCommandWhenExpanded = false
-        if (imeVisible || commandInput.hasFocus()) {
-            hideCommandIme()
-        }
+        // Drop focus even when insets report IME already hidden. This also
+        // prevents a delayed IME visibility callback from re-opening the sheet.
+        hideCommandIme()
         if (behavior.state != BottomSheetBehavior.STATE_COLLAPSED) {
             behavior.state = BottomSheetBehavior.STATE_COLLAPSED
         }
@@ -233,11 +230,27 @@ internal class ConsoleDockController(
                 focusCommandWhenExpanded = false
                 return@post
             }
+            // Request IME against the actual editable view rather than the
+            // CoordinatorLayout. Some Android 14 emulator keyboards ignore the
+            // first request during the sheet's expansion animation.
             commandInput.requestFocus()
-            WindowInsetsControllerCompat(activity.window, root).show(
+            WindowInsetsControllerCompat(activity.window, commandInput).show(
                 WindowInsetsCompat.Type.ime(),
             )
             focusCommandWhenExpanded = false
+            // One bounded retry, only while the user still has the terminal
+            // open and the command editor focused. Never reopen after Close.
+            commandInput.postDelayed({
+                if (!activity.isFinishing && !activity.isDestroyed &&
+                    behavior.state == BottomSheetBehavior.STATE_EXPANDED &&
+                    commandInput.isShown && commandInput.hasFocus() &&
+                    ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+                ) {
+                    WindowInsetsControllerCompat(activity.window, commandInput).show(
+                        WindowInsetsCompat.Type.ime(),
+                    )
+                }
+            }, 180L)
         }
     }
 
@@ -256,13 +269,8 @@ internal class ConsoleDockController(
                 panel.post { updateVisibleBodyHeight() }
             }
 
-            if (
-                imeVisible &&
-                commandInput.hasFocus() &&
-                behavior.state != BottomSheetBehavior.STATE_EXPANDED
-            ) {
-                behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            }
+            // Window insets report keyboard visibility; they do not get to
+            // override the user's explicit Collapse action.
 
             // Do not consume or duplicate IME/system-bar insets. `adjustResize`
             // remains the single owner of the available window height.
