@@ -113,7 +113,10 @@ class TerminalAndImportAndroidTest {
                     .adapter!!.itemCount == vm().terminalSnapshot().size
             }
             scenario.onActivity { it.findViewById<View>(R.id.btnConsoleClose).performClick() }
-            waitUi(scenario) { !expanded(it) }
+            waitUi(scenario) {
+                BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel))
+                    .state == BottomSheetBehavior.STATE_COLLAPSED
+            }
             var beforeSecondBurst = -1
             scenario.onActivity {
                 beforeSecondBurst = it.findViewById<RecyclerView>(R.id.rvConsoleOutput).adapter!!.itemCount
