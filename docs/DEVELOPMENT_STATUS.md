@@ -1,4 +1,32 @@
-# NekoFlash 2.0 — текущая DEV-сводка и маршрут проверки
+# NekoFlash 2.0 — актуальный статус DEV, 31 октября 2026
+
+Это **текущая сводка**, сверенная по GitHub. Исторический снимок REV27 ниже сохранён для проверки происхождения решений; его SHA и CI **не являются текущими**.
+
+| Объект | Подтверждённое состояние |
+|---|---|
+| Рабочая DEV-ветка | `work/rev26-terminal-imports-20261030` |
+| Последний объединённый этап | REV33, [PR #26](https://github.com/Ncorror/NekoFlash-2.0/pull/26), merge `59e729b2ab40d4defaeb2f5e8e726d10a476aa66` |
+| Проверенный точный head до merge | REV33 `e4bc3f9f2c70bcbbc3432a8eafd81a7eeb4640c5`, [CI 41136014650](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41136014650), build + Android API 26/34 PASS |
+| Дополнительный UI-этап | REV32, [PR #25](https://github.com/Ncorror/NekoFlash-2.0/pull/25), merge `3e0e7496ee0c94bc561d6f69959b332222824e0c` |
+| Текущая разработка | REV34: coalesced terminal BottomSheet/IME resize, отдельный незавершённый PR |
+| Защита релиза | [Security PR #22](https://github.com/Ncorror/NekoFlash-2.0/pull/22) перенесён на текущую DEV, остаётся draft; правила веток и environment secrets требуют owner-side GitHub Settings |
+| Release | `main` этой серии не содержит; физическая USB/OTG-валидация ревизий DEV не подтверждена |
+
+## Факты и оставшиеся риски
+
+- REV31 сохраняет полные бинарные stdout/stderr one-shot ADB команд на диск. REV33 разбирает листинг `adb pull -r` из файла, не создавая полную копию ответа в heap. Проверка физической памяти и многочасовых USB-сессий ещё нужна.
+- Подтверждения перед `erase`, `format`, рискованным Quick Flash и Mass Flash **уже присутствуют** в `ProfessionalOperationReviewPolicy` и `MainActivity`; существующие unit-тесты подтверждают политику. Не считать старое наблюдение «кнопки напрямую запускают команду» актуальным без новой сверки.
+- [TERM-01](https://github.com/Ncorror/NekoFlash-2.0/issues/20) остаётся открытым: эмуляторные проверки IME и ротации не заменяют воспроизведение на реальном Android HOST.
+- Сырые диагностические журналы не урезать и не чистить при исправлении безопасности. Публичные PR/Issues не должны содержать реальные приватные логи, серийники, ключи и Mi-токены.
+- Встроенные `mke2fs`/`mkfs.f2fs` и точную последовательность Fastboot/ADB валидировать отдельно на устройствах с подготовленным восстановлением.
+- До кандидата в релиз: settings hardening (rulesets, release environment и миграция секретов), атомарность ADB key, Mi session policy, большие SAF-источники, USB detach/cancel, RU/EN/TalkBack, документация версии и проверка подписанного обновления.
+
+**Граница результатов:** прохождение GitHub Actions означает успешную заданную матрицу CI, не аппаратную совместимость, отсутствие всех багов или разрешение на выпуск.
+
+---
+
+## Архивная DEV-сводка (исторический REV27, 30 октября 2026)
+
 
 Дата сверки: **30 октября 2026**. Речь только о репозитории `Ncorror/NekoFlash-2.0`, не о NekoFlash Pro и не о релизном APK старого `Ncorror/NekoFlash`.
 

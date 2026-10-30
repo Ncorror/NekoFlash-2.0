@@ -39,6 +39,7 @@ internal class ConsoleDockController(
     private var focusCommandWhenExpanded: Boolean = false
     private var imeVisible: Boolean = false
     private var lastPeekLine: String = ""
+    private var bodyHeightUpdateQueued: Boolean = false
 
     /** True while the Console body is visible above its collapsed peek height. */
     var isExpanded: Boolean = false
@@ -64,11 +65,11 @@ internal class ConsoleDockController(
                 object : BottomSheetBehavior.BottomSheetCallback() {
                     override fun onStateChanged(bottomSheet: View, newState: Int) {
                         renderState(newState)
-                        bottomSheet.post { updateVisibleBodyHeight(bottomSheet) }
+                        scheduleVisibleBodyHeightUpdate()
                     }
 
                     override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                        updateVisibleBodyHeight(bottomSheet)
+                        scheduleVisibleBodyHeightUpdate()
                     }
                 },
             )
@@ -88,11 +89,11 @@ internal class ConsoleDockController(
             if (headerHeight > 0 && behavior.expandedOffset != headerHeight) {
                 behavior.expandedOffset = headerHeight
             }
-            updateVisibleBodyHeight()
+            scheduleVisibleBodyHeightUpdate()
         }
 
         renderState(behavior.state)
-        root.post { updateVisibleBodyHeight() }
+        scheduleVisibleBodyHeightUpdate()
     }
 
     /** Updates the single-line preview shown while the Console is collapsed. */
@@ -201,6 +202,23 @@ internal class ConsoleDockController(
      * slice, the RecyclerView bottom and command bar stay below the window in
      * half-expanded state.
      */
+    /**
+     * One body remeasure per display frame even when BottomSheet callbacks,
+     * root layout and IME insets arrive together. Height and bottom bar still
+     * follow the actual current sheet top; no intermediate resize is discarded
+     * from the next frame's observable state.
+     */
+    private fun scheduleVisibleBodyHeightUpdate() {
+        if (bodyHeightUpdateQueued) return
+        bodyHeightUpdateQueued = true
+        panel.postOnAnimation {
+            bodyHeightUpdateQueued = false
+            if (!activity.isDestroyed && !activity.isFinishing) {
+                updateVisibleBodyHeight()
+            }
+        }
+    }
+
     private fun updateVisibleBodyHeight(bottomSheet: View = panel) {
         if (root.height <= 0 || handle.height <= 0 || header.height <= 0) return
 
@@ -266,7 +284,7 @@ internal class ConsoleDockController(
                 imeVisible = nextImeVisible
                 behavior.isDraggable = false
                 panel.requestLayout()
-                panel.post { updateVisibleBodyHeight() }
+                scheduleVisibleBodyHeightUpdate()
             }
 
             // Window insets report keyboard visibility; they do not get to
