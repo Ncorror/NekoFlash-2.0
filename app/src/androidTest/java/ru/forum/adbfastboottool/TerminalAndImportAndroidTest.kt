@@ -149,7 +149,7 @@ class TerminalAndImportAndroidTest {
     @Test fun shellOperationCannotCollapseTerminalOrOpenProgressDialog() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
-            waitUi(scenario, ::expanded)
+            waitUi(scenario, "terminal expanded") { expanded(it) }
             // Keep activation observable: immediate no-device failure can coalesce true/false.
             @Suppress("UNCHECKED_CAST")
             val active = DeviceViewModel::class.java.getDeclaredField("_operationActive").apply { isAccessible = true }.get(vm()) as MutableLiveData<Boolean>
@@ -165,7 +165,7 @@ class TerminalAndImportAndroidTest {
             waitUi(scenario) { BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel)).state == BottomSheetBehavior.STATE_COLLAPSED }
             assertTrue("Closing the terminal cancelled the operation", active.value == true)
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
-            waitUi(scenario, ::expanded)
+            waitUi(scenario, "terminal expanded") { expanded(it) }
             scenario.onActivity {
                 it.findViewById<View>(R.id.btnTerminalStop).performClick()
                 assertEquals(true, field(it, "operationCancelRequested"))
@@ -245,7 +245,7 @@ class TerminalAndImportAndroidTest {
                 AndroidUiCapture.save(scenario, "terminal-keyboard.png")
                 instrumentation.sendKeyDownUpSync(KeyEvent.KEYCODE_BACK)
                 waitUi(scenario) { ViewCompat.getRootWindowInsets(it.findViewById(R.id.rootCoordinator))?.isVisible(WindowInsetsCompat.Type.ime()) != true }
-                scenario.recreate(); waitUi(scenario, ::expanded)
+                scenario.recreate(); waitUi(scenario, "terminal expanded") { expanded(it) }
                 scenario.onActivity {
                     assertEquals("adb shell echo draft", it.findViewById<EditText>(R.id.etCommand).text.toString())
                     it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
