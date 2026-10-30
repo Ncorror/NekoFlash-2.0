@@ -28,6 +28,11 @@ class ProfessionalOperationReviewPolicyTest {
             assertTrue(target, review.requiresReview(ProfessionalOperationReviewPolicy.Action.QUICK_FLASH, listOf(target)))
         }
         assertTrue(review.requiresReview(ProfessionalOperationReviewPolicy.Action.QUICK_FLASH, listOf("boot"), "all"))
+        assertTrue(review.requiresReview(ProfessionalOperationReviewPolicy.Action.QUICK_FLASH, listOf("vbmeta")))
+        assertTrue(review.requiresReview(ProfessionalOperationReviewPolicy.Action.QUICK_FLASH, listOf("modem_a")))
+        assertTrue(review.requiresReview(ProfessionalOperationReviewPolicy.Action.MASS_FLASH, listOf("vbmeta")))
+        assertFalse(review.isCritical("vbmeta"))
+
     }
 
     @Test fun queueReviewIsOneCheckpointNotOnePerPartition() {
