@@ -287,6 +287,11 @@ internal class ConsoleDockController(
         )
         imeVisible = false
         behavior.isDraggable = false
+        // clearFocus() alone may immediately hand focus back to the only
+        // focusable EditText on Android 8 (observed in instrumented REV31 CI).
+        // Give it an explicit, non-editable destination before collapsing.
+        root.isFocusableInTouchMode = true
+        root.requestFocus()
         commandInput.clearFocus()
     }
 
