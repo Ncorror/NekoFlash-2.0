@@ -1,8 +1,14 @@
 # Changelog
 
-Release-level changes only. Commit-by-commit development notes, temporary plans and maintainer workflow history belong in Git history.
+The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes are not published APK releases.** The technical REV number is independent of `versionName` / `versionCode`; see [development status](docs/DEVELOPMENT_STATUS.md). Historical build/release statements refer to the source snapshot in which they were recorded.
 
-## v6.0.0-alpha11 — UI/UX audit
+## Unreleased DEV (REV26–REV27, based on `6.0.0-alpha11`)
+
+- REV26: separated terminal close from cancellation and operation progress; preserved command history and PTY; fixed cancellable SAF provider import on Android API 26.
+- REV27: deferred RecyclerView updates while Console is collapsed, rendered up-to-date output on reopen, and added regression tests for long output.
+- [Verified REV27 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41012595076) passed 19 installed-app tests on API 26 and API 34. These changes **are not** a production release and do not validate physical-device flashing.
+
+## Unreleased `6.0.0-alpha11` source line — UI/UX audit
 
 - Restored and refined the Home **Operation Center** as a persistent, non-blocking task surface with a prominent current action, percentage/indeterminate progress, `step X of Y`, a bounded nearby-step queue, contextual failure/verification details, reports access and explicit cancellation.
 - Added a compact **live operation strip** above every workflow page so Flash/Sideload/Unlock/diagnostic work remains visible without leaving the current tab. It now shows the current step together with the safety/status message, and tapping it opens Home and scrolls directly to the full Operation Center. Completed/cancelled results auto-clear after a short confirmation window, while failed/verify-pending states remain until reviewed or dismissed.
@@ -15,7 +21,7 @@ Release-level changes only. Commit-by-commit development notes, temporary plans 
 
 ## v6.0.0-alpha10.2 — published release
 
-- Current packaged source identity is `versionName=6.0.0-alpha10.2`, `versionCode=233`, matching the release links and version metadata documented in this source snapshot.
+- Historical release snapshot identity was `versionName=6.0.0-alpha10.2`, `versionCode=233`; the current NekoFlash 2.0 DEV source has since advanced to `versionName=6.0.0-alpha11`, `versionCode=234`.
 - The UI/UX audit above is **unreleased** and is not claimed as part of the already published alpha10.2 APK.
 
 ## v6.0.0-alpha10.1 — published hotfix release
