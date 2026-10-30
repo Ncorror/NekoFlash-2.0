@@ -55,6 +55,9 @@ jobs:
       - name: Print Gradle version
         run: ./gradlew --version
 
+      - name: Verify repository security gates
+        run: python3 tests/check_repository_security.py
+
       - name: REV26 structural and source-guard tests
         run: |
           python3 tests/check_rev26.py
