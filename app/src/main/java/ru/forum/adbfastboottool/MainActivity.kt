@@ -257,7 +257,11 @@ class MainActivity : AppCompatActivity() {
             rawMode = { ::viewModel.isInitialized && viewModel.isInteractiveAdbShellActive() },
             sink = { bytes -> viewModel.sendInteractiveAdbShellBytes(bytes) }
         )
-        consoleDockController = ConsoleDockController(this, rvConsoleOutput).also { it.initialize() }
+        consoleDockController = ConsoleDockController(
+            this,
+            rvConsoleOutput,
+            onExpanded = { flushConsoleRender(pinToBottom = true) },
+        ).also { it.initialize() }
         findViewById<View>(R.id.btnConsoleLogs).setOnClickListener { showLogsMenu() }
         findViewById<View>(R.id.btnConsoleClose).setOnClickListener { consoleDockController.collapse() }
         findViewById<View>(R.id.btnTerminalStop).setOnClickListener { requestOperationCancelFromUi() }
@@ -4389,9 +4393,18 @@ class MainActivity : AppCompatActivity() {
     private val flushConsoleRenderRunnable = Runnable { flushConsoleRender() }
 
     private fun renderLog(lines: List<String>) {
-        pendingConsoleSnapshot = CompactLogRenderPolicy.boundedSnapshot(lines)
-        lines.lastOrNull()?.let(consoleDockController::updatePeek)
-            ?: consoleDockController.updatePeek("")
+        // DeviceViewModel already owns a bounded, immutable transcript snapshot.
+        // Do not copy/format 3,000 lines or touch RecyclerView while the dock is
+        // closed. Keep just the newest snapshot and update its compact preview.
+        pendingConsoleSnapshot = lines
+        consoleDockController.updatePeek(lines.lastOrNull().orEmpty())
+        if (!consoleDockController.isExpanded) {
+            if (consoleRenderScheduled) {
+                consoleRenderHandler.removeCallbacks(flushConsoleRenderRunnable)
+                consoleRenderScheduled = false
+            }
+            return
+        }
 
         if (!consoleRenderScheduled) {
             consoleRenderScheduled = true
@@ -4402,17 +4415,27 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun flushConsoleRender() {
-        consoleRenderScheduled = false
-        val lines = pendingConsoleSnapshot ?: return
+    private fun flushConsoleRender(pinToBottom: Boolean = false) {
+        if (consoleRenderScheduled) {
+            consoleRenderHandler.removeCallbacks(flushConsoleRenderRunnable)
+            consoleRenderScheduled = false
+        }
+        // Preserve a pending snapshot until the panel becomes visible again.
+        if (!consoleDockController.isExpanded || !::viewModel.isInitialized) return
+
+        // A user can reopen the panel before ViewModel's 75 ms publication;
+        // query its live transcript in that case, never display stale output.
+        val lines = CompactLogRenderPolicy.boundedSnapshot(
+            if (pinToBottom) viewModel.terminalSnapshot()
+            else pendingConsoleSnapshot ?: return
+        )
         pendingConsoleSnapshot = null
 
         val decision = CompactLogRenderPolicy.decide(lines, compactLogRenderState)
         compactLogRenderState = decision.nextState
 
         val layoutManager = rvConsoleOutput.layoutManager as? LinearLayoutManager
-        val keepPinnedToBottom = !consoleDockController.isExpanded ||
-            !rvConsoleOutput.canScrollVertically(1)
+        val keepPinnedToBottom = pinToBottom || !rvConsoleOutput.canScrollVertically(1)
         val firstVisiblePosition = layoutManager?.findFirstVisibleItemPosition() ?: -1
         val firstVisibleOffset = if (firstVisiblePosition >= 0) {
             layoutManager?.findViewByPosition(firstVisiblePosition)?.top ?: 0
