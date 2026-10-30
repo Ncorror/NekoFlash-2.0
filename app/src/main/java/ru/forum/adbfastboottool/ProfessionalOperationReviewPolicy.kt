@@ -14,9 +14,13 @@ internal object ProfessionalOperationReviewPolicy {
         when (action) {
             Action.ERASE, Action.FORMAT -> true
             Action.QUICK_FLASH -> slot.equals("all", ignoreCase = true) ||
-                partitions.any(::isCritical)
-            Action.MASS_FLASH -> partitions.size > 1 || partitions.any(::isCritical)
+                partitions.any(::needsRiskReview)
+            Action.MASS_FLASH -> partitions.size > 1 || partitions.any(::needsRiskReview)
         }
+
+    fun needsRiskReview(partition: String): Boolean =
+        FastbootPartitionInventory.riskTier(partition) !=
+            FastbootPartitionInventory.RiskTier.NORMAL
 
     fun isCritical(partition: String): Boolean =
         FastbootPartitionInventory.riskTier(partition) ==
