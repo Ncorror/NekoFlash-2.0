@@ -35,7 +35,7 @@ jobs:
             echo "::error::Release tag is not based on main history"
             exit 1
           fi
-          VERSION="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\\1/p' app/build.gradle | head -1)"
+          VERSION="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle | head -1)"
           test -n "$VERSION"
           if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
             echo "::error::Release tag must match versionName"
