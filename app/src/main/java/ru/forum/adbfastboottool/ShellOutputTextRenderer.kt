@@ -49,7 +49,7 @@ internal class ShellOutputTextRenderer(
             val result = decoder.flush(characters)
             drainCharacters()
             if (result.isUnderflow) break
-            result.throwException()
+            if (!result.isOverflow) result.throwException()
         }
         emitLine(trimCr = true)
     }
@@ -59,7 +59,7 @@ internal class ShellOutputTextRenderer(
             val result = decoder.decode(buffer, characters, endOfInput)
             drainCharacters()
             if (result.isUnderflow) return
-            result.throwException()
+            if (!result.isOverflow) result.throwException()
         }
     }
 
