@@ -5,7 +5,7 @@
     <string name="pro_review_message">Review the exact target and source before proceeding:\n\n%1$s\n\nThis action can permanently alter device partitions. NekoFlash does not remove or redact diagnostic records.</string>
     <string name="pro_review_erase">erase</string>
     <string name="pro_review_format">format</string>
-    <string name="pro_review_flash">flash critical target</string>
+    <string name="pro_review_flash">flash sensitive target</string>
     <string name="pro_review_queue">flash queue</string>
     <string name="pro_review_execute">EXECUTE</string>
     <string name="pro_review_slot_default">default / active</string>
