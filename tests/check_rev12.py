@@ -24,7 +24,17 @@ git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdi
 assert git_blob in {
     '7acf241d15e112d7fdc49c917c69661b437321df',  # REV12 baseline
     '9b80d7a5aa0aa7b0e5e2dd8b1e54958f88f607c7',  # REV31 exact reviewed blob
+    'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',  # REV33 exact raw-file directory listing
 }, 'Unreviewed AdbProtocol change'
+if git_blob == 'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e':
+    # Do not allow the new variant to silently fall back to full-result heap
+    # capture, lose raw evidence or bypass path validation.
+    assert 'runShellCommandForResult(listCommand, logOutput = false, captureOutput = false)' in adb
+    assert 'stdoutFile.reader(Charsets.UTF_8).use { reader ->' in adb
+    assert 'AdbPullPathPolicy.parseListing(reader)' in adb
+    pull = (base/'AdbPullPathPolicy.kt').read_text()
+    assert 'fun parseListing(reader: Reader)' in pull
+    assert 'require(normalize(record).isNotEmpty())' in pull
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb

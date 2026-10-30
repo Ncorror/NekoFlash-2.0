@@ -931,14 +931,22 @@ class AdbProtocol(
 
         onLog("-> adb pull -r $remoteDir ${localDir.absolutePath}")
         val listCommand = "cd ${shellQuote(remoteDir)} && printf 'AFT_DIRS_BEGIN\\0' && find . -type d -print0 && printf 'AFT_FILES_BEGIN\\0' && find . -type f -print0 && printf 'AFT_DONE\\0'"
-        val listResult = runShellCommandForResult(listCommand, logOutput = false)
+        // The shell has already spooled complete raw stdout to durable disk.
+        // A recursive find may enumerate hundreds of thousands of paths, so do
+        // not duplicate the entire listing into a heap String before parsing.
+        val listResult = runShellCommandForResult(listCommand, logOutput = false, captureOutput = false)
         if (!listResult.success) {
             onLog("❌ adb pull: could not list files in the remote directory")
             return false
         }
 
         val sections = try {
-            AdbPullPathPolicy.parseListing(listResult.stdout).also { (dirs, files) ->
+            val stdoutFile = requireNotNull(listResult.rawStdoutFile) {
+                "Missing persistent ADB shell stdout evidence"
+            }
+            stdoutFile.reader(Charsets.UTF_8).use { reader ->
+                AdbPullPathPolicy.parseListing(reader)
+            }.also { (dirs, files) ->
                 (dirs + files).forEach { AdbPullPathPolicy.destination(localDir, it) }
             }
         } catch (error: Exception) {
@@ -1671,7 +1679,8 @@ class AdbProtocol(
         val stdout: String,
         val stderr: String,
         val exitCode: Int?,
-        val success: Boolean
+        val success: Boolean,
+        val rawStdoutFile: File? = null
     ) {
         fun combinedOutput(): String = listOf(stdout, stderr).filter { it.isNotBlank() }.joinToString("\n")
     }
@@ -1721,7 +1730,7 @@ class AdbProtocol(
         var exitCode: Int? = null
         fun result(success: Boolean): ShellResult {
             val (stdout, stderr) = record.finish(exitCode, success, captureOutput)
-            return ShellResult(stdout, stderr, exitCode, success)
+            return ShellResult(stdout, stderr, exitCode, success, record.stdoutFile)
         }
         try {
             // Close stdin for one-shot shell/v2 commands.
@@ -1793,7 +1802,7 @@ class AdbProtocol(
         if (logOutput) onLog("ℹ️ Raw ADB shell stdout: ${record.stdoutFile.absolutePath}")
         fun result(success: Boolean): ShellResult {
             val (stdout, stderr) = record.finish(null, success, captureOutput)
-            return ShellResult(stdout, stderr, null, success)
+            return ShellResult(stdout, stderr, null, success, record.stdoutFile)
         }
         try {
             while (!cancelled && !stream.closed) {
