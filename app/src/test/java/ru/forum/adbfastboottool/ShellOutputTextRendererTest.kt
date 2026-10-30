@@ -26,6 +26,17 @@ class ShellOutputTextRendererTest {
         assertEquals(listOf("│ first", "│ second part", "│ tail"), events)
     }
 
+    @Test fun progressOverCarriageReturnsIsVisibleBeforeCommandExits() {
+        val events = mutableListOf<String>()
+        val renderer = ShellOutputTextRenderer(false, events::add)
+        renderer.accept("10%\r20".toByteArray(Charsets.UTF_8))
+        assertEquals(listOf("│ 10%"), events)
+        renderer.accept("%\r100%\r\n".toByteArray(Charsets.UTF_8))
+        assertEquals(listOf("│ 10%", "│ 20%", "│ 100%"), events)
+        renderer.finish()
+        assertEquals(3, events.size)
+    }
+
     @Test fun stdoutAndStderrKeepSeparateUtf8DecoderState() {
         val events = mutableListOf<String>()
         val out = ShellOutputTextRenderer(false, events::add)
