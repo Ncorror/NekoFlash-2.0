@@ -1,5 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
+    <!-- Expert recovery GUI: single contextual review, never applies to terminal commands. -->
+    <string name="pro_review_title">Verify operation: %1$s</string>
+    <string name="pro_review_message">Review the exact target and source before proceeding:\n\n%1$s\n\nThis action can permanently alter device partitions. NekoFlash does not remove or redact diagnostic records.</string>
+    <string name="pro_review_erase">erase</string>
+    <string name="pro_review_format">format</string>
+    <string name="pro_review_flash">flash critical target</string>
+    <string name="pro_review_queue">flash queue</string>
+    <string name="pro_review_execute">EXECUTE</string>
+    <string name="pro_review_slot_default">default / active</string>
+    <string name="pro_review_queue_count">Queue: %1$d targets</string>
+    <string name="pro_review_additional_targets">…and %1$d more targets (see queue for full list)</string>
+    <string name="pro_review_source_changed">Source or queue changed. Review the current selection again.</string>
     <string name="app_name">NekoFlash</string>
     <string name="app_name_neko">Neko</string>
     <string name="app_name_flash">Flash</string>
