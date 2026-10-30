@@ -50,6 +50,7 @@ jobs:
         run: |
           python3 tests/check_rev26.py
           python3 tests/check_i18n.py
+          python3 tests/check_docs.py
 
       - name: Native transfer deadline regression tests
         run: |
