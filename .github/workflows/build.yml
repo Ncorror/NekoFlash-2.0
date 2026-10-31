@@ -51,6 +51,15 @@ jobs:
           python3 tests/check_rev26.py
           python3 tests/check_i18n.py
           python3 tests/check_docs.py
+          python3 tests/check_insiders_testbook.py
+
+      - name: Publish standalone offline Insiders testbook
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-Insiders-Testbook-REV43-${{ github.sha }}
+          path: docs/insiders/testbook.html
+          if-no-files-found: error
+          retention-days: 90
 
       - name: Native transfer deadline regression tests
         run: |
