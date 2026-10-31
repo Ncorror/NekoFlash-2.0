@@ -687,7 +687,8 @@ class AdbProtocol(
         cancelled = false
 
         return when {
-            localPath.exists() && localPath.isFile && localPath.canRead() -> pushFile(localPath, remotePath, mode)
+            localPath.exists() && localPath.isFile && localPath.canRead() ->
+                pushFileInternal(localPath, remotePath, mode, startNewOperation = false)
             localPath.exists() && localPath.isDirectory && localPath.canRead() -> pushDirectory(localPath, remotePath, mode)
             else -> {
                 onLog("❌ adb push: local path is unavailable: ${localPath.absolutePath}")
@@ -763,8 +764,8 @@ class AdbProtocol(
     }
 
     private fun pushDirectory(localDir: File, remotePath: String, mode: Int = 0x1A4): Boolean {
-        if (!isConnected) return false
-        cancelled = false
+        // pushPath already opened this operation; do not clear its Stop flag.
+        if (cancelled || !isConnected) return false
 
         if (!localDir.exists() || !localDir.isDirectory || !localDir.canRead()) {
             onLog("❌ adb push: local folder is unavailable: ${localDir.absolutePath}")
@@ -815,6 +816,7 @@ class AdbProtocol(
                 onLog("ℹ️ adb push file ${pushed + 1}/${expected.files}: $relative")
                 checkCancelled()
                 if (!pushFileInternal(file, remoteFile, mode, startNewOperation = false)) {
+                    checkCancelled()
                     throw java.io.IOException("ADB push file did not complete: $relative")
                 }
                 pushed++
