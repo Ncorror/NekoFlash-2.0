@@ -1,3 +1,5 @@
+> **АРХИВ REV9.** Для текущих реальных испытаний REV43 бери [Insiders тестбук](../insiders/testbook.html), [инструкцию REV43](INSIDERS-FIELD-TEST-REV43-RU.md) и [статус DEV](../DEVELOPMENT_STATUS.md). Исторические инструкции REV9 ниже сохранены, но не подтверждают новых аппаратных PASS.
+
 # NekoFlash 2.0 — большой аппаратный тест REV9
 
 Статус: **план испытаний, а не отчёт об испытаниях**. Репозиторий Ncorror/NekoFlash-2.0; тестируемая ветка feature/rev6-shell, PR #1 Draft, main не изменён.
