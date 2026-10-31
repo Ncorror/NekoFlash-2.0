@@ -1,4 +1,31 @@
-# NekoFlash 2.0 — Android-to-Android ADB / Fastboot (DEV REV27)
+# NekoFlash 2.0 — Android-to-Android ADB / Fastboot (DEV REV43)
+
+> **Актуальная DEV (1 ноября 2026):** ветка [`work/rev26-terminal-imports-20261030`](https://github.com/Ncorror/NekoFlash-2.0/tree/work/rev26-terminal-imports-20261030), коммит после [REV43 PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37) — `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`. Разработка NekoFlash 2.0, **не** NekoFlash Pro и **не** production release. `main` не трогаем.
+
+## Тестирование на реальных Android HOST → TARGET / Insiders field tests
+
+**[Открыть офлайн-тестбук REV43 (RU/EN)](docs/insiders/testbook.html)** · **[Скачать отдельный HTML из DEV](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/work/rev26-terminal-imports-20261030/docs/insiders/testbook.html)** · [Инструкция RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN manual](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Статус DEV и CI](docs/DEVELOPMENT_STATUS.md)
+
+Тестбук — автономный HTML: чек-листы, статусы, комментарии, локальный JSON-прогресс, ZIP с `report.txt`, `progress.json`, `evidence-manifest.json`, скриншотами и исходными `log-*`, `trace-*.bin`, `session-summary-*`. Сохранены RU/EN, чёрно-оранжевый дизайн и ручное разрешение Android на папку. **Без отправки данных в сеть и без очистки логов**. GitHub Actions DEV дополнительно публикует отдельный архив `NekoFlash-Insiders-Testbook-REV43-...`.
+
+**[Тестовая Debug APK REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)** (artifact ZIP; `ru.forum.adbfastboottool.dev`, 6.0.0-alpha11-dev, versionCode 234). Не удаляй стабильную APK. Вычисляй SHA-256 скачанной APK, а не используй контрольную сумму старого REV29 файла.
+
+| Проверка | Фактический результат |
+|---|---|
+| [PR REV43 run 41247325391](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391) | Build/JVM/lint и Android API26/API34 — **PASS** |
+| [Merged DEV run 41248168147](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) | Build PASS, API34 PASS, **API26 FAIL** (два UI wait-timeout) |
+| REV43 physical HOST → TARGET | Кампания начинается; **подтверждённых аппаратных PASS пока нет** |
+
+Действия первого раунда: проверка OTG/USB без записи разделов, `adb devices`, `adb shell getprop`, терминал/Gboard/поворот, копирование, логи. Следующий раунд: тестовые `adb push/pull`, `push -r` на 512 файлах, Stop, detach/reconnect только при **одноразовой ADB передаче**, проверка SHA и RAM. Fastboot DATA/flash/erase/format/unlock — исключительно отдельная согласованная лаборатория на запасном устройстве.
+
+**Открыто:** [TERM-01 #20](https://github.com/Ncorror/NekoFlash-2.0/issues/20), [CI API26 #16](https://github.com/Ncorror/NekoFlash-2.0/issues/16), [ADB push RAM/USB #36](https://github.com/Ncorror/NekoFlash-2.0/issues/36). Публикуй в GitHub только обезличенные выводы; полные бинарные логи передавай в доверенный закрытый канал.
+
+---
+
+## Историческая DEV REV27 и общая документация (архивный раздел)
+
+> Ниже сохранён исторический снимок ревизии 27 и общие сведения об архитектуре; старые SHA, результаты CI и ссылки **не описывают актуальную REV43**. Актуальные данные — выше и в `docs/DEVELOPMENT_STATUS.md`.
+
 
 > **Актуальная разработка (30 октября 2026):** рабочая ветка [`work/rev26-terminal-imports-20261030`](https://github.com/Ncorror/NekoFlash-2.0/tree/work/rev26-terminal-imports-20261030), включающая [REV26 (PR #13)](https://github.com/Ncorror/NekoFlash-2.0/pull/13) и [REV27 (PR #14)](https://github.com/Ncorror/NekoFlash-2.0/pull/14). Последний проверенный merge: `8806222d8590`. Это **NekoFlash 2.0**, не NekoFlash Pro. Разработка пока **не объединена в `main` и не является production release**.
 

@@ -1,27 +1,49 @@
-# NekoFlash 2.0 — актуальный статус DEV, 31 октября 2026
+# NekoFlash 2.0 — актуальный статус DEV и полевые тесты, 1 ноября 2026
 
-Это **текущая сводка**, сверенная по GitHub. Исторический снимок REV27 ниже сохранён для проверки происхождения решений; его SHA и CI **не являются текущими**.
+**Это текущая точка входа.** Предыдущие ревизии и их CI сохранены в исторических разделах ниже. Не переносить старые PASS на REV43.
 
 | Объект | Подтверждённое состояние |
 |---|---|
-| Рабочая DEV-ветка | `work/rev26-terminal-imports-20261030` |
-| Последний объединённый этап | REV33, [PR #26](https://github.com/Ncorror/NekoFlash-2.0/pull/26), merge `59e729b2ab40d4defaeb2f5e8e726d10a476aa66` |
-| Проверенный точный head до merge | REV33 `e4bc3f9f2c70bcbbc3432a8eafd81a7eeb4640c5`, [CI 41136014650](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41136014650), build + Android API 26/34 PASS |
-| Дополнительный UI-этап | REV32, [PR #25](https://github.com/Ncorror/NekoFlash-2.0/pull/25), merge `3e0e7496ee0c94bc561d6f69959b332222824e0c` |
-| Текущая разработка | REV34: coalesced terminal BottomSheet/IME resize, отдельный незавершённый PR |
-| Защита релиза | [Security PR #22](https://github.com/Ncorror/NekoFlash-2.0/pull/22) перенесён на текущую DEV, остаётся draft; правила веток и environment secrets требуют owner-side GitHub Settings |
-| Release | `main` этой серии не содержит; физическая USB/OTG-валидация ревизий DEV не подтверждена |
+| Репозиторий | `Ncorror/NekoFlash-2.0`, не NekoFlash Pro |
+| Основная DEV-ветка | `work/rev26-terminal-imports-20261030` |
+| DEV HEAD перед документальным PR | `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5` |
+| Последняя объединённая функциональная ревизия | REV43, [PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37), streaming `adb push -r` + Stop/USB cancellation |
+| Точный исходный PR коммит | `27ab796d100387b3530bd88a6faf28e48d1c717c` |
+| PR CI REV43 | [Run #41247325391](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391): **BUILD/JVM/lint/API26/API34 PASS** |
+| Повторный CI объединённого DEV | [Run #41248168147](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147): BUILD PASS, API34 PASS, **API26 FAIL (2 UI timeouts)** |
+| Тестовая Debug APK | [GitHub Actions artifact REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171), пакет `ru.forum.adbfastboottool.dev`, versionCode 234, `6.0.0-alpha11-dev` |
+| Тестбук | [Offline RU/EN HTML](insiders/testbook.html), [инструкция RU](testing/INSIDERS-FIELD-TEST-REV43-RU.md), [EN](testing/INSIDERS-FIELD-TEST-REV43-EN.md) |
+| Физический HOST → TARGET для REV43 | **Тестовая кампания начинается, новые PASS пока не подтверждены** |
+| Публикация | `main` не содержит эти DEV-изменения; Release Candidate не объявлен |
 
-## Факты и оставшиеся риски
+## Где скачать тестбук
 
-- REV31 сохраняет полные бинарные stdout/stderr one-shot ADB команд на диск. REV33 разбирает листинг `adb pull -r` из файла, не создавая полную копию ответа в heap. Проверка физической памяти и многочасовых USB-сессий ещё нужна.
-- Подтверждения перед `erase`, `format`, рискованным Quick Flash и Mass Flash **уже присутствуют** в `ProfessionalOperationReviewPolicy` и `MainActivity`; существующие unit-тесты подтверждают политику. Не считать старое наблюдение «кнопки напрямую запускают команду» актуальным без новой сверки.
-- [TERM-01](https://github.com/Ncorror/NekoFlash-2.0/issues/20) остаётся открытым: эмуляторные проверки IME и ротации не заменяют воспроизведение на реальном Android HOST.
-- Сырые диагностические журналы не урезать и не чистить при исправлении безопасности. Публичные PR/Issues не должны содержать реальные приватные логи, серийники, ключи и Mi-токены.
-- Встроенные `mke2fs`/`mkfs.f2fs` и точную последовательность Fastboot/ADB валидировать отдельно на устройствах с подготовленным восстановлением.
-- До кандидата в релиз: settings hardening (rulesets, release environment и миграция секретов), атомарность ADB key, Mi session policy, большие SAF-источники, USB detach/cancel, RU/EN/TalkBack, документация версии и проверка подписанного обновления.
+[**Скачать автономный REV43 HTML прямо из DEV**](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/work/rev26-terminal-imports-20261030/docs/insiders/testbook.html). Он поддерживает RU/EN, этапы, чекбоксы, статусы и свободные замечания, JSON-прогресс, ZIP-отчёт с исходными `log-*`, `trace-*.bin`, `session-summary-*` и фотографиями. Он не отправляет файлы на сервер и требует ручного разрешения на папку логов. Каждый успешный build CI также экспортирует тестбук как отдельный скачиваемый GitHub Actions artifact.
 
-**Граница результатов:** прохождение GitHub Actions означает успешную заданную матрицу CI, не аппаратную совместимость, отсутствие всех багов или разрешение на выпуск.
+**Внимание:** GitHub Actions artifact APK — отдельный ZIP; не путать с архивом отчёта. SHA-256 старой REV29 APK не относится к REV43: проверь новый APK самостоятельно. Не удаляй установленную стабильную версию NekoFlash.
+
+## Фактически выполненные изменения REV34–43
+
+- **REV34–37:** работа над BottomSheet/IME, UTF-8 оболочкой, вводом и корректным разбиением PTY stdin на предел `CNXN maxdata`. Исторические подробности — [source-audit](source-audit/).
+- **REV38:** IME-композиция, русский текст, emoji и Backspace; [PR #31](https://github.com/Ncorror/NekoFlash-2.0/pull/31), [PR CI PASS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41235219229).
+- **REV39:** системное выделение и копирование строк вывода; [PR #32](https://github.com/Ncorror/NekoFlash-2.0/pull/32), [CI PASS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41235417522).
+- **REV40:** выделение блокирует нежелательную автопрокрутку; [PR #33](https://github.com/Ncorror/NekoFlash-2.0/pull/33), [CI PASS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41236741574).
+- **REV41:** ограниченный общий срок ожидания Fastboot final после DATA (2-секундные чтения, общий срок 30 секунд); [PR #34](https://github.com/Ncorror/NekoFlash-2.0/pull/34), [CI PASS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41240926690). **Post-DATA на реальном устройстве не проверен.**
+- **REV42:** разделение каждого generic ADB `A_WRTE` по peer `maxdata` без потери исходных байтов; [PR #35](https://github.com/Ncorror/NekoFlash-2.0/pull/35), [CI PASS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41241152461).
+- **REV43:** потоковый трёхпроходный рекурсивный `adb push -r` без `toList()` всего дерева; внутренний `pushFile` больше не сбрасывает Stop между файлами; [PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37). Физический рост RAM и USB detach остаются открытыми для тестов.
+
+## Известные открытые проблемы
+
+- **CI DEV API26**: `InterfacePolishAndroidTest.thousandRowsRecycleAndKeepOrderFormAndScrollAcrossRecreation` и `largeFontAndLandscapeKeepNavigationAndMassActionVisible` упали с `UI did not reach the expected state`. Вследствие этого часть UI-скриншотов не создана. См. [run #41248168147](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) и [issue #16](https://github.com/Ncorror/NekoFlash-2.0/issues/16). Нельзя выдавать объединённую ветку за полностью зелёную.
+- **[TERM-01 #20](https://github.com/Ncorror/NekoFlash-2.0/issues/20)**: задержка закрытия/клавиатура/поворот — нужен настоящий Android HOST.
+- **[ADB #19](https://github.com/Ncorror/NekoFlash-2.0/issues/19)**: долгие оболочки, доказательство RAM/дисковой диагностики на физическом устройстве.
+- **[ADB push #36](https://github.com/Ncorror/NekoFlash-2.0/issues/36)**: кодовый фикс REV43 слит, но реальная RAM, Stop, USB detach, 512+ файлов, старый ADB maxdata ещё ждут отчётов.
+- Постоянные диагностические raw логи **не удаляем и не обрезаем**; в публичные Issue не выкладываем серийники, Mi-токены, ключи и приватные `trace-*.bin`.
+- Проверка опасных операций `erase`, `format`, Fastboot DATA, Sideload и flashing — только отдельный согласованный этап на запасном разблокированном TARGET с резервной копией и планом восстановления. Защита release/GitHub переносится на финальный этап.
+
+## Граница этой ревизии документации
+
+REV44 добавляет офлайн-тестбук и обновляет актуальные индексные документы. **Исторические отчёты alpha10 и REV5/REV9/REV27 не переписываем:** даты, CI SHA и условия в них относятся только к указанным старым проверкам. `CHANGELOG.md` описывает опубликованные версии; DEV REV43 нельзя выдавать за новый официальный релиз.
 
 ---
 
