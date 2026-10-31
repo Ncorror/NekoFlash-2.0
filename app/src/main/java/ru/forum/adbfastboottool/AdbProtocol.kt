@@ -1448,20 +1448,29 @@ class AdbProtocol(
 
     private fun runInteractiveShellV2(stream: AdbStream): Boolean {
         var exitCode: Int? = null
+        val stdoutDisplay = ShellOutputTextRenderer(false, onLog)
+        val stderrDisplay = ShellOutputTextRenderer(true, onLog)
+        try {
         while (!cancelled && !stream.closed) {
-            drainInteractiveShellInputV2(stream)
-            consumeInteractiveShellV2Packets(stream) { code -> exitCode = code }
+            drainInteractiveShellInputV2(stream, stdoutDisplay, stderrDisplay) { code -> exitCode = code }
+            consumeInteractiveShellV2Packets(stream, stdoutDisplay, stderrDisplay) { code -> exitCode = code }
             if (exitCode != null) break
 
             val header = readHeader(timeoutMs = 250)
-            if (header == null) continue
+            if (header == null) {
+                // Publish newline-free prompts without finalizing a partially
+                // received UTF-8 character.
+                stdoutDisplay.flushVisibleFragment()
+                stderrDisplay.flushVisibleFragment()
+                continue
+            }
 
             when (header.command) {
                 A_WRTE -> {
                     val data = readData(header.dataLength) ?: return false
                     sendMessageInternal(A_OKAY, stream.localId, header.arg0, EMPTY_PAYLOAD)
                     if (data.isNotEmpty()) stream.pending.add(data)
-                    consumeInteractiveShellV2Packets(stream) { code -> exitCode = code }
+                    consumeInteractiveShellV2Packets(stream, stdoutDisplay, stderrDisplay) { code -> exitCode = code }
                     if (exitCode != null) break
                 }
                 A_OKAY -> {
@@ -1480,21 +1489,31 @@ class AdbProtocol(
             }
         }
 
-        exitCode?.let { onLog("=== ADB INTERACTIVE SHELL EXIT: $it ===") }
+        exitCode?.let {
+            stdoutDisplay.finish()
+            stderrDisplay.finish()
+            onLog("=== ADB INTERACTIVE SHELL EXIT: $it ===")
+        }
         return !cancelled
+        } finally {
+            stdoutDisplay.finish()
+            stderrDisplay.finish()
+        }
     }
 
-    private fun drainInteractiveShellInputV2(stream: AdbStream) {
+    private fun drainInteractiveShellInputV2(
+        stream: AdbStream,
+        stdoutDisplay: ShellOutputTextRenderer,
+        stderrDisplay: ShellOutputTextRenderer,
+        onExit: (Int) -> Unit
+    ) {
         while (!cancelled && !stream.closed) {
             val payload = pollInteractiveShellInput() ?: break
             if (!writeShellPacket(stream, SHELL_ID_STDIN, payload)) {
                 stream.closed = true
                 break
             }
-            consumeInteractiveShellV2Packets(stream) { code ->
-                onLog("=== ADB INTERACTIVE SHELL EXIT: $code ===")
-                stream.closed = true
-            }
+            consumeInteractiveShellV2Packets(stream, stdoutDisplay, stderrDisplay, onExit)
         }
         if (shouldCloseInteractiveShell() && !isInteractiveShellCloseStdinSent()) {
             if (writeShellPacket(stream, SHELL_ID_CLOSE_STDIN, EMPTY_PAYLOAD)) {
@@ -1503,7 +1522,12 @@ class AdbProtocol(
         }
     }
 
-    private fun consumeInteractiveShellV2Packets(stream: AdbStream, onExit: (Int) -> Unit) {
+    private fun consumeInteractiveShellV2Packets(
+        stream: AdbStream,
+        stdoutDisplay: ShellOutputTextRenderer,
+        stderrDisplay: ShellOutputTextRenderer,
+        onExit: (Int) -> Unit
+    ) {
         while (pendingByteCount(stream) >= SHELL_PACKET_HEADER) {
             val headerRaw = peekPendingExact(stream, SHELL_PACKET_HEADER) ?: return
             val id = headerRaw[0].toInt() and 0xFF
@@ -1518,8 +1542,8 @@ class AdbProtocol(
             val payload = readPendingExact(stream, length) ?: EMPTY_PAYLOAD
 
             when (id) {
-                SHELL_ID_STDOUT -> logShellOutput(payload, isStderr = false)
-                SHELL_ID_STDERR -> logShellOutput(payload, isStderr = true)
+                SHELL_ID_STDOUT -> stdoutDisplay.accept(payload)
+                SHELL_ID_STDERR -> stderrDisplay.accept(payload)
                 SHELL_ID_EXIT -> {
                     val code = payload.firstOrNull()?.toInt()?.and(0xFF) ?: 0
                     onExit(code)
@@ -1534,20 +1558,25 @@ class AdbProtocol(
 
     private fun runInteractiveLegacyShell(stream: AdbStream): Boolean {
         onLog("ℹ️ legacy shell: stdout/stderr and exit code are not separated")
+        val display = ShellOutputTextRenderer(false, onLog)
+        try {
         while (!cancelled && !stream.closed) {
-            drainInteractiveLegacyOutput(stream)
+            drainInteractiveLegacyOutput(stream, display)
             drainInteractiveLegacyInput(stream)
-            drainInteractiveLegacyOutput(stream)
+            drainInteractiveLegacyOutput(stream, display)
 
             val header = readHeader(timeoutMs = 250)
-            if (header == null) continue
+            if (header == null) {
+                display.flushVisibleFragment()
+                continue
+            }
 
             when (header.command) {
                 A_WRTE -> {
                     stream.remoteId = header.arg0
                     val data = readData(header.dataLength) ?: return false
                     sendMessageInternal(A_OKAY, stream.localId, stream.remoteId, EMPTY_PAYLOAD)
-                    logServiceOutput(data)
+                    display.accept(data)
                 }
                 A_OKAY -> {
                     if (header.dataLength > 0) readData(header.dataLength)
@@ -1565,6 +1594,9 @@ class AdbProtocol(
             }
         }
         return !cancelled
+        } finally {
+            display.finish()
+        }
     }
 
     private fun drainInteractiveLegacyInput(stream: AdbStream) {
@@ -1577,11 +1609,11 @@ class AdbProtocol(
         }
     }
 
-    private fun drainInteractiveLegacyOutput(stream: AdbStream) {
+    private fun drainInteractiveLegacyOutput(stream: AdbStream, display: ShellOutputTextRenderer) {
         while (stream.pending.isNotEmpty()) {
             val remaining = pendingByteCount(stream)
             val data = readPendingExact(stream, remaining) ?: return
-            logServiceOutput(data)
+            display.accept(data)
         }
     }
 

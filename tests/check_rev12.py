@@ -26,10 +26,12 @@ assert git_blob in {
     '9b80d7a5aa0aa7b0e5e2dd8b1e54958f88f607c7',  # REV31 exact reviewed blob
     'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',  # REV33 raw-file directory listing
     '6f975b156a643323b2ebc42916086e2d4b2e91e1',  # REV35 packet-safe UTF-8 terminal rendering
+    '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e',  # REV36 interactive PTY packet-safe output
 }, 'Unreviewed AdbProtocol change'
 if git_blob in {
     'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',
     '6f975b156a643323b2ebc42916086e2d4b2e91e1',
+    '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e',
 }:
     # Do not allow the new variant to silently fall back to full-result heap
     # capture, lose raw evidence or bypass path validation.
@@ -39,7 +41,7 @@ if git_blob in {
     pull = (base/'AdbPullPathPolicy.kt').read_text()
     assert 'fun parseListing(reader: Reader)' in pull
     assert 'require(normalize(record).isNotEmpty())' in pull
-if git_blob == '6f975b156a643323b2ebc42916086e2d4b2e91e1':
+if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e'}:
     # Only UI text rendering changed: raw binary writes and protocol identity
     # must stay untouched; stdout and stderr keep independent decoder state.
     assert 'record.writeStdout(data)' in adb and 'record.writeStderr(data)' in adb
@@ -54,6 +56,17 @@ if git_blob == '6f975b156a643323b2ebc42916086e2d4b2e91e1':
     assert 'StandardCharsets.UTF_8.newDecoder()' in renderer
     assert 'MAX_VIEW_FRAGMENT = 8192' in renderer
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/ShellOutputTextRendererTest.kt').is_file()
+if git_blob == '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e':
+    interactive = adb.split('private fun runInteractiveShellV2(')[1].split('data class CapturedShellResult(')[0]
+    assert 'ShellOutputTextRenderer(false, onLog)' in interactive
+    assert 'ShellOutputTextRenderer(true, onLog)' in interactive
+    assert 'SHELL_ID_STDOUT -> stdoutDisplay.accept(payload)' in interactive
+    assert 'SHELL_ID_STDERR -> stderrDisplay.accept(payload)' in interactive
+    assert 'display.accept(data)' in interactive
+    assert 'flushVisibleFragment()' in interactive
+    assert 'stdoutDisplay.finish()' in interactive and 'stderrDisplay.finish()' in interactive
+    assert 'display.finish()' in interactive
+    assert 'fun flushVisibleFragment()' in renderer
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb

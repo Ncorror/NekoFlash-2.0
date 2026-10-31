@@ -69,6 +69,39 @@ class ShellOutputTextRendererTest {
         assertEquals(text, events.joinToString("") { it.removePrefix("│ ") })
     }
 
+    @Test fun promptIsShownWithoutNewlineWhileSplitEmojiStaysValid() {
+        val events = mutableListOf<String>()
+        val renderer = ShellOutputTextRenderer(false, events::add)
+        val emoji = "🌙".toByteArray(Charsets.UTF_8)
+        renderer.accept("shell@device:$ ".toByteArray(Charsets.UTF_8))
+        renderer.accept(emoji.copyOfRange(0, 2))
+        renderer.flushVisibleFragment()
+        assertEquals(listOf("│ shell@device:$ "), events)
+        renderer.accept(emoji.copyOfRange(2, 4))
+        renderer.accept(" готово".toByteArray(Charsets.UTF_8))
+        renderer.flushVisibleFragment()
+        renderer.accept("\n".toByteArray(Charsets.UTF_8))
+        renderer.finish()
+        assertEquals(listOf("│ shell@device:$ ", "│ 🌙 готово"), events)
+    }
+
+    @Test fun splitUtf8ChannelsStayIndependentWhenPtyCloses() {
+        val events = mutableListOf<String>()
+        val stdout = ShellOutputTextRenderer(false, events::add)
+        val stderr = ShellOutputTextRenderer(true, events::add)
+        val out = "Привет".toByteArray(Charsets.UTF_8)
+        val err = "Ошибка".toByteArray(Charsets.UTF_8)
+        out.forEachIndexed { i, b ->
+            stdout.accept(byteArrayOf(b))
+            if (i < err.size) stderr.accept(byteArrayOf(err[i]))
+        }
+        if (err.size > out.size) stderr.accept(err.copyOfRange(out.size, err.size))
+        stdout.flushVisibleFragment()
+        stderr.finish()
+        stdout.finish()
+        assertEquals(listOf("│ Привет", "│ stderr: Ошибка"), events)
+    }
+
     @Test fun binaryNulIsOnlyHiddenInTextViewAndMalformedUtf8DoesNotCrash() {
         val events = mutableListOf<String>()
         val renderer = ShellOutputTextRenderer(true, events::add)
