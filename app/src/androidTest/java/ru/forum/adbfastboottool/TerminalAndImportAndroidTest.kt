@@ -9,6 +9,8 @@ import android.content.DialogInterface
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.graphics.Rect
+import android.text.Spannable
+import android.text.Selection
 import android.net.Uri
 import android.os.Build
 import android.os.LocaleList
@@ -153,6 +155,17 @@ class TerminalAndImportAndroidTest {
                 val line = view as TextView
                 assertTrue("Visible Console lines must support native Select/Copy", line.isTextSelectable)
                 assertTrue("No visible line text to copy", line.text.isNotBlank())
+                // Test the actual visible TextView selection state used by
+                // MainActivity's auto-follow guard, not just a policy Boolean.
+                val span = line.text as Spannable
+                Selection.setSelection(span, 0, minOf(3, span.length))
+                val selected = MainActivity::class.java
+                    .getDeclaredMethod("hasSelectedConsoleText").apply { isAccessible = true }
+                assertEquals("Active text selection must block automatic following",
+                    true, selected.invoke(it))
+                Selection.removeSelection(span)
+                assertEquals("Clearing selection must resume normal following",
+                    false, selected.invoke(it))
                 assertEquals("> rev27-before-publish", vm().terminalSnapshot().last())
             }
         }
