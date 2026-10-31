@@ -2031,8 +2031,29 @@ class AdbProtocol(
         stream.closed = true
     }
 
+    /**
+     * ADB CNXN peer maxdata limits each A_WRTE, not the logical SYNC file
+     * frame. A single 64-KiB SYNC DATA record can span many 4-KiB A_WRTEs.
+     * Preserve the byte stream intact and wait for the ACK of every WRTE.
+     */
     private fun writeAdbStream(stream: AdbStream, payload: ByteArray): Boolean {
-        if (stream.closed) return false
+        if (stream.closed || cancelled) return false
+        if (payload.size <= peerMaxPayloadSize) {
+            return writeAdbStreamChunk(stream, payload)
+        }
+        for (slice in AdbInteractiveInputChunkPolicy.fragments(
+            payload.size, peerMaxPayloadSize, framingBytes = 0
+        )) {
+            if (stream.closed || cancelled) return false
+            if (!writeAdbStreamChunk(stream, payload.copyOfRange(slice.first, slice.last + 1))) {
+                return false
+            }
+        }
+        return true
+    }
+
+    private fun writeAdbStreamChunk(stream: AdbStream, payload: ByteArray): Boolean {
+        if (stream.closed || cancelled) return false
         sendMessageInternal(A_WRTE, stream.localId, stream.remoteId, payload)
         while (!cancelled) {
             val header = readHeader(timeoutMs = 10_000) ?: run {
