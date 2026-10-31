@@ -59,7 +59,10 @@ internal class PtyInputEditText @JvmOverloads constructor(
             private var composing = ""
 
             override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
-                if (!raw()) return super.setComposingText(text, newCursorPosition)
+                if (!raw()) {
+                    composing = ""
+                    return super.setComposingText(text, newCursorPosition)
+                }
                 val next = text?.toString().orEmpty()
                 val ok = emit(PtyInputDelta.rewrite(composing, next))
                 if (ok) composing = next
@@ -67,7 +70,10 @@ internal class PtyInputEditText @JvmOverloads constructor(
             }
 
             override fun commitText(text: CharSequence?, newCursorPosition: Int): Boolean {
-                if (!raw()) return super.commitText(text, newCursorPosition)
+                if (!raw()) {
+                    composing = ""
+                    return super.commitText(text, newCursorPosition)
+                }
                 val next = text?.toString().orEmpty()
                 val bytes = if (composing.isEmpty()) {
                     next.toByteArray(StandardCharsets.UTF_8)
@@ -80,19 +86,34 @@ internal class PtyInputEditText @JvmOverloads constructor(
             }
 
             override fun finishComposingText(): Boolean {
-                if (!raw()) return super.finishComposingText()
+                if (!raw()) {
+                    composing = ""
+                    return super.finishComposingText()
+                }
                 composing = ""
                 return true
             }
 
+            private fun deletePtyText(
+                beforeLength: Int, afterLength: Int, inCodePoints: Boolean
+            ): Boolean {
+                if (beforeLength < 0 || afterLength < 0) return false
+                val planned = PtyInputDelta.deletion(
+                    composing, beforeLength, afterLength, inCodePoints
+                )
+                val ok = emit(planned.bytes)
+                // Do not advance composition when the PTY session rejected
+                // this write: the next IME update must not lose input.
+                if (ok) composing = planned.remainingComposition
+                return ok
+            }
+
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
-                if (!raw()) return super.deleteSurroundingText(beforeLength, afterLength)
-                composing = ""
-                return when {
-                    beforeLength > 0 -> emitDelete(beforeLength)
-                    afterLength > 0 -> emit("\u001B[3~".repeat(afterLength).toByteArray())
-                    else -> true
+                if (!raw()) {
+                    composing = ""
+                    return super.deleteSurroundingText(beforeLength, afterLength)
                 }
+                return deletePtyText(beforeLength, afterLength, inCodePoints = false)
             }
 
             override fun deleteSurroundingTextInCodePoints(
@@ -100,29 +121,32 @@ internal class PtyInputEditText @JvmOverloads constructor(
                 afterLength: Int
             ): Boolean {
                 if (!raw()) {
+                    composing = ""
                     return super.deleteSurroundingTextInCodePoints(beforeLength, afterLength)
                 }
-                composing = ""
-                return when {
-                    beforeLength > 0 -> emitDelete(beforeLength)
-                    afterLength > 0 -> emit("\u001B[3~".repeat(afterLength).toByteArray())
-                    else -> true
-                }
+                return deletePtyText(beforeLength, afterLength, inCodePoints = true)
             }
 
             override fun performEditorAction(actionCode: Int): Boolean {
-                if (!raw()) return super.performEditorAction(actionCode)
-                composing = ""
-                return emit(byteArrayOf('\n'.code.toByte()))
+                if (!raw()) {
+                    composing = ""
+                    return super.performEditorAction(actionCode)
+                }
+                val ok = emit(byteArrayOf('\n'.code.toByte()))
+                if (ok) composing = ""
+                return ok
             }
 
             override fun sendKeyEvent(event: KeyEvent): Boolean {
-                if (!raw() || event.action != KeyEvent.ACTION_DOWN) {
+                if (!raw()) {
+                    composing = ""
                     return super.sendKeyEvent(event)
                 }
-                composing = ""
+                if (event.action != KeyEvent.ACTION_DOWN) {
+                    return super.sendKeyEvent(event)
+                }
                 return when (event.keyCode) {
-                    KeyEvent.KEYCODE_DEL -> emitDelete(1)
+                    KeyEvent.KEYCODE_DEL -> deletePtyText(1, 0, inCodePoints = true)
                     KeyEvent.KEYCODE_ENTER -> emit(byteArrayOf('\n'.code.toByte()))
                     KeyEvent.KEYCODE_TAB -> emit(byteArrayOf('\t'.code.toByte()))
                     KeyEvent.KEYCODE_DPAD_UP -> emit("\u001B[A".toByteArray())
