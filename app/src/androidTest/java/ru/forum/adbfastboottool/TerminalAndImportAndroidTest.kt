@@ -1,6 +1,8 @@
 package ru.forum.adbfastboottool
 
 import android.app.Application
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.app.LocaleManager
 import android.content.Context
 import android.content.DialogInterface
@@ -320,6 +322,77 @@ class TerminalAndImportAndroidTest {
             }
         }
     }
+    @Test fun ptyImeComposingDeletionUnicodeAndPasteDoNotRequireUsb() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+            waitUi(scenario, "REV38 PTY editor visible") { expanded(it) }
+            scenario.onActivity { activity ->
+                val editor = activity.findViewById<PtyInputEditText>(R.id.etCommand)
+                val sent = mutableListOf<ByteArray>()
+                editor.configurePty(
+                    rawMode = { true },
+                    sink = { bytes -> sent.add(bytes.copyOf()); true }
+                )
+                try {
+                    val input = requireNotNull(editor.onCreateInputConnection(EditorInfo()))
+                    assertTrue(input.setComposingText("прив", 1))
+                    assertTrue(input.deleteSurroundingTextInCodePoints(1, 0))
+                    assertTrue(input.setComposingText("при", 1))
+                    assertTrue(input.commitText("привет 🌙", 1))
+                    assertEquals(3, sent.size)
+                    assertArrayEquals("прив".toByteArray(Charsets.UTF_8), sent[0])
+                    assertArrayEquals(byteArrayOf(PtyInputDelta.DEL.toByte()), sent[1])
+                    assertArrayEquals("вет 🌙".toByteArray(Charsets.UTF_8), sent[2])
+
+                    // Both sides of the cursor must be processed, and an
+                    // emoji is one code point even if it spans two UTF-16 units.
+                    assertTrue(input.setComposingText("🌙", 1))
+                    assertTrue(input.deleteSurroundingText(1, 2))
+                    assertArrayEquals(byteArrayOf(PtyInputDelta.DEL.toByte()) +
+                        "\u001B[3~\u001B[3~".toByteArray(Charsets.US_ASCII), sent.last())
+                    assertTrue(input.commitText("✨", 1))
+                    assertArrayEquals("✨".toByteArray(Charsets.UTF_8), sent.last())
+
+                    // Test the actual Android context-menu paste route,
+                    // not only IME commitText. Never read the user's clipboard.
+                    val clipboard = activity.getSystemService(ClipboardManager::class.java)
+                    clipboard.setPrimaryClip(ClipData.newPlainText("REV38 fixture", "echo Байт\n"))
+                    assertTrue(editor.onTextContextMenuItem(android.R.id.paste))
+                    assertArrayEquals("echo Байт\n".toByteArray(Charsets.UTF_8), sent.last())
+                    if (Build.VERSION.SDK_INT >= 28) clipboard.clearPrimaryClip()
+                    else clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+
+                    assertTrue(input.performEditorAction(EditorInfo.IME_ACTION_SEND))
+                    assertArrayEquals(byteArrayOf('\n'.code.toByte()), sent.last())
+                    assertTrue(input.sendKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_UP)))
+                    assertArrayEquals("\u001B[A".toByteArray(Charsets.UTF_8), sent.last())
+                    assertTrue("Raw input must not leave a host command draft", editor.text.isNullOrEmpty())
+
+                    // A rejected write must not advance the IME composition.
+                    editor.configurePty(rawMode = { true }, sink = { false })
+                    val rejected = requireNotNull(editor.onCreateInputConnection(EditorInfo()))
+                    assertFalse(rejected.setComposingText("пароль", 1))
+                    editor.configurePty(rawMode = { true },
+                        sink = { bytes -> sent.add(bytes.copyOf()); true })
+                    assertTrue(rejected.commitText("пароль", 1))
+                    assertArrayEquals("пароль".toByteArray(Charsets.UTF_8), sent.last())
+
+                    // When raw mode ends, the same connection remains a
+                    // normal Android EditText, not a phantom remote PTY.
+                    editor.configurePty(rawMode = { false }, sink = { false })
+                    assertTrue(rejected.commitText("local", 1))
+                    assertTrue(editor.text.toString().contains("local"))
+                } finally {
+                    editor.configurePty(
+                        rawMode = { vm().isInteractiveAdbShellActive() },
+                        sink = { bytes -> vm().sendInteractiveAdbShellBytes(bytes) }
+                    )
+                    editor.text?.clear()
+                }
+            }
+        }
+    }
+
     @Test fun providerImportPreservesExistingFileAndCopiesExactBytes() {
         File(workspace, "provider_image.img").writeText("old image")
         instrumentation.runOnMainSync { assertTrue(vm().importWorkspaceFile(uri, workspace)) }
