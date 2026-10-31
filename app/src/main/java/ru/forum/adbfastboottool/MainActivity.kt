@@ -4518,7 +4518,11 @@ class MainActivity : AppCompatActivity() {
         compactLogRenderState = decision.nextState
 
         val layoutManager = rvConsoleOutput.layoutManager as? LinearLayoutManager
-        val keepPinnedToBottom = pinToBottom || !rvConsoleOutput.canScrollVertically(1)
+        val keepPinnedToBottom = ConsoleAutoFollowPolicy.followOutput(
+            explicitlyRequested = pinToBottom,
+            currentlyAtBottom = !rvConsoleOutput.canScrollVertically(1),
+            selectingText = hasSelectedConsoleText(),
+        )
         val firstVisiblePosition = layoutManager?.findFirstVisibleItemPosition() ?: -1
         val firstVisibleOffset = if (firstVisiblePosition >= 0) {
             layoutManager?.findViewByPosition(firstVisiblePosition)?.top ?: 0
@@ -4544,10 +4548,28 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun hasSelectedConsoleText(): Boolean {
+        // The output adapter uses a TextView as each visible row. A selection
+        // can be active while a new log line arrives and the list is at bottom.
+        // Do not yank the action toolbar or the selected line out of view.
+        return (0 until rvConsoleOutput.childCount).any { index ->
+            val line = rvConsoleOutput.getChildAt(index) as? TextView
+            line != null && line.isTextSelectable &&
+                line.selectionStart >= 0 && line.selectionEnd >= 0 &&
+                line.selectionStart != line.selectionEnd
+        }
+    }
+
     private fun scrollConsoleToBottom() {
         val lastPosition = consoleLogAdapter.itemCount - 1
         if (lastPosition < 0) return
-        rvConsoleOutput.post { rvConsoleOutput.scrollToPosition(lastPosition) }
+        rvConsoleOutput.post {
+            if (!isFinishing && !isDestroyed &&
+                consoleDockController.isExpanded && !hasSelectedConsoleText()
+            ) {
+                rvConsoleOutput.scrollToPosition(lastPosition)
+            }
+        }
     }
 
     // ─── Авто-снижение яркости во время записи ───────────────────────────────
