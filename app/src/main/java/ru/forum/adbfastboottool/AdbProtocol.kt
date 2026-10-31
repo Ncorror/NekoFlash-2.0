@@ -687,7 +687,8 @@ class AdbProtocol(
         cancelled = false
 
         return when {
-            localPath.exists() && localPath.isFile && localPath.canRead() -> pushFile(localPath, remotePath, mode)
+            localPath.exists() && localPath.isFile && localPath.canRead() ->
+                pushFileInternal(localPath, remotePath, mode, startNewOperation = false)
             localPath.exists() && localPath.isDirectory && localPath.canRead() -> pushDirectory(localPath, remotePath, mode)
             else -> {
                 onLog("❌ adb push: local path is unavailable: ${localPath.absolutePath}")
@@ -696,9 +697,18 @@ class AdbProtocol(
         }
     }
 
-    fun pushFile(localFile: File, remotePath: String, mode: Int = 0x1A4): Boolean {
-        if (!isConnected) return false
-        cancelled = false
+    fun pushFile(localFile: File, remotePath: String, mode: Int = 0x1A4): Boolean =
+        pushFileInternal(localFile, remotePath, mode, startNewOperation = true)
+
+    /**
+     * Recursive push is one operation. Its nested file sends must never
+     * clear a cancellation requested between directory siblings.
+     */
+    private fun pushFileInternal(
+        localFile: File, remotePath: String, mode: Int, startNewOperation: Boolean
+    ): Boolean {
+        if (startNewOperation) cancelled = false
+        if (cancelled || !isConnected) return false
 
         if (!localFile.exists() || !localFile.isFile || !localFile.canRead()) {
             onLog("❌ adb push: local file is unavailable: ${localFile.absolutePath}")
@@ -754,8 +764,8 @@ class AdbProtocol(
     }
 
     private fun pushDirectory(localDir: File, remotePath: String, mode: Int = 0x1A4): Boolean {
-        if (!isConnected) return false
-        cancelled = false
+        // pushPath already opened this operation; do not clear its Stop flag.
+        if (cancelled || !isConnected) return false
 
         if (!localDir.exists() || !localDir.isDirectory || !localDir.canRead()) {
             onLog("❌ adb push: local folder is unavailable: ${localDir.absolutePath}")
@@ -774,35 +784,55 @@ class AdbProtocol(
             cleanRemote.trimEnd('/')
         }
 
-        val allEntries = localDir.walkTopDown().toList()
-        val directories = allEntries.filter { it.isDirectory }
-        val files = allEntries.filter { it.isFile }
+        val walker = AdbPushDirectoryWalker(localDir)
+        val checkCancelled = {
+            if (cancelled || !isConnected) {
+                throw CancellationException("ADB push directory cancelled or USB disconnected")
+            }
+        }
         onLog("-> adb push -r ${localDir.absolutePath} $targetRoot")
-        onLog("ℹ️ Directory: ${directories.size} folders, ${files.size} files")
+        var pushed = 0L
+        return try {
+            // Maintain the old order: preflight before remote changes, all
+            // directories before the first file, files in walkTopDown order.
+            // Each pass streams the entries without a full-tree heap List.
+            val expected = walker.scan(checkCancelled)
+            onLog("ℹ️ Directory: ${expected.directories} folders, ${expected.files} files")
 
-        directories.forEach { dir ->
-            if (cancelled) return false
-            val relative = dir.relativeTo(localDir).path.replace(File.separatorChar, '/')
-            val remoteDir = if (relative.isBlank() || relative == ".") targetRoot else joinRemotePath(targetRoot, relative)
-            if (!ensureRemoteDirectory(remoteDir)) return false
-        }
+            val afterDirs = walker.visitDirectories(checkCancelled) { dir ->
+                val relative = dir.relativeTo(localDir).path.replace(File.separatorChar, '/')
+                val remoteDir = if (relative.isBlank() || relative == ".") targetRoot else joinRemotePath(targetRoot, relative)
+                if (!ensureRemoteDirectory(remoteDir)) {
+                    throw java.io.IOException("Cannot create remote directory: $remoteDir")
+                }
+            }
+            if (afterDirs != expected) {
+                throw java.io.IOException("Local directory tree changed while creating remote directories")
+            }
 
-        var pushed = 0
-        files.forEach { file ->
-            if (cancelled) return false
-            val relative = file.relativeTo(localDir).path.replace(File.separatorChar, '/')
-            val remoteFile = joinRemotePath(targetRoot, relative)
-            onLog("ℹ️ adb push file ${pushed + 1}/${files.size}: $relative")
-            if (!pushFile(file, remoteFile, mode)) return false
-            pushed++
-        }
-
-        return if (cancelled) {
-            onLog("⚠️ adb push directory cancelled")
-            false
-        } else {
+            val afterFiles = walker.visitFiles(checkCancelled) { file ->
+                val relative = file.relativeTo(localDir).path.replace(File.separatorChar, '/')
+                val remoteFile = joinRemotePath(targetRoot, relative)
+                onLog("ℹ️ adb push file ${pushed + 1}/${expected.files}: $relative")
+                checkCancelled()
+                if (!pushFileInternal(file, remoteFile, mode, startNewOperation = false)) {
+                    checkCancelled()
+                    throw java.io.IOException("ADB push file did not complete: $relative")
+                }
+                pushed++
+            }
+            if (afterFiles != expected) {
+                throw java.io.IOException("Local directory tree changed while transferring files")
+            }
+            checkCancelled()
             onLog("✅ adb push directory completed: $pushed files → $targetRoot")
             true
+        } catch (_: CancellationException) {
+            onLog("⚠️ adb push directory cancelled/disconnected after $pushed files")
+            false
+        } catch (error: Exception) {
+            onLog("❌ adb push directory error after $pushed files: ${error.message ?: error.javaClass.simpleName}")
+            false
         }
     }
 
