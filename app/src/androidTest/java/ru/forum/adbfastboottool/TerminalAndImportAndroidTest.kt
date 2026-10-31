@@ -145,6 +145,16 @@ class TerminalAndImportAndroidTest {
                     .adapter!!.itemCount == vm().terminalSnapshot().size
             }
             assertEquals("> rev27-before-publish", vm().terminalSnapshot().last())
+            waitUi(scenario, "REV39 selectable console row") {
+                it.findViewById<RecyclerView>(R.id.rvConsoleOutput).childCount > 0
+            }
+            scenario.onActivity {
+                val view = it.findViewById<RecyclerView>(R.id.rvConsoleOutput).getChildAt(0)
+                val line = view as TextView
+                assertTrue("Visible Console lines must support native Select/Copy", line.isTextSelectable)
+                assertTrue("No visible line text to copy", line.text.isNotBlank())
+                assertEquals("> rev27-before-publish", vm().terminalSnapshot().last())
+            }
         }
     }
 
