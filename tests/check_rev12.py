@@ -18,15 +18,19 @@ main = (base/'MainActivity.kt').read_text()
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
-# Two byte-exact, audited variants only. REV31 adds disk-backed shell/v2
-# and legacy output recording; the original SAF/sideload transport invariants
-# remain covered by the rest of this and the older source guards.
+# Allow only exact audited ADB source variants. REV31 added lossless disk
+# spooling, REV33 file-backed directory parsing, REV35 UTF-8 display rendering.
+# The original SAF/sideload transport invariants remain guarded below.
 assert git_blob in {
     '7acf241d15e112d7fdc49c917c69661b437321df',  # REV12 baseline
     '9b80d7a5aa0aa7b0e5e2dd8b1e54958f88f607c7',  # REV31 exact reviewed blob
-    'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',  # REV33 exact raw-file directory listing
+    'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',  # REV33 raw-file directory listing
+    '6f975b156a643323b2ebc42916086e2d4b2e91e1',  # REV35 packet-safe UTF-8 terminal rendering
 }, 'Unreviewed AdbProtocol change'
-if git_blob == 'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e':
+if git_blob in {
+    'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',
+    '6f975b156a643323b2ebc42916086e2d4b2e91e1',
+}:
     # Do not allow the new variant to silently fall back to full-result heap
     # capture, lose raw evidence or bypass path validation.
     assert 'runShellCommandForResult(listCommand, logOutput = false, captureOutput = false)' in adb
@@ -35,6 +39,21 @@ if git_blob == 'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e':
     pull = (base/'AdbPullPathPolicy.kt').read_text()
     assert 'fun parseListing(reader: Reader)' in pull
     assert 'require(normalize(record).isNotEmpty())' in pull
+if git_blob == '6f975b156a643323b2ebc42916086e2d4b2e91e1':
+    # Only UI text rendering changed: raw binary writes and protocol identity
+    # must stay untouched; stdout and stderr keep independent decoder state.
+    assert 'record.writeStdout(data)' in adb and 'record.writeStderr(data)' in adb
+    assert 'ShellOutputTextRenderer(false, onLog)' in adb
+    assert 'ShellOutputTextRenderer(true, onLog)' in adb
+    assert 'stdoutDisplay?.accept(data)' in adb
+    assert 'stderrDisplay?.accept(data)' in adb
+    assert 'stdoutDisplay?.finish()' in adb
+    assert 'stderrDisplay?.finish()' in adb
+    assert 'if (logOutput && exitCode != null) onLog("=== ADB SHELL EXIT: $exitCode ===")' in adb
+    renderer = (base/'ShellOutputTextRenderer.kt').read_text()
+    assert 'StandardCharsets.UTF_8.newDecoder()' in renderer
+    assert 'MAX_VIEW_FRAGMENT = 8192' in renderer
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/ShellOutputTextRendererTest.kt').is_file()
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb
