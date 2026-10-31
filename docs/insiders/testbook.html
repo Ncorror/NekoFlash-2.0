@@ -1,0 +1,1902 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#050505">
+<meta name="description" content="Offline RU/EN NekoFlash 2.0 REV43 hardware field-test book, original BIN logs and ZIP reports.">
+<title>NekoFlash 2.0 · Insiders Hardware Testbook REV43</title>
+<style>
+:root {
+  color-scheme: dark;
+  --bg: #050505;
+  --panel: #0d0d10;
+  --panel2: #141419;
+  --panel3: #1b1b22;
+  --text: #f5f5f7;
+  --muted: #9a9aa6;
+  --stroke: #26262f;
+  --stroke-orange: #ff6b0066;
+  --orange: #ff6b00;
+  --orange-bright: #ff8c33;
+  --orange-pale: #ffb370;
+  --orange-dim: rgba(255, 107, 0, 0.12);
+  --green: #22c55e;
+  --red: #ef4444;
+  --amber: #f59e0b;
+  --shadow: 0 12px 36px rgba(0, 0, 0, 0.75);
+}
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background:
+    radial-gradient(ellipse 100% 340px at 50% -80px, rgba(255, 107, 0, 0.16) 0%, rgba(255, 60, 0, 0.04) 45%, #050505 75%),
+    #050505;
+  color: var(--text);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.5;
+}
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; transition: all 0.15s ease; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+}
+a { color: var(--orange-bright); text-decoration: none; }
+a:hover { text-decoration: underline; color: var(--orange-pale); }
+
+.page { max-width: 980px; margin: 0 auto; padding: 20px 14px 88px; }
+.top { display: flex; align-items: flex-start; gap: 16px; justify-content: space-between; margin-bottom: 6px; }
+.eyebrow {
+  font-size: 11.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--orange);
+}
+h1 {
+  font-size: clamp(24px, 5vw, 36px);
+  margin: 4px 0;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  background: linear-gradient(90deg, #ffffff 0%, #ffb370 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+h2 { font-size: 20px; line-height: 1.3; margin: 0 0 12px; letter-spacing: -0.02em; color: #fff; }
+h3 { font-size: 15px; margin: 0 0 8px; }
+.muted, .hint { color: var(--muted); }
+.muted { font-size: 14px; margin: 4px 0; }
+.tiny { font-size: 12px; }
+
+.lang {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--panel);
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.lang button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 8px 13px;
+  font-size: 13px;
+  font-weight: 800;
+}
+.lang button.active {
+  background: var(--orange);
+  color: #050505;
+  box-shadow: 0 2px 12px rgba(255, 107, 0, 0.35);
+}
+
+.card {
+  background: linear-gradient(155deg, var(--panel2) 0%, var(--panel) 100%);
+  border: 1px solid var(--stroke);
+  border-radius: 18px;
+  padding: 18px;
+  margin: 16px 0;
+  box-shadow: var(--shadow);
+}
+.summary { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 12px; }
+.kpi { font-size: 28px; font-weight: 850; letter-spacing: -0.04em; color: #fff; }
+.bar-wrap { margin: 12px 0; }
+.bar-label { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+.bar {
+  height: 9px;
+  border-radius: 99px;
+  background: #1c1c24;
+  border: 1px solid #2a2a35;
+  overflow: hidden;
+}
+.bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5100, #ff9d42);
+  width: 0%;
+  transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 12px rgba(255, 107, 0, 0.5);
+}
+.bar.secondary { height: 5px; margin-top: 6px; }
+.bar.secondary > div { background: linear-gradient(90deg, #b45309, #fbbf24); }
+
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.chip {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  border: 1px solid var(--stroke);
+  background: #111116;
+  border-radius: 999px;
+  padding: 5px 11px;
+  color: #d4d4dc;
+  font-size: 12px;
+  font-weight: 650;
+}
+.chip b { color: var(--orange-bright); }
+.chip[data-stat="pass"] b { color: var(--green); }
+.chip[data-stat="fail"] b { color: var(--red); }
+.chip[data-stat="blocked"] b { color: var(--amber); }
+
+.steps-intro { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.mini {
+  background: #101015;
+  border: 1px solid var(--stroke);
+  border-top: 2px solid var(--orange);
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 13px;
+  min-height: 96px;
+}
+.mini strong {
+  display: inline-block;
+  color: #050505;
+  background: var(--orange);
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+.warning {
+  border-left: 4px solid var(--orange);
+  background: rgba(255, 107, 0, 0.09);
+  border-radius: 10px;
+  padding: 12px 14px;
+  color: #ffd8b8;
+  font-size: 13px;
+  margin: 14px 0;
+}
+.soft {
+  background: #09090c;
+  padding: 11px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  font-size: 13px;
+  color: #c4c4d0;
+}
+
+.formgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.field label { display: block; color: var(--muted); font-size: 12px; margin-bottom: 5px; font-weight: 700; }
+.field input, .field textarea, .field select {
+  width: 100%;
+  background: #08080b;
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  border-radius: 10px;
+  min-height: 43px;
+  padding: 10px 12px;
+  transition: border-color 0.15s ease;
+}
+.field input:focus, .field textarea:focus, .field select:focus {
+  border-color: var(--orange);
+}
+.field textarea { resize: vertical; min-height: 84px; }
+.field.wide { grid-column: 1 / -1; }
+
+.btn {
+  border: 1px solid #3a3a46;
+  background: #181820;
+  color: #f4f4f6;
+  padding: 10px 15px;
+  font-weight: 750;
+  border-radius: 11px;
+  min-height: 42px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.btn:hover:not(:disabled) {
+  border-color: var(--orange);
+  background: #20202a;
+}
+.btn.primary {
+  background: linear-gradient(135deg, #ff7a00 0%, #e05300 100%);
+  border-color: #ff9433;
+  color: #050505;
+  font-weight: 800;
+  box-shadow: 0 4px 16px rgba(255, 107, 0, 0.28);
+}
+.btn.primary:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+.btn.ghost {
+  background: #0c0c10;
+  border-color: var(--stroke);
+  color: var(--muted);
+}
+.btn.ghost:hover:not(:disabled) {
+  color: #fff;
+  border-color: #454554;
+}
+.btn.danger {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.35);
+  color: #fca5a5;
+}
+.btn.danger:hover:not(:disabled) {
+  border-color: var(--red);
+  background: rgba(239, 68, 68, 0.2);
+}
+.btn.sm {
+  min-height: 32px;
+  padding: 5px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.tests-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.tests-header h2 { margin: 0; }
+.toolbar-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.filters {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 0 0 6px;
+}
+.filters button {
+  white-space: nowrap;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid var(--stroke);
+  background: var(--panel);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+  padding: 7px 13px;
+}
+.filters button:hover { border-color: #3f3f4e; color: #fff; }
+.filters button.active {
+  border-color: var(--orange);
+  background: var(--orange-dim);
+  color: var(--orange-bright);
+}
+.filters .cnt {
+  font-size: 11px;
+  opacity: 0.75;
+  margin-left: 4px;
+}
+
+.search { margin: 8px 0 14px; position: relative; }
+.search input {
+  width: 100%;
+  border: 1px solid var(--stroke);
+  border-radius: 12px;
+  background: var(--panel);
+  color: #fff;
+  min-height: 44px;
+  padding: 10px 14px;
+}
+.search input:focus { border-color: var(--orange); }
+
+.test {
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  background: var(--panel);
+  margin: 12px 0;
+  overflow: hidden;
+  transition: border-color 0.15s ease;
+}
+.test[open] { border-color: #383846; }
+.test[data-status="pass"] { border-left: 4px solid var(--green); }
+.test[data-status="fail"] { border-left: 4px solid var(--red); }
+.test[data-status="blocked"] { border-left: 4px solid var(--amber); }
+.test[data-status="skip"] { border-left: 4px solid #6b7280; }
+
+.test summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 15px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  user-select: none;
+}
+.test summary:hover { background: rgba(255, 255, 255, 0.015); }
+.test summary::-webkit-details-marker { display: none; }
+.index {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--orange-dim);
+  border: 1px solid var(--stroke-orange);
+  color: var(--orange-bright);
+  font-size: 12.5px;
+  font-weight: 900;
+  flex-shrink: 0;
+}
+.test-head { min-width: 0; flex: 1; }
+.test-title { font-weight: 780; font-size: 15px; line-height: 1.3; color: #fff; }
+.test-sub { color: var(--muted); font-size: 12px; margin-top: 4px; word-wrap: break-word; }
+.chevron { color: var(--orange); font-size: 16px; transition: transform 0.2s; }
+.test[open] .chevron { transform: rotate(180deg); }
+
+.badge-status {
+  font-size: 11px;
+  font-weight: 750;
+  color: var(--muted);
+  padding: 4px 9px;
+  border: 1px solid var(--stroke);
+  background: #14141a;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.test[data-status="pass"] .badge-status { color: #86efac; border-color: rgba(34, 197, 94, 0.4); background: rgba(34, 197, 94, 0.1); }
+.test[data-status="fail"] .badge-status { color: #fca5a5; border-color: rgba(239, 68, 68, 0.4); background: rgba(239, 68, 68, 0.1); }
+.test[data-status="blocked"] .badge-status { color: #fcd34d; border-color: rgba(245, 158, 11, 0.4); background: rgba(245, 158, 11, 0.1); }
+
+.test-body { padding: 4px 16px 16px; border-top: 1px solid var(--stroke); background: #0a0a0d; }
+.detail-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+}
+.detail-intro { font-size: 13px; color: #d4d4de; margin: 0; flex: 1; min-width: 220px; }
+
+.step { padding: 12px 0; border-bottom: 1px solid #1c1c24; }
+.step-row { display: flex; align-items: flex-start; gap: 11px; }
+.step input[type=checkbox] {
+  appearance: none;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  background: #070709;
+  border: 2px solid #525263;
+  border-radius: 6px;
+  cursor: pointer;
+  margin: 1px 0 0;
+  position: relative;
+  transition: all 0.15s ease;
+}
+.step input[type=checkbox]:hover { border-color: var(--orange-bright); }
+.step input:checked {
+  background: var(--orange);
+  border-color: var(--orange);
+}
+.step input:checked:after {
+  content: '✓';
+  position: absolute;
+  left: 3px;
+  top: -4px;
+  color: #050505;
+  font-size: 18px;
+  font-weight: 900;
+}
+.step-text { flex: 1; font-size: 14px; min-width: 0; }
+.step-text.done { color: #787887; }
+.step-text.done > .stepline { text-decoration: line-through; text-decoration-color: var(--orange); }
+.stepline { overflow-wrap: anywhere; cursor: pointer; }
+.step-hint { font-size: 12px; color: var(--orange-pale); margin-top: 5px; opacity: 0.85; }
+
+.command {
+  background: #050507;
+  border: 1px solid #2b221a;
+  border-radius: 10px;
+  margin: 9px 0 0;
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+}
+.command code {
+  display: block;
+  flex: 1;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 12.5px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace;
+  color: #ffb870;
+  padding: 11px;
+  min-width: 0;
+  user-select: text;
+}
+.copy {
+  border: 0;
+  border-left: 1px solid #2b221a;
+  border-radius: 0 9px 9px 0;
+  background: #1a120b;
+  color: var(--orange-bright);
+  min-width: 82px;
+  padding: 9px 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.copy:hover { background: var(--orange); color: #050505; }
+
+.expected {
+  background: rgba(255, 107, 0, 0.07);
+  border: 1px solid rgba(255, 107, 0, 0.28);
+  border-radius: 10px;
+  padding: 11px 13px;
+  margin-top: 14px;
+  font-size: 13px;
+  color: #ffe2c6;
+}
+.expected strong { color: var(--orange-bright); }
+
+.test-bottom {
+  display: grid;
+  grid-template-columns: minmax(160px, 230px) 1fr;
+  gap: 12px;
+  margin-top: 15px;
+}
+
+.file-items { display: flex; flex-direction: column; gap: 6px; margin-top: 10px; }
+.file-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #09090c;
+  border: 1px solid var(--stroke);
+  border-radius: 9px;
+  padding: 7px 11px;
+  font-size: 12.5px;
+}
+.file-row-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e4e4ec; }
+.file-row-meta { color: var(--muted); font-size: 11.5px; white-space: nowrap; display: flex; align-items: center; gap: 8px; }
+.file-remove {
+  border: 0;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-radius: 6px;
+  width: 24px;
+  height: 24px;
+  font-weight: 800;
+  line-height: 1;
+}
+.file-remove:hover { background: var(--red); color: #fff; }
+
+.empty { text-align: center; padding: 30px; color: var(--muted); border: 1px dashed var(--stroke); border-radius: 14px; }
+.footer { padding: 18px 5px; color: #757582; font-size: 12px; text-align: center; }
+.actions { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.toast {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 24px;
+  background: #14100c;
+  border: 1px solid var(--orange);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+  padding: 12px 18px;  border-radius: 12px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 650;
+  max-width: 92vw;
+  display: none;
+}
+.toast.show { display: block; }
+.linkbar { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; }
+.linkbar a { font-size: 12.5px; font-weight: 650; }
+.divider { height: 1px; background: var(--stroke); margin: 16px 0; }
+.name-warning { color: var(--orange-pale); font-size: 12px; margin: 10px 0; }
+.small-help { font-size: 12.5px; color: var(--muted); margin: 8px 0; }
+
+@media (max-width: 640px) {
+  .page { padding: 14px 12px 84px; }
+  .card { padding: 14px; margin: 13px 0; }
+  .steps-intro { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .formgrid { grid-template-columns: 1fr; }
+  .field.wide { grid-column: auto; }
+  .test-bottom { grid-template-columns: 1fr; }
+  .top { gap: 8px; }
+  .lang button { padding: 8px 10px; }
+  .test summary { padding: 13px; }
+  .test-body { padding: 4px 13px 15px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="top">
+    <div>
+      <div class="eyebrow">NekoFlash · Insiders · REV43</div>
+      <h1 id="appTitle">Тестбук NekoFlash 2.0</h1>
+      <p class="muted" id="subline">Полевые тесты DEV REV43 · HOST → TARGET · исходные логи в ZIP · офлайн.</p>
+    </div>
+    <div class="lang" role="group" aria-label="Language">
+      <button id="ru" class="active" type="button">RU</button>
+      <button id="en" type="button">EN</button>
+    </div>
+  </header>
+
+  <section class="card">
+    <div class="summary">
+      <div>
+        <div class="eyebrow" id="progressLabel">Результаты тестов</div>
+        <div class="kpi" id="progressCount">0 / 34</div>
+      </div>
+      <div style="text-align:right">
+        <div class="eyebrow" id="stepsLabel">Отмечено шагов</div>
+        <div style="font-weight:850;font-size:20px;color:var(--orange-bright)" id="stepCount">0 / 0</div>
+      </div>
+    </div>
+    <div class="bar-wrap">
+      <div class="bar" role="progressbar" aria-label="Test progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" id="barOuter">
+        <div id="barInner"></div>
+      </div>
+      <div class="bar secondary" aria-hidden="true">
+        <div id="stepBarInner"></div>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <section class="card" aria-label="Instructions">
+    <h2 id="howTitle">Как пользоваться</h2>
+    <div class="steps-intro" id="howSteps"></div>
+    <p class="warning" id="safeText"></p>
+    <p class="soft" id="offlineText"></p>
+  </section>
+
+
+
+  <section class="card" id="rev43status" style="border-color:#82430d">
+    <h2>REV43 · Hardware testing / Аппаратные испытания</h2>
+    <p class="muted">RU: начинаем полевую проверку HOST → TARGET. Реальные PASS пока не подтверждены. PR CI: build/API26/API34 PASS; merged DEV CI: API26 FAIL (2 UI wait-timeout), API34 PASS. Не путай CI с проверкой USB на телефоне.</p>
+    <p class="muted">EN: HOST → TARGET field campaign begins; no new physical PASS is verified yet. PR CI succeeded; merged DEV CI failed API26 on two UI timeouts, API34 passed.</p>
+    <p class="small-help"><a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391">REV43 PR CI</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147">merged DEV CI</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171">Download REV43 test APK / Скачать тестовую APK (artifact ZIP)</a></p>
+  </section>
+  <section class="card" id="devices">
+    <h2 id="devicesTitle">Устройства и сборка</h2>
+    <div class="formgrid">
+      <div class="field">
+        <label for="hostModel" id="hostModelLabel">HOST — телефон с NekoFlash</label>
+        <input id="hostModel" data-meta="hostModel" autocomplete="off" placeholder="POCO X3 Pro">
+      </div>
+      <div class="field">
+        <label for="hostAndroid" id="hostAndroidLabel">HOST — версия Android</label>
+        <input id="hostAndroid" data-meta="hostAndroid" autocomplete="off" placeholder="Android 13 / LineageOS 20">
+      </div>
+      <div class="field">
+        <label for="targetModel" id="targetModelLabel">TARGET — второй телефон</label>
+        <input id="targetModel" data-meta="targetModel" autocomplete="off" placeholder="Второй смартфон">
+      </div>
+      <div class="field">
+        <label for="targetAndroid" id="targetAndroidLabel">TARGET — версия Android</label>
+        <input id="targetAndroid" data-meta="targetAndroid" autocomplete="off" placeholder="Android 12+">
+      </div>
+      <div class="field">
+        <label for="usbInfo" id="usbInfoLabel">USB-кабель / OTG</label>
+        <input id="usbInfo" data-meta="usbInfo" autocomplete="off" placeholder="USB-C to USB-C / OTG">
+      </div>
+      <div class="field">
+        <label for="build" id="buildLabel">Идентификатор сборки</label>
+        <input id="build" data-meta="build" autocomplete="off">
+      </div>
+    </div>
+    <p class="small-help" id="localHint"></p>
+  </section>
+
+  <section id="testsSection">
+    <div class="tests-header">
+      <h2 id="testsTitle">Проверки</h2>
+      <div class="toolbar-actions">
+        <button class="btn ghost sm" id="expandAllBtn" type="button">Развернуть все</button>
+        <button class="btn ghost sm" id="collapseAllBtn" type="button">Свернуть все</button>
+        <button class="btn danger sm" id="resetAllBtn" type="button">Сбросить</button>
+      </div>
+    </div>
+    <div class="field" style="margin:10px 0">
+      <label for="roundSelect" id="roundLabel">Этап тестирования</label>
+      <select id="roundSelect" style="background:#101015;border:1px solid #42424c;border-radius:10px;color:#fff;min-height:44px;padding:8px 12px;width:100%"><option value="today">Сегодня — диагностический раунд</option><option value="extended">Расширенные испытания</option><option value="lab">Лабораторный этап (отдельно)</option><option value="all">Все проверки</option></select>
+    </div>
+    <p class="small-help" id="roundCount" aria-live="polite"></p>
+    <div class="filters" id="filters" role="group" aria-label="Test filter"></div>
+    <div class="search">
+      <input id="search" type="search" placeholder="Поиск по тестам и командам" aria-label="Search tests">
+    </div>
+    <div id="testList"></div>
+  </section>
+
+  <section class="card" id="report">
+    <h2 id="reportTitle">Собрать ZIP-отчёт</h2>
+    <p class="muted" id="reportIntro"></p>
+    <div class="field">
+      <label id="suggestionsLabel" for="suggestions">Общие замечания и предложения</label>
+      <textarea id="suggestions" data-meta="suggestions" rows="4" placeholder="Что доработать, что неудобно, что сломалось..."></textarea>
+    </div>
+    <div class="divider"></div>
+    <div class="soft" id="autoLogsBox" style="margin: 12px 0 16px; border-color: #82430d;">
+      <div style="font-weight:800;color:var(--orange-bright);margin-bottom:5px" id="autoLogsTitle">Автоматически вложить журналы NekoFlash</div>
+      <p class="small-help" id="autoLogsHelp">Один раз разреши браузеру доступ к /Download/NekoFlash/logs. При создании ZIP файлы будут перечитаны заново, если браузер поддерживает доступ к папкам. Иначе выбери папку повторно перед отчётом.</p>
+      <div class="actions" style="margin-top: 7px;">
+        <button class="btn primary sm" id="chooseLogFolder" type="button">📁 Подключить папку логов</button>
+        <button class="btn sm" id="androidLogFolder" type="button">Android: выбрать папку</button>
+        <button class="btn ghost sm" id="disconnectLogFolder" type="button">Отключить</button>
+      </div>
+      <input type="file" id="logFolderFallback" webkitdirectory directory multiple hidden>
+      <div class="small-help" id="logFolderStatus" role="status" aria-live="polite" style="margin-top: 10px;"></div>
+    </div>
+    <div class="field">
+      <label for="attachments" id="attachLabel">Приложить логи / скриншоты / записи экрана</label>
+      <input id="attachments" type="file" multiple accept=".log,.txt,.json,.zip,.xml,.csv,.png,.jpg,.jpeg,.webp,.mp4,.webm,.gz,.html,application/zip,image/*,video/*">
+    </div>
+    <div class="small-help" id="fileSummary"></div>
+    <div class="file-items" id="fileList"></div>
+    <p class="name-warning" id="privacy"></p>
+    <div class="actions">
+      <button class="btn primary" id="makeZip" type="button">📦 Создать ZIP-отчёт</button>
+      <button class="btn" id="copyReportBtn" type="button">📋 Скопировать report.txt</button>
+      <button class="btn" id="exportJson" type="button">Сохранить прогресс JSON</button>
+      <button class="btn ghost" id="importJson" type="button">Загрузить прогресс</button>
+      <input type="file" id="importFile" accept=".json,application/json" hidden>
+    </div>
+    <p class="small-help" id="reportHint"></p>
+    <div class="linkbar">
+      <a href="https://github.com/Ncorror/NekoFlash-2.0/pull/18" target="_blank" rel="noopener noreferrer">REV43 · PR #18</a>
+      <a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171" target="_blank" rel="noopener noreferrer" id="apkLink">DEV APK · REV43 CI</a>
+    </div>
+  </section>
+
+  <footer class="footer" id="footer"></footer>
+</main>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+'use strict';
+const T = {
+  ru: {
+    title: 'Тестбук NekoFlash 2.0',
+    roundLabel: 'Этап тестирования',
+    rounds: {today:'Сегодня — диагностика без записи разделов',extended:'Расширенный тест на запасном TARGET',lab:'Лаборатория — отдельное разрешение',all:'Все проверки'},
+    sub: 'Полевые тесты DEV REV43 · HOST → TARGET · исходные логи в ZIP · офлайн.',
+    progress: 'Результаты тестов',
+    steps: 'Отмечено шагов',
+    how: 'Как пользоваться',
+    howSteps: [
+      ['01', 'Выбери проверку и прочитай действия.'],
+      ['02', 'Выполни команды на нужном телефоне.'],
+      ['03', 'Ставь галочки, выбирай результат и пиши ошибки.'],
+      ['04', 'Приложи файлы, скачай ZIP и отправь его в Telegram.']
+    ],
+    safe: '⚠️ СЕГОДНЯ: безопасная диагностика, USB и тестовый импорт. Не выполнять erase/format/flash/unlock на рабочем TARGET. Разрушающие сценарии — отдельный лабораторный этап на разблокированном запасном устройстве с резервной копией. Функции для профессионалов не ограничены.',
+    offline: '🔒 Файлы никуда не отправляются. Галочки и заметки сохраняются в браузере, если хранилище доступно. Для надёжности выгружай JSON-прогресс. В Telegram отправляй созданный ZIP как файл.',
+    devices: 'Устройства и сборка',
+    hostModel: 'HOST — телефон с NekoFlash',
+    hostAndroid: 'HOST — версия Android',
+    targetModel: 'TARGET — второй телефон',
+    targetAndroid: 'TARGET — версия Android',
+    usbInfo: 'USB-кабель / OTG',
+    build: 'Идентификатор сборки',
+    localHint: 'HOST = телефон, где запущен NekoFlash. TARGET = подключаемое устройство. Если тестируешь без USB, TARGET можно оставить пустым.',
+    tests: 'Проверки',
+    expandAll: 'Развернуть все',
+    collapseAll: 'Свернуть все',
+    resetAll: 'Сбросить',
+    resetConfirm: 'Сбросить все отметки, результаты и заметки?',
+    resetDone: 'Прогресс очищен',
+    checkAllSteps: 'Отметить все шаги',
+    search: 'Поиск по тестам и командам...',
+    categories: { all: 'Все', basic: 'Без USB', adb: 'ADB / USB', fastboot: 'Fastboot', ui: 'Интерфейс' },
+    notstarted: 'Не начато',
+    pass: 'PASS — работает',
+    fail: 'FAIL — ошибка',
+    blocked: 'BLOCKED — не получилось',
+    skip: 'NOT TESTED — пропуск',
+    notes: 'Ошибка / замечания / что доработать',
+    noteplaceholder: 'Что сделал, что ожидал, что получилось, как повторить...',
+    expected: 'Что должно получиться',
+    copy: 'Копировать',
+    copied: 'Скопировано в буфер обмена',
+    copymanual: 'Не удалось скопировать автоматически. Выдели текст вручную.',
+    report: 'Собрать ZIP-отчёт',
+    reportIntro: 'Отметки и комментарии попадут в ZIP автоматически. Подключи папку NekoFlash/logs: при создании отчёта доступные журналы будут добавлены без изменения содержимого. Скриншоты можно приложить отдельно.',
+    suggestions: 'Общие замечания и предложения',
+    suggestionsPlaceholder: 'Что доработать, что неудобно, что сломалось...',
+    attach: 'Логи, скриншоты и записи экрана (можно добавлять по очереди)',
+    noFiles: 'Ручных вложений пока нет. Автосбор логов показывается отдельно выше.',
+    autoLogsTitle: 'Автоматически вложить журналы NekoFlash',
+    autoLogsHelp: 'Выбери Download/NekoFlash/logs или папку NekoFlash. В поддерживаемом браузере новые журналы, включая исходные trace-*.bin, подхватываются прямо при создании ZIP. Android-файловый браузер может требовать повторного выбора папки перед каждым отчётом.',
+    chooseLogFolder: '📁 Подключить / обновить логи',
+    androidLogFolder: 'Android: разовый выбор папки',
+    disconnectLogFolder: 'Отключить доступ',
+    logNotConnected: 'Папка ещё не выбрана — ZIP не может получить логи сам.',
+    logLive: n => `Подключено: ${n}. Новые логи перечитываются при каждом ZIP.`,
+    logSnapshot: n => `Выбрано файлов: ${n}. Этот Android-браузер дал только снимок папки; для новых логов нажми «Обновить логи» перед отчётом.`,
+    logRestored: 'Доступ к папке восстановлен. При создании ZIP проверю разрешение.',
+    logNeedPermission: 'Доступ к папке истёк. Нажми «Подключить / обновить логи» ещё раз.',
+    logEmpty: 'В выбранной папке не найдены журналы NekoFlash (log-, trace-, session-summary-). Проверь папку Download/NekoFlash/logs.',
+    logSelectionCancelled: 'Выбор папки отменён.',
+    logSelectionError: 'Не удалось прочитать папку: ',
+    logBrowserFallback: 'В этом браузере постоянный доступ к папке недоступен. Открой выбор папки ещё раз или используй обычные вложения.',
+    logMissingConfirm: 'Папка NekoFlash/logs не выбрана. Создать ZIP БЕЗ диагностических логов?',
+    logPermissionError: 'Нет доступа к папке логов — подключи её повторно. ZIP без журналов не создан.',
+    logCollected: n => `Автоматически добавлено ${n} исходных лог-файлов; их содержимое не менялось.`,
+    logTooMany: 'ZIP32 не может вместить весь объём логов. Файлы не удалены; раздели сбор по сессиям или используй экспорт NekoFlash.',
+    privacy: 'Логи НЕ очищаются, НЕ маскируются и включаются в ZIP без изменений. Архив НЕ шифруется. Отправляй полные диагностические данные только в доверенный канал; не публикуй их в открытом GitHub.',
+    zip: '📦 Создать ZIP-отчёт',
+    copyReport: '📋 Скопировать report.txt',
+    reportCopied: 'Текст отчёта скопирован в буфер обмена',
+    save: 'Сохранить прогресс JSON',
+    load: 'Загрузить прогресс',
+    reportHint: 'ZIP: report.txt, progress.json, evidence-manifest.json, свежие исходные логи (если разрешён доступ) и ручные вложения. ZIP без сжатия: точные байты исходных файлов. В Telegram отправляй как документ.',
+    footer: 'Офлайн-тестбук REV43 · без аналитики, сервера и автоматической отправки · профессиональные логи без потерь · Black & Orange 2.0.',
+    filesSelected: n => `Ручных вложений: ${n}. После перезагрузки потребуется выбрать их заново.`,
+    zipCreating: 'Собираю ZIP-отчёт…',
+    zipDone: 'ZIP создан. Проверь папку загрузок.',
+    zipErr: 'Ошибка при создании ZIP: ',
+    saved: 'JSON-прогресс сохранён',
+    loaded: 'Прогресс импортирован',
+    badImport: 'Не удалось импортировать: неверный файл',
+    storageWarn: '⚠️ Этот браузер не сохраняет прогресс между открытиями. Регулярно выгружай JSON.',
+    stepLabel: 'шагов'
+  },
+  en: {
+    title: 'NekoFlash 2.0 Test Kit',
+    roundLabel:'Test stage',
+    rounds: {today:'Today — read-only / disposable data',extended:'Extended tests on spare TARGET',lab:'Lab — separate authorization required',all:'All checks'},
+    sub: 'REV43 DEV hardware checks, original binary logs and offline ZIP reporting.',
+    progress: 'Test results',
+    steps: 'Steps checked',
+    how: 'How to use',
+    howSteps: [
+      ['01', 'Choose a test and read the instructions.'],
+      ['02', 'Run commands on the indicated device.'],
+      ['03', 'Tick steps, choose a result and describe problems.'],
+      ['04', 'Attach evidence, download ZIP and send it to Telegram.']
+    ],
+    safe: '⚠️ TODAY: diagnostics, USB and disposable-file import only. No erase/format/flash/unlock on a production TARGET. Destructive work belongs to a separate lab phase with an unlocked spare and backup. Expert tools remain unrestricted.',
+    offline: '🔒 No files are uploaded. Checkmarks and notes are saved in this browser when storage is available. Export a JSON backup for safety. Send the generated ZIP to Telegram as a document.',
+    devices: 'Devices and build',
+    hostModel: 'HOST — phone running NekoFlash',
+    hostAndroid: 'HOST — Android version',
+    targetModel: 'TARGET — connected device',
+    targetAndroid: 'TARGET — Android version',
+    usbInfo: 'USB cable / OTG',
+    build: 'Build identifier',
+    localHint: 'HOST runs NekoFlash. TARGET is the second device. Leave TARGET fields blank for UI-only tests.',
+    tests: 'Tests',
+    expandAll: 'Expand all',
+    collapseAll: 'Collapse all',
+    resetAll: 'Reset',
+    resetConfirm: 'Reset all checkmarks, statuses and notes?',
+    resetDone: 'Progress cleared',
+    checkAllSteps: 'Check all steps',
+    search: 'Search tests and commands...',
+    categories: { all: 'All', basic: 'No USB', adb: 'ADB / USB', fastboot: 'Fastboot', ui: 'Interface' },
+    notstarted: 'Not started',
+    pass: 'PASS — works',
+    fail: 'FAIL — issue',
+    blocked: 'BLOCKED',
+    skip: 'NOT TESTED',
+    notes: 'Bug / notes / suggested improvements',
+    noteplaceholder: 'Steps taken, expected and actual result, reproduction details...',
+    expected: 'Expected result',
+    copy: 'Copy',
+    copied: 'Copied to clipboard',
+    copymanual: 'Automatic copy failed. Select the text manually.',
+    report: 'Create ZIP report',
+    reportIntro: 'Checkmarks and notes are included automatically. Connect the NekoFlash/logs folder to collect original diagnostic files during report generation; add screenshots separately.',
+    suggestions: 'General feedback and improvements',
+    suggestionsPlaceholder: 'What should change? What was confusing or broken?',
+    attach: 'Logs, screenshots and screen recordings (can be added incrementally)',
+    noFiles: 'No manually attached files. Automatic log collection is shown above.',
+    autoLogsTitle: 'Automatically include NekoFlash diagnostic logs',
+    autoLogsHelp: 'Choose Download/NekoFlash/logs or the NekoFlash folder. On supported browsers new logs, including raw trace-*.bin evidence, are scanned at ZIP creation. Some Android file pickers return only a snapshot; reselect the folder before the next report.',
+    chooseLogFolder: '📁 Connect / refresh logs',
+    androidLogFolder: 'Android: choose folder once',
+    disconnectLogFolder: 'Disconnect folder',
+    logNotConnected: 'No folder selected — this page cannot fetch logs without access.',
+    logLive: n => `Connected: ${n}. New logs are read again at every ZIP.`,
+    logSnapshot: n => `${n} file(s) selected. This Android browser returned a snapshot; refresh the folder to include newly generated logs.`,
+    logRestored: 'Folder access restored. Permissions will be checked at ZIP creation.',
+    logNeedPermission: 'Folder permission expired. Connect / refresh logs again.',
+    logEmpty: 'No NekoFlash log files (log-, trace-, session-summary-) were found. Choose Download/NekoFlash/logs.',
+    logSelectionCancelled: 'Folder selection cancelled.',
+    logSelectionError: 'Unable to read folder: ',
+    logBrowserFallback: 'Persistent folder access is unavailable in this browser. Select the folder again or attach the logs manually.',
+    logMissingConfirm: 'NekoFlash/logs is not connected. Generate ZIP WITHOUT diagnostic logs?',
+    logPermissionError: 'Log folder access expired — reconnect it. The report was not generated without logs.',
+    logCollected: n => `Automatically included ${n} original log files without modifying their contents.`,
+    logTooMany: 'ZIP32 cannot fit all log data. No source files were deleted; split collection by sessions or use NekoFlash export.',
+    privacy: 'Raw logs are NOT cleaned, masked, or modified. ZIP is NOT encrypted. Share complete diagnostic evidence only through a trusted private channel, not in public GitHub issues.',
+    zip: '📦 Create ZIP report',
+    copyReport: '📋 Copy report.txt',
+    reportCopied: 'Report text copied to clipboard',
+    save: 'Export progress JSON',
+    load: 'Import progress',
+    reportHint: 'ZIP includes report.txt, progress.json, evidence-manifest.json, fresh original logs (with folder permission), and manual files. No compression or redaction. Send as a Telegram document.',
+    footer: 'Offline REV43 checklist · no analytics, backend or automatic upload · full professional diagnostics · Black & Orange 2.0.',
+    filesSelected: n => `${n} manual file(s). Reselect them after reopening the page.`,
+    zipCreating: 'Creating ZIP report…',
+    zipDone: 'ZIP created. Check your Downloads folder.',
+    zipErr: 'ZIP generation failed: ',
+    saved: 'JSON progress exported',
+    loaded: 'Progress imported',
+    badImport: 'Could not import this file',
+    storageWarn: '⚠️ This browser does not persist progress. Export JSON backups regularly.',
+    stepLabel: 'steps'
+  }
+};
+
+const TESTS = [
+  {id:'SETUP-01',group:'basic',ru:'Установка и проверка APK',en:'Installation and APK verification',intro:{ru:'На HOST. Нужен Debug APK из этого комплекта, versionCode 234. Устанавливай без удаления оригинального NekoFlash.',en:'On HOST. Install the checked Debug APK from this kit, versionCode 234, without removing original NekoFlash.'},steps:[
+    {ru:'Распакуй набор REV43 и найди NekoFlash-6.0.0-alpha11-debug.apk рядом с этим HTML; либо скачай официальный GitHub Actions artifact.',en:'Unpack the REV43 kit and find NekoFlash-6.0.0-alpha11-debug.apk next to this HTML; alternatively use the GitHub Actions artifact.'},
+    {ru:'Установи APK на HOST. Старый NekoFlash не удаляй.',en:'Install the APK on HOST; do not uninstall the original NekoFlash.'},
+    {ru:'Открой приложение и разреши запрошенный доступ.',en:'Launch the app and grant the necessary requested permissions.'},
+    {ru:'Дополнительно проверь SHA-256 APK в Termux на HOST (если он есть и файл в Download).',en:'Optionally check APK SHA-256 in Termux on HOST (when available and the file is in Download).',cmd:'sha256sum ~/storage/downloads/NekoFlash-6.0.0-alpha11-debug.apk',where:{ru:'Termux на HOST; перед первым доступом к Download выполни termux-setup-storage.',en:'Termux on HOST; run termux-setup-storage first if needed.'}}
+  ],expect:{ru:'APK запускается отдельно от оригинального приложения. SHA-256: вычисли SHA-256 установленного REV43 APK отдельно / compute SHA-256 from your downloaded APK.',en:'APK launches independently from the original. SHA-256: вычисли SHA-256 установленного REV43 APK отдельно / compute SHA-256 from your downloaded APK.'}},
+  {id:'UI-01',group:'basic',ru:'Вкладки и навигация',en:'Tabs and navigation',intro:{ru:'Без USB. Проверяем пять вкладок и разделы прошивки, не нажимая запуск записи.',en:'No USB. Check five main tabs and Flash sections without executing writes.'},steps:[
+    {ru:'Открой Главная, Прошивка, Sideload, Unlock и Настройки.',en:'Open Home, Flash, Sideload, Unlock and Settings.'},
+    {ru:'В Прошивке переключи Быстрая / Массовая / Инструменты.',en:'Switch Quick Flash / Mass Flash / Tools.'},
+    {ru:'Переключись между вкладками десять раз.',en:'Switch between tabs ten times.'},
+    {ru:'Сверни приложение, вернись и проверь сохранение состояния.',en:'Background and restore the app; verify the UI state.'},
+    {ru:'Закрой и повторно открой приложение.',en:'Close and relaunch the app.'}
+  ],expect:{ru:'Нет вылетов, зависаний, исчезнувших кнопок или неуместных автоматических действий.',en:'No crashes, freezes, missing controls or unintended automatic operations.'}},
+  {id:'UI-02',group:'basic',ru:'Шрифт, ориентация, RU/EN',en:'Font scaling, rotation and RU/EN',intro:{ru:'Проверяем мобильную вёрстку актуальной DEV REV43.',en:'Validate current REV43 mobile layout.'},steps:[
+    {ru:'Проверь все вкладки с обычным шрифтом.',en:'Check all tabs with normal system font size.'},
+    {ru:'Увеличь системный шрифт примерно до 130% и повтори проверку.',en:'Increase system font to roughly 130% and repeat.'},
+    {ru:'Поверни экран горизонтально и обратно.',en:'Rotate to landscape and back.'},
+    {ru:'Переключи язык RU → EN → RU.',en:'Switch language RU → EN → RU.'},
+    {ru:'При проблемах сделай снимки с видимым масштабом/ориентацией.',en:'Capture screenshots for clipping, overlap or scaling issues.'}
+  ],expect:{ru:'Текст читается, элементы доступны, скролл работает; переводы корректны.',en:'Text is readable, controls remain usable, scrolling works and translations are correct.'}},
+  {id:'TERM-01',group:'basic',ru:'Терминал и экранная клавиатура',en:'Terminal and software keyboard',intro:{ru:'Открой встроенный терминал >_. Для первого этапа кабель не нужен.',en:'Open the built-in >_ terminal. No cable is needed initially.'},steps:[
+    {ru:'Открой/закрой терминал несколько раз.',en:'Open and close the terminal repeatedly.'},
+    {ru:'Проверь длинный ввод, пробелы, Backspace, Enter и вставку.',en:'Try long input, spaces, Backspace, Enter and paste.'},
+    {ru:'Открой клавиатуру, поверни телефон, нажми Back.',en:'Open the keyboard, rotate HOST, press Back.'},
+    {ru:'Введи команду без TARGET и проверь, что нет ложного SUCCESS.',en:'Run without TARGET and verify there is no false SUCCESS.',cmd:'adb devices',where:{ru:'Терминал NekoFlash на HOST',en:'NekoFlash terminal on HOST'}},
+    {ru:'Проверь вторую команду без TARGET.',en:'Check the second command without TARGET.',cmd:'fastboot devices',where:{ru:'Терминал NekoFlash на HOST',en:'NekoFlash terminal on HOST'}}
+  ],expect:{ru:'IME не перекрывает ввод. Без TARGET приложение не выдумывает подключение.',en:'Keyboard does not obscure input. No fabricated connection without TARGET.'}},
+  {id:'USB-01',group:'adb',ru:'USB Host / OTG',en:'USB Host / OTG',intro:{ru:'HOST управляет вторым телефоном. TARGET включён с USB-отладкой и подтвердил RSA-авторизацию.',en:'HOST manages the second phone. TARGET has USB debugging enabled and has approved RSA authorization.'},steps:[
+    {ru:'Включи USB-отладку на TARGET и подключи DATA-кабель к HOST.',en:'Enable USB debugging on TARGET and connect a data cable to HOST.'},
+    {ru:'Разреши приложению доступ к USB; подтверди RSA на TARGET.',en:'Grant the app USB permission; approve RSA on TARGET.'},
+    {ru:'Проверь модель и режим устройства в USB-панели и на Главной.',en:'Verify detected device and mode in the USB panel and Home.'},
+    {ru:'В простое отключи и переподключи USB пять раз.',en:'Disconnect and reconnect USB five times while idle.'},
+    {ru:'Проверь возврат из фона и после блокировки HOST.',en:'Check background return and HOST lock/unlock.'}
+  ],expect:{ru:'Правильный TARGET, запросы разрешений без циклов, честные состояния подключения/отключения.',en:'Correct TARGET, no permission-loop, accurate connect/disconnect state.'}},
+  {id:'ADB-01',group:'adb',ru:'ADB — диагностика только для чтения',en:'ADB — read-only diagnostics',intro:{ru:'Выполняй по одной во встроенном терминале NekoFlash, когда TARGET авторизован.',en:'Run commands one by one in the NekoFlash terminal when TARGET is authorized.'},steps:[
+    {ru:'Проверь список подключённых устройств.',en:'Check connected devices.',cmd:'adb devices'},
+    {ru:'Запроси модель TARGET.',en:'Query TARGET model.',cmd:'adb shell getprop ro.product.model'},
+    {ru:'Запроси кодовое имя TARGET.',en:'Query TARGET codename.',cmd:'adb shell getprop ro.product.device'},
+    {ru:'Запроси Android TARGET.',en:'Query TARGET Android version.',cmd:'adb shell getprop ro.build.version.release'},
+    {ru:'Проверь shell identity.',en:'Check shell identity.',cmd:'adb shell id'},
+    {ru:'Проверь правильность текстового ответа.',en:'Verify exact text output.',cmd:'adb shell echo NEKOFLASH_TEST_OK'}
+  ],expect:{ru:'Команды возвращают правдоподобные данные TARGET; последняя возвращает NEKOFLASH_TEST_OK.',en:'Commands return valid TARGET information; the last one prints NEKOFLASH_TEST_OK.'}},
+  {id:'ADB-02',group:'adb',ru:'Интерактивный ADB shell',en:'Interactive ADB shell',intro:{ru:'Это тест интерактивного режима, а не просто выполнения одной команды.',en:'This tests interactive shell behaviour, not just one-shot commands.'},steps:[
+    {ru:'Открой интерактивный shell.',en:'Start interactive shell.',cmd:'adb shell'},
+    {ru:'Уже внутри shell выполни команду.',en:'Run this inside the remote shell.',cmd:'id',where:{ru:'Внутри ADB shell',en:'Inside remote ADB shell'}},
+    {ru:'Проверь каталог.',en:'Check current directory.',cmd:'pwd',where:{ru:'Внутри ADB shell',en:'Inside remote ADB shell'}},
+    {ru:'Выйди из shell.',en:'Exit the remote shell.',cmd:'exit',where:{ru:'Внутри ADB shell',en:'Inside remote ADB shell'}}
+  ],expect:{ru:'Клавиатура работает, ответы видны, после exit управление возвращается в host-терминал.',en:'Keyboard works, output is visible, exit restores the host terminal.'}},
+  {id:'ADB-03',group:'adb',stage:'extended',ru:'ADB Push/Pull и SHA-256',en:'ADB Push/Pull and SHA-256',intro:{ru:'Только тестовый файл, без системных разделов. Подготовка в Termux на HOST; adb — в NekoFlash.',en:'Disposable test file only. Preparation in Termux on HOST; adb commands in NekoFlash.'},steps:[
+    {ru:'Создай тестовый файл 16 MiB на HOST в Termux.',en:'Create a 16 MiB file on HOST in Termux.',cmd:'termux-setup-storage\nmkdir -p ~/storage/downloads/NekoFlashQA\ndd if=/dev/urandom of=~/storage/downloads/NekoFlashQA/probe.bin bs=1M count=16',where:{ru:'Termux на HOST',en:'Termux on HOST'}},
+    {ru:'Создай тестовую папку на TARGET.',en:'Create a test folder on TARGET.',cmd:'adb shell mkdir -p /sdcard/Download/NekoFlashQA'},
+    {ru:'Отправь файл на TARGET.',en:'Push the file to TARGET.',cmd:'adb push /sdcard/Download/NekoFlashQA/probe.bin /sdcard/Download/NekoFlashQA/probe.bin'},
+    {ru:'Проверь наличие и размер на TARGET.',en:'Verify file existence and size on TARGET.',cmd:'adb shell ls -l /sdcard/Download/NekoFlashQA/probe.bin'},
+    {ru:'Скачай файл обратно на HOST.',en:'Pull the file back to HOST.',cmd:'adb pull /sdcard/Download/NekoFlashQA/probe.bin /sdcard/Download/NekoFlashQA/probe-return.bin'},
+    {ru:'Сравни SHA-256 обоих файлов в Termux на HOST.',en:'Compare both SHA-256 values using Termux on HOST.',cmd:'sha256sum ~/storage/downloads/NekoFlashQA/probe.bin ~/storage/downloads/NekoFlashQA/probe-return.bin',where:{ru:'Termux на HOST',en:'Termux on HOST'}}
+  ],expect:{ru:'Хэши совпадают, размер полный, приложение не сообщает ложный успех. Если путь блокируется Android — зафиксируй ошибку.',en:'Hashes match, size is complete, no false success. Report any Android path-access error.'}},
+  {id:'FB-01',group:'fastboot',stage:'extended',ru:'Fastboot — только getvar',en:'Fastboot — getvar only',intro:{ru:'Только запасной TARGET с уже разблокированным загрузчиком. В Fastboot переходи вручную; команды только на чтение.',en:'Use a spare TARGET with an already unlocked bootloader. Enter Fastboot manually; read-only commands.'},steps:[
+    {ru:'Переведи TARGET в Fastboot вручную и подключи к HOST.',en:'Manually enter TARGET Fastboot and connect to HOST.'},
+    {ru:'Проверь обнаружение.',en:'Check detection.',cmd:'fastboot devices'},
+    {ru:'Прочитай кодовое имя.',en:'Read product name.',cmd:'fastboot getvar product'},
+    {ru:'Прочитай слот (если поддерживается).',en:'Read active slot, if supported.',cmd:'fastboot getvar current-slot'},
+    {ru:'Прочитай состояние блокировки.',en:'Read lock status.',cmd:'fastboot getvar unlocked'},
+    {ru:'Проверь userspace fastboot и лимит загрузки.',en:'Check userspace status and download limit.',cmd:'fastboot getvar is-userspace\nfastboot getvar max-download-size'}
+  ],expect:{ru:'Устройство определяется; неподдерживаемые переменные корректно показывают ошибку/unknown. Ничего не записываем.',en:'Device is detected; unsupported variables report an honest error/unknown. No writes.'}},
+  {id:'QUICK-01',group:'ui',ru:'Quick Flash — только интерфейс',en:'Quick Flash — interface only',intro:{ru:'Для выбора подойдёт безвредная тестовая копия файла .img. Нельзя нажимать «Прошить».',en:'Use a harmless test .img file for selection. Never press Flash.'},steps:[
+    {ru:'Открой Прошивка → Быстрая и выбери раздел.',en:'Open Flash → Quick and choose a partition.'},
+    {ru:'Выбери тестовый .img файл.',en:'Select a harmless test .img file.'},
+    {ru:'Проверь раздел, слот, имя файла и состояние кнопок.',en:'Check partition, slot, filename and action states.'},
+    {ru:'Поверни экран, переключи вкладки и вернись.',en:'Rotate, switch tabs and return.'},
+    {ru:'Проверь реакцию на недоступный исходный файл.',en:'Check handling of an unavailable source file.'}
+  ],expect:{ru:'Выбор восстанавливается корректно, нет автоматической записи и ложных статусов.',en:'Selection restores accurately; no automatic writes or misleading status.'}},
+  {id:'MASS-01',group:'ui',ru:'Mass Flash — очередь без прошивки',en:'Mass Flash — queue without flashing',intro:{ru:'Добавляй только тестовые файлы; все строки предназначены для проверки UI, не для записи на телефон.',en:'Add test files only; entries are for UI validation, not real device writes.'},steps:[
+    {ru:'Открой Массовую прошивку, проверь пустую очередь.',en:'Open Mass Flash and check the empty queue state.'},
+    {ru:'Добавь 5–10 строк с тестовыми файлами.',en:'Add 5–10 entries using test files.'},
+    {ru:'Поменяй порядок, удали и снова добавь строки.',en:'Reorder, remove and re-add entries.'},
+    {ru:'Проверь замену файла при повторном выборе точного имени раздела.',en:'Verify replacement when the exact partition name is added again.'},
+    {ru:'Проверь разные boot_a и boot_b, затем поворот и возврат.',en:'Check that boot_a and boot_b remain distinct; rotate and return.'},
+    {ru:'По возможности проверь очередь из более 32 строк.',en:'If practical, test a queue longer than 32 entries.'}
+  ],expect:{ru:'Порядок, номера, имена/размеры, прокрутка и форма сохраняются; операция НЕ запускается.',en:'Order, numbering, names/sizes, scroll and form persist; execution is NOT started.'}},
+  {id:'FILE-01',group:'ui',ru:'Файлы и Android SAF',en:'Files and Android SAF',intro:{ru:'Проверяем только выбор файлов и разрешения на чтение.',en:'Test file selection and read permissions only.'},steps:[
+    {ru:'Открой файловый выбор из Quick Flash.',en:'Open the file picker from Quick Flash.'},
+    {ru:'Отмени выбор и проверь, что старый файл не пропал.',en:'Cancel selection and confirm previous choice is intact.'},
+    {ru:'Выбери файл с пробелами или длинным именем.',en:'Select a file with spaces or a long filename.'},
+    {ru:'Повтори через «Файлы Android» / DocumentsUI.',en:'Repeat with Android Files / DocumentsUI.'},
+    {ru:'После выбора временно сделай тестовый источник недоступным и проверь статус.',en:'Make a disposable test source unavailable and check reported state.'}
+  ],expect:{ru:'Нет ложного SUCCESS, автоматической прошивки или потери выбранного файла при отмене.',en:'No false SUCCESS, automatic flashing or lost selection on cancellation.'}},
+  {id:'SIDE-01',group:'ui',ru:'Sideload — только экран выбора',en:'Sideload — selection UI only',intro:{ru:'Никакой установки ZIP в Recovery в первом раунде.',en:'Do not install ZIP packages in Recovery in this round.'},steps:[
+    {ru:'Открой вкладку Sideload.',en:'Open Sideload.'},
+    {ru:'Выбери тестовый ZIP, но не запускай передачу.',en:'Select a harmless test ZIP without starting transfer.'},
+    {ru:'Проверь имя файла, поворот и переключение вкладок.',en:'Check filename, rotation and tab switching.'},
+    {ru:'Проверь статус при отсутствии Recovery-устройства.',en:'Check behaviour without a connected Recovery device.'}
+  ],expect:{ru:'Корректное состояние. Передача 100% сама по себе не доказывает успешную установку.',en:'Accurate state. 100% transfer alone never proves successful installation.'}},
+  {id:'UNLOCK-01',group:'ui',ru:'Unlock — только интерфейс',en:'Unlock — interface only',intro:{ru:'Не вводи в отчёт данные Mi Account и не запускай разблокировку.',en:'Do not include Mi Account credentials or execute unlocking.'},steps:[
+    {ru:'Открой вкладку Unlock.',en:'Open Unlock.'},
+    {ru:'Проверь подписи и состояние кнопок без устройства.',en:'Check labels and button states without a device.'},
+    {ru:'Проверь поворот и масштаб шрифта.',en:'Check rotation and font scaling.'},
+    {ru:'Проверь, что неизвестное состояние не показывается как успех.',en:'Verify unknown state is not displayed as success.'}
+  ],expect:{ru:'Нет автоматического unlock, ложного успеха или скрытых критичных предупреждений.',en:'No automatic unlocking, false success or missing important warnings.'}},
+  {id:'STAB-01',group:'adb',stage:'extended',ru:'Фон, поворот и USB reconnect',en:'Background, rotation and USB reconnect',intro:{ru:'Без прошивки: выполняй только диагностические команды и операции с отдельными тестовыми файлами.',en:'No flashing: use only diagnostics and disposable file operations.'},steps:[
+    {ru:'Подключи авторизованный TARGET и выполни чтение модели.',en:'Connect authorized TARGET and read its model.',cmd:'adb shell getprop ro.product.model'},
+    {ru:'Сверни приложение на 30–60 секунд, затем вернись.',en:'Background the app for 30–60 seconds, then return.'},
+    {ru:'Заблокируй HOST, разблокируй и поверни дисплей.',en:'Lock/unlock HOST and rotate the screen.'},
+    {ru:'Отключи USB только в простое, затем подключи снова.',en:'Disconnect USB only while idle, then reconnect.'},
+    {ru:'Повтори чтение модели и проверь журнал состояний.',en:'Repeat model query and inspect the state history.',cmd:'adb shell getprop ro.product.model'}
+  ],expect:{ru:'Нет зависаний, самоповторов операций и ложного SUCCESS после переподключения.',en:'No freezes, automatic command replays or false SUCCESS after reconnect.'}},
+  {id:'REPORT-01',group:'basic',ru:'Сбор логов и отправка отчёта',en:'Logs and report submission',intro:{ru:'Финальный этап: доказательства и описание неисправностей.',en:'Final stage: evidence and reproducible bug descriptions.'},steps:[
+    {ru:'Открой диагностику/историю NekoFlash и экспортируй доступные логи.',en:'Open NekoFlash diagnostics/history and export available logs.'},
+    {ru:'Сделай скриншоты или запись экрана найденных ошибок.',en:'Capture screenshots or recordings of problems.'},
+    {ru:'Заполни результат и замечания для проблемных тестов.',en:'Fill in status and notes for failed tests.'},
+    {ru:'Прикрепи файлы в блоке «Собрать отчёт» ниже.',en:'Attach evidence files in the report section below.'},
+    {ru:'Создай ZIP, затем отправь его в Telegram как документ.',en:'Create ZIP, then send it to Telegram as a document.'}
+  ],expect:{ru:'Один ZIP с report.txt, progress.json и выбранными файлами БЕЗ изменения исходных логов. Архив без шифрования — передавай только в доверенный канал.',en:'One ZIP with report.txt, progress.json and ORIGINAL attachments unchanged. The archive is not encrypted; share via trusted channels only.'}},
+  {"id":"BUILD-02","group":"basic","stage":"today","ru":"Сверка DEV APK / SHA / CI","en":"Verify DEV APK / SHA / CI","intro":{"ru":"Важно: одинаковое имя alpha11 не означает одинаковый код.","en":"The same alpha11 filename can refer to different commits."},"steps":[{"ru":"Проверь версию 6.0.0-alpha11-dev / code 234 / dev-пакет.","en":"Check version 6.0.0-alpha11-dev / code 234 / dev package."},{"ru":"Найди APK из комплекта и проверь SHA-256 в Termux.","en":"Locate the bundled APK and verify SHA-256 in Termux.","cmd":"sha256sum ~/storage/downloads/NekoFlash-6.0.0-alpha11-debug.apk","where":{"ru":"Termux на HOST после распаковки","en":"Termux on HOST after extraction"}},{"ru":"Сверь SHA-256 с результатом SETUP-01 или файлом SHA256SUMS.txt из комплекта.","en":"Match SHA-256 against SETUP-01 expected result or SHA256SUMS.txt in the kit."},{"ru":"Проверь, что скачанная сборка из CI #41247325391.","en":"Verify the original artifact is from CI #41247325391."}],"expect":{"ru":"SHA совпадает; версия и package правильные; старый NekoFlash установлен отдельно.","en":"Hash matches; version and package are correct; old NekoFlash remains separate."}},
+  {"id":"TERM-02","group":"basic","stage":"today","ru":"REV26: закрытие vs остановка и старые 100%","en":"REV26: close vs stop / stale 100%","intro":{"ru":"Проверь известный старый дефект при ADB без TARGET и с авторизованным TARGET.","en":"Regression for accidental terminal collapse or global 100% progress popup."},"steps":[{"ru":"Открой терминал и набери adb devices.","en":"Open Console and enter adb devices.","cmd":"adb devices"},{"ru":"Убедись, что Console не свернулась и Центр операций не перекрыл ввод.","en":"Check Console stays open and global Operations dialog does not steal focus."},{"ru":"Нажми только «Закрыть терминал», снова открой и проверь сохранение вывода.","en":"Use Close only, reopen and check output is retained."},{"ru":"При длительной читающей команде попробуй отдельную кнопку Stop.","en":"For a long read-only command, check the separate Stop button."},{"ru":"Сделай скрин при ошибочном диалоге или ложном 100%.","en":"Screenshot any stale 100% dialog or unexpected collapse."}],"expect":{"ru":"Закрытие панели не отменяет текущую операцию; Stop обрабатывается отдельно.","en":"Closing panel does not cancel a command; Stop is independent."}},
+  {"id":"TERM-03","group":"adb","stage":"today","ru":"REV27: длинный вывод и повторное открытие","en":"REV27: long output / reopen","intro":{"ru":"Без прошивки. Стресс-тест именно UI и записываемого журнала.","en":"No flashing; tests UI viewport and persistent raw evidence."},"steps":[{"ru":"С подключённым TARGET выполни чтение списка системных свойств.","en":"With TARGET connected, query system properties.","cmd":"adb shell getprop"},{"ru":"Во время прокрутки закрой и открой Console 5 раз.","en":"Close/reopen Console five times while scrolling."},{"ru":"Прокрути в начало и конец, проверь скорость и зависания.","en":"Scroll to beginning/end; observe stalls and latency."},{"ru":"Открой лог-файлы NekoFlash и проверь, что ранние строки остаются в исходной диагностике.","en":"Inspect NekoFlash raw logs and check early entries are still available."}],"expect":{"ru":"UI остаётся отзывчивым, видимая история ограничена интерфейсом, но исходный лог полный.","en":"UI responsive; viewport is bounded but persistent logs remain complete."}},
+  {"id":"TERM-04","group":"basic","stage":"today","ru":"IME и масштаб 130% / поворот","en":"IME / 130% font / rotation","intro":{"ru":"Проверить физическую клавиатуру Android, шторку и Back.","en":"Test real Android keyboard handling, Back and rotation."},"steps":[{"ru":"Открой Console с IME и увеличь масштаб системного шрифта.","en":"Open Console with IME and increase system font size."},{"ru":"Поверни HOST портрет → альбомный → портрет.","en":"Rotate HOST portrait → landscape → portrait."},{"ru":"Нажми Back: сперва должна уйти IME, а не закрыться/сброситься Console.","en":"Press Back; IME should dismiss before Console loses state."},{"ru":"Повтори ввод/историю после поворота и возврата.","en":"Check command input/history after rotation."}],"expect":{"ru":"Команды, ввод и фокус не теряются; навигация предсказуема.","en":"Input, focus and history remain stable."}},
+  {"id":"USB-02","group":"adb","stage":"extended","ru":"USB detach во время безопасного чтения","en":"USB detach during read-only query","intro":{"ru":"Только read-only, никакой записи разделов или больших переносов.","en":"Read-only operations only; no flash or large file transfer."},"steps":[{"ru":"Подключи авторизованный TARGET и начни чтение.","en":"Connect an authorized TARGET and start a read.","cmd":"adb shell getprop"},{"ru":"Во время чтения отсоедини data-кабель и зафиксируй точный статус.","en":"Disconnect the data cable mid-read, capture exact status."},{"ru":"Переподключи и выполни явную новую команду.","en":"Reconnect and explicitly run a new command.","cmd":"adb devices"},{"ru":"Проверь, что команда не отправилась автоматически повторно.","en":"Verify no automatic command replay."}],"expect":{"ru":"Обрыв зафиксирован; нет ложного SUCCESS и самостоятельного повторного запуска.","en":"Disconnect logged; no false success or automatic replay."}},
+  {"id":"ADB-04","group":"adb","stage":"today","ru":"shell/v2 — вывод stderr и код завершения","en":"shell/v2 — stderr and exit result","intro":{"ru":"Выполняй после авторизации TARGET. На некоторых прошивках shell/v2 отсутствует — отметь это.","en":"Run with authorized TARGET. Some devices do not offer shell/v2; record this."},"steps":[{"ru":"Проверь успешный код выхода.","en":"Check successful exit.","cmd":"adb shell true"},{"ru":"Проверь явный неуспешный выход; это НЕ PASS самой команды.","en":"Check a deliberate nonzero exit; command itself must not be reported SUCCESS.","cmd":"adb shell false"},{"ru":"Выведи тестовую строку в stderr.","en":"Emit harmless text to stderr.","cmd":"adb shell 'echo NEKO_ERR_TEST 1>&2'"},{"ru":"Проверь в журнале вывод и признак завершения.","en":"Inspect logs for stderr and exit/legacy limitation."}],"expect":{"ru":"Ошибки не выдают SUCCESS, stderr виден; legacy честно сообщает отсутствие exit-code.","en":"No false success; stderr visible, legacy reports missing exit-code."}},
+  {"id":"ADB-05","group":"adb","stage":"extended","ru":"Большие ADB-ответы: RAM/потери данных","en":"Large ADB output: memory / lossless","intro":{"ru":"Известная задача #19: не требуем 100 МБ в консоль; оцениваем память и полный raw log.","en":"Known issue #19: avoid dumping 100 MB into UI; inspect memory and raw logs."},"steps":[{"ru":"Запусти умеренный объём вывода на TARGET.","en":"Produce moderate output on TARGET.","cmd":"adb shell getprop"},{"ru":"Повтори 10 раз с паузами и отметь лаги/сбои.","en":"Repeat ten times with pauses, note latency/stalls."},{"ru":"Проверь наличие всех запросов и ответов в сегментах диагностического журнала.","en":"Verify all requests/responses in persisted diagnostic segments."},{"ru":"При замедлении приложи полный журнал и снимок потребления памяти.","en":"Attach full raw log and memory screenshot on slowdown."}],"expect":{"ru":"Данные не обрезаны; если RAM растёт — отчёт FAIL/замечание (#19), не скрывать проблему.","en":"No truncation; report RAM growth as issue #19, not a pass."}},
+  {"id":"ADB-06","group":"adb","stage":"today","ru":"ADB авторизация после перезапуска HOST","en":"ADB auth persistence across restart","intro":{"ru":"REV28: важна стабильность ADB-ключа; не очищай разрешения на TARGET.","en":"REV28: verify stored host ADB identity; do not revoke TARGET authorizations."},"steps":[{"ru":"Авторизуй HOST и проверь adb devices.","en":"Authorize HOST and check adb devices.","cmd":"adb devices"},{"ru":"Полностью закрой и снова открой NekoFlash.","en":"Fully close and relaunch NekoFlash."},{"ru":"Переподключи TARGET и проверь, что повторный RSA-диалог не появляется без причины.","en":"Reconnect TARGET and check no unexpected second RSA prompt."},{"ru":"Не удаляй существующие ключи; сообщи о любой потере ADB-доверия.","en":"Do not delete keys; report any lost ADB trust."}],"expect":{"ru":"Идентичность HOST сохраняется; история и прежнее доверие не теряются.","en":"HOST identity persists; previously trusted ADB connection remains valid."}},
+  {"id":"FB-02","group":"fastboot","stage":"extended","ru":"REV43: Fastboot getvar:all и сырые INFO","en":"REV43: Fastboot getvar:all / raw INFO","intro":{"ru":"Только запасной TARGET с доступным Fastboot. Чтение не пишет разделы.","en":"Spare Fastboot-capable TARGET. Read-only operation."},"steps":[{"ru":"Подключи запасной TARGET в Fastboot.","en":"Connect spare TARGET in Fastboot mode."},{"ru":"Проверь полный вывод getvar:all.","en":"Capture all getvar:all output.","cmd":"fastboot getvar all"},{"ru":"Проверь INFO/FAIL/OKAY/тайминги в исходном логе, без маскировки serial.","en":"Check INFO/FAIL/OKAY/timing and unmasked serial in raw local log."},{"ru":"Повтори 3 раза и сравни стабильность USB.","en":"Repeat three times and compare USB stability."}],"expect":{"ru":"Нет зависания/пересылки команд; полный raw log с заводскими значениями сохранён.","en":"No hangs or command replays; full factory values remain in raw local log."}},
+  {"id":"FB-03","group":"fastboot","stage":"extended","ru":"REV43: медленный Fastboot и пустые чтения","en":"REV43: slow Fastboot and empty reads","intro":{"ru":"Если нет медленного устройства или воспроизводимой ошибки — BLOCKED, не выдумывать результат.","en":"If no slow device/USB failure, mark BLOCKED rather than fabricate."},"steps":[{"ru":"На запасном TARGET проверь запрос с медленным ответом, если такой есть.","en":"Try a slow responding read-only getvar on the spare TARGET.","cmd":"fastboot getvar product"},{"ru":"Следи, чтобы процессор не уходил в постоянную нагрузку при таймаутах.","en":"Observe CPU under repeated USB timeout/empty responses."},{"ru":"Проверь, что одна команда не отправилась повторно автоматически.","en":"Verify a single command was not resent automatically."},{"ru":"Сохрани полные строки fastboot-timing из лога.","en":"Preserve full raw fastboot-timing lines."}],"expect":{"ru":"На мгновенно пустом USB-чтении нет busy-spin; команда не дублируется.","en":"No busy-spin on immediate empty read; command not duplicated."}},
+  {"id":"SAF-01","group":"ui","stage":"today","ru":"REV26: отмена импорта при чтении","en":"REV26: cancel import while copying","intro":{"ru":"Только тестовый файл без ценных данных. Не выбирать рабочие firmware-файлы.","en":"Disposable file only, not production firmware."},"steps":[{"ru":"Подготовь тестовый файл 16 МиБ в Download.","en":"Prepare a disposable 16 MiB file in Download.","cmd":"dd if=/dev/urandom of=~/storage/downloads/NekoFlashQA/import-test.img bs=1M count=16","where":{"ru":"Termux HOST; сначала mkdir -p ~/storage/downloads/NekoFlashQA","en":"Termux HOST; create directory first"}},{"ru":"Выбери файл через Android DocumentsUI в рабочий каталог NekoFlash.","en":"Select the file via Android DocumentsUI into NekoFlash workspace."},{"ru":"Во время копирования нажми «Отменить»; повтори с поворотом экрана.","en":"Cancel during copy; repeat with screen rotation."},{"ru":"Убедись: исходник цел, неполный файл не представлен как готовый.","en":"Verify source intact; partial output is not published as complete."}],"expect":{"ru":"Отмена завершается и приложение не зависает; исходный файл не повреждён.","en":"Cancel settles; no UI hang; original source is intact."}},
+  {"id":"SAF-02","group":"ui","stage":"extended","ru":"Импорт: SHA-256 точной копии","en":"Import: byte-exact SHA-256","intro":{"ru":"Сравни только тестовые исходник и полную готовую копию.","en":"Compare only a disposable source and fully published copy."},"steps":[{"ru":"Импортируй 16 МиБ файл SAF до завершения.","en":"Import the 16 MiB SAF file to completion."},{"ru":"Найди исходный и импортированный файл на HOST.","en":"Locate original and imported files on HOST."},{"ru":"Сравни SHA-256 в Termux, с подстановкой реального пути импортированной копии.","en":"Compare hashes in Termux, using the actual imported destination path.","cmd":"sha256sum ~/storage/downloads/NekoFlashQA/import-test.img /sdcard/Download/NekoFlash/<ИМЯ_ИМПОРТИРОВАННОГО_ФАЙЛА>","where":{"ru":"Подставь точный путь из приложения; <...> не копировать буквально","en":"Replace placeholder with actual path; do not use literal <...>"}}],"expect":{"ru":"Размер и SHA-256 совпадают; никаких скрытых усечений.","en":"Size and SHA-256 match with no truncation."}},
+  {"id":"SAF-03","group":"ui","stage":"extended","ru":"Импорт: отзыв разрешения / недостаточно места","en":"Import: revoked grant / low space","intro":{"ru":"Никакого искусственного заполнения диска. Тест только с ненужным файлом и разрешениями SAF.","en":"Never intentionally fill storage; only use disposable files and SAF permissions."},"steps":[{"ru":"Выбери ненужный SAF-источник, затем отмени выбор.","en":"Choose a disposable SAF source then cancel selection."},{"ru":"Отзови разрешение DocumentsUI или сделай файл недоступным.","en":"Revoke DocumentsUI access or make the source unavailable."},{"ru":"Попробуй импорт и зафиксируй сообщение об ошибке.","en":"Try import and record the exact failure."},{"ru":"Убедись, что старые данные и прежние готовые копии не удалены.","en":"Verify previously complete files were not deleted."}],"expect":{"ru":"Ошибка честная, без ложного SUCCESS, без потери ранее сохранённых файлов.","en":"Honest error, no false success and no deletion of previous files."}},
+  {"id":"GUI-02","group":"ui","stage":"today","ru":"REV28: просмотр опасного действия в GUI","en":"REV28: review of destructive GUI actions","intro":{"ru":"Без подключённого TARGET и без подтверждения операции. Прямой терминал не блокируется.","en":"Without TARGET, never confirm a destructive action. Expert terminal remains unrestricted."},"steps":[{"ru":"Отключи TARGET; открой Flash → Tools.","en":"Disconnect TARGET; open Flash → Tools."},{"ru":"Введи userdata как тестовую цель erase/format; нажми действие только для проверки диалога.","en":"Enter userdata as target and tap Erase/Format to inspect dialog ONLY."},{"ru":"Проверь раздел и предупреждение, выбери «Отмена».","en":"Verify exact partition and warning, choose Cancel."},{"ru":"Вернись в терминал; убедись, что обычные команды работают без лишних подтверждений.","en":"Return to terminal; regular commands must remain direct.","cmd":"fastboot devices"}],"expect":{"ru":"Диалог не запускает операцию без подтверждения; Cancel ничего не меняет.","en":"No operation occurs without confirmation; Cancel changes nothing."}},
+  {"id":"GUI-03","group":"ui","stage":"lab","ru":"Резервный TARGET: прошивка по согласованному плану","en":"Spare TARGET: authorized flash lab","intro":{"ru":"НЕ выполнять сегодня. Только разблокированное запасное устройство, проверенный образ и полный план восстановления.","en":"NOT for today. Requires unlocked disposable TARGET, verified image, full recovery plan."},"steps":[{"ru":"Сверь серийник TARGET, загрузчик, разметку, слот и бэкап.","en":"Verify serial, bootloader, partition topology, slot and backups."},{"ru":"Подготовь контрольный образ и сверь SHA-256.","en":"Prepare approved image and verify SHA-256."},{"ru":"Согласуй точный план команд и обратного восстановления.","en":"Approve exact commands and rollback plan."},{"ru":"Запусти только согласованную операцию на запасном тестовом устройстве.","en":"Execute only the authorized operation on expendable lab hardware."},{"ru":"Сними полный raw log, проверку загрузки и восстановление.","en":"Collect complete raw log, boot verification and recovery evidence."}],"expect":{"ru":"Фиксировать только реально выполненный лабораторный тест и весь исходный журнал.","en":"Record only a real lab execution with full raw evidence."}},
+  {"id":"LOG-01","group":"basic","stage":"today","ru":"Сырые журналы после длительной сессии","en":"Raw logs after long session","intro":{"ru":"Профессиональная диагностика: журналы НЕ чистим. Проверяем, что исходные строки остались.","en":"Professional diagnostics: raw logs MUST remain unchanged."},"steps":[{"ru":"Создай несколько обычных ошибок и запросов без TARGET.","en":"Produce harmless errors and device queries without TARGET.","cmd":"fastboot devices"},{"ru":"Найди каталоги log- и trace- в Download/NekoFlash.","en":"Locate log- and trace- segment files under Download/NekoFlash."},{"ru":"Закрой и открой приложение. Проверь, что прежние сессии на месте.","en":"Restart app and verify previous sessions remain."},{"ru":"Проверь точные серийники/ошибки в полном локальном логе, если они присутствуют.","en":"Verify exact serials/error codes remain in full local logs, if present."}],"expect":{"ru":"Ни один старый сегмент не удалён автоматически; журнал точный.","en":"No prior segment auto-deleted; raw evidence exact."}},
+  {"id":"LOG-02","group":"basic","stage":"today","ru":"Экспорт, оригиналы и приватная отправка","en":"Evidence export and trusted sharing","intro":{"ru":"Нажми «Подключить логи», выбери NekoFlash/logs, затем собери ZIP. Разрешение на чтение выдаётся только через браузер; ZIP не зашифрован.","en":"Connect NekoFlash/logs with the folder picker, then create ZIP. Browser read permission is required; ZIP is unencrypted."},"steps":[{"ru":"Выбери папку Download/NekoFlash/logs один раз; скриншоты и видео приложи вручную.","en":"Choose Download/NekoFlash/logs once; attach screenshots and videos manually."},{"ru":"Создай ZIP, проверь evidence-manifest.json и наличие log- / trace- / session-summary-; сравни оригиналы по SHA-256.","en":"Create ZIP; inspect evidence-manifest.json and all log-/trace-/session-summary- files; compare original SHA-256."},{"ru":"Экспортируй JSON-прогресс и проверь повторный импорт.","en":"Export progress JSON and import it back."},{"ru":"Отправляй полные данные только в доверенный личный чат, не публичный issue.","en":"Share full evidence only in private trusted channel, not public issue."}],"expect":{"ru":"Содержимое вложений побайтово не изменено; все отметки и комментарии на месте.","en":"Attachments byte-exact; all statuses/notes retained."}},
+  {"id":"LOG-03","group":"basic","stage":"today","ru":"Автосбор логов в ZIP — новый режим","en":"Auto-collect logs into ZIP — new mode","intro":{"ru":"Проверь доступ к папке без сторонних разрешений APK. HTML не может читать файлы без твоего выбора; сырые данные не изменяются.","en":"Grant folder read access using the browser. No NekoFlash APK permissions are changed; all raw data remains untouched."},"steps":[{"ru":"В тестбуке нажми «Подключить / обновить логи» и выбери Download/NekoFlash/logs. Если этот выбор недоступен — «Android: разовый выбор папки».","en":"Tap Connect / refresh logs, choose Download/NekoFlash/logs; if unsupported use Android: choose folder once."},{"ru":"Вернись в NekoFlash и создай новую тестовую диагностическую запись; старые журналы не удаляй.","en":"Generate a new harmless diagnostic entry in NekoFlash; do not delete any older logs."},{"ru":"Создай ZIP в тестбуке; для постоянного доступа новая запись включится сама. В разовом режиме ещё раз обнови папку перед ZIP.","en":"Generate a ZIP; new logs appear automatically in live mode. Refresh the folder first in snapshot mode."},{"ru":"Проверь evidence-manifest.json, количество и имена log-/trace-/session-summary- файлов, затем точные SHA-256 исходника и вложения.","en":"Inspect evidence-manifest.json, log/trace/session filenames, and compare SHA-256 of source and ZIP copies."},{"ru":"При запрете доступа убедись, что ZIP не создаётся тихо без логов и что тестбук просит выбрать папку заново.","en":"With folder permission revoked, ensure the page does not silently export without logs and prompts to reconnect."}],"expect":{"ru":"Логи собираются без ручного прикрепления каждого файла, без очистки и потери данных. На неподдерживаемом Android требуется выбор папки перед отчётом.","en":"Raw logs included without attaching every file, with no redaction or data loss. Unsupported Android pickers require folder reselection."}},
+  {"id":"CI-01","group":"basic","stage":"today","ru":"Проверка исходного CI и номера сборки","en":"Source CI and build provenance","intro":{"ru":"Эмуляторный PASS — база для тестов, не доказательство USB-совместимости конкретного телефона.","en":"CI emulator PASS is a prerequisite, not proof of physical USB compatibility."},"steps":[{"ru":"Открой ссылку на Actions #41247325391 внизу страницы или в README_RU_EN.txt.","en":"Open GitHub Actions #41247325391 from the page footer or README_RU_EN.txt."},{"ru":"Проверь CI SHA 27ab796d и merge HEAD 3562bee5.","en":"Check CI SHA 27ab796d and merged HEAD 3562bee5."},{"ru":"Убедись, что build, API26 и API34 были SUCCESS (20 тестов на каждом).","en":"Check build, API26 and API34 SUCCESS (20 tests each)."},{"ru":"Сверь локальный APK SHA-256; чужую alpha11 сборку не подменяй.","en":"Verify local APK SHA-256; avoid any other alpha11 build."}],"expect":{"ru":"Коммит и APK совпадают с проверенной REV43; аппаратные испытания начинаются отдельно.","en":"Commit/APK match checked REV43; physical validation starts separately."}},
+  {"id":"TERM-04","group":"basic","stage":"today","ru":"REV38: Gboard, Unicode и Backspace","en":"REV38: Gboard, Unicode and Backspace","intro":{"ru":"Тест ввода, не прошивки.","en":"Input-only test, not flashing."},"steps":[{"ru":"Набери и исправь «привет мир» через Gboard.","en":"Type and correct «привет мир» with Gboard."},{"ru":"Вставь «Кот 🐈‍⬛ Байт 🌙», удали часть строки и набери снова.","en":"Paste «Кот 🐈‍⬛ Байт 🌙», delete part, type again."},{"ru":"Перейди в adb shell, проверь Backspace, Enter и выход.","en":"Enter adb shell, check Backspace, Enter and exit.","cmd":"adb shell"}],"expect":{"ru":"Нет испорченных UTF-8 символов, двойного ввода или зависшего IME.","en":"No corrupted UTF-8, duplicates or stuck IME."}},
+  {"id":"TERM-05","group":"basic","stage":"today","ru":"REV39–40: копирование вывода и автопрокрутка","en":"REV39–40: console text selection and scrolling","intro":{"ru":"Только чтение; логи не очищать.","en":"Read-only; do not clear logs."},"steps":[{"ru":"Открой терминал и получи длинный вывод.","en":"Open console and generate long output.","cmd":"adb shell getprop"},{"ru":"Долгим нажатием выдели строку и скопируй.","en":"Long-press, select and copy a visible line."},{"ru":"При выделении получи новый вывод; проверь, что текст не уехал вниз.","en":"Receive additional output while selected; no unexpected jump."},{"ru":"Сними выделение; проверь обычную автопрокрутку.","en":"Clear selection and check normal auto-follow."}],"expect":{"ru":"Копирование верно, выделение не сбивается.","en":"Exact copy and stable selection."}},
+  {"id":"ADB-04","group":"adb","stage":"extended","ru":"REV42: A_WRTE maxdata на старом TARGET","en":"REV42: A_WRTE maxdata with older TARGET","intro":{"ru":"Без устройства с малым maxdata пометь BLOCKED.","en":"Mark BLOCKED without a small-maxdata target."},"steps":[{"ru":"Подключи старый Android с разрешённой USB-отладкой.","en":"Connect authorized older Android target."},{"ru":"Отправь одноразовый файл, не системный образ.","en":"Send a disposable file, not a system image.","cmd":"adb push /sdcard/Download/NekoFlashQA/probe.bin /sdcard/Download/NekoFlashQA/probe.bin"},{"ru":"Проверь размер и SHA-256 на HOST/TARGET; приложи исходные логи.","en":"Compare sizes/hashes on HOST and TARGET; attach original logs."}],"expect":{"ru":"Все A_WRTE в пределах peer maxdata, байты файла совпадают.","en":"Each A_WRTE respects peer maxdata, content exact."}},
+  {"id":"ADB-05","group":"adb","stage":"extended","ru":"REV43: большой каталог adb push -r","en":"REV43: large recursive adb push","intro":{"ru":"Только одноразовая папка в Download; не прошивать разделы.","en":"Disposable Download folder only; no partition writes."},"steps":[{"ru":"В Termux HOST подготовь 512 маленьких файлов.","en":"Create 512 small files in HOST Termux.","cmd":"termux-setup-storage\nmkdir -p ~/storage/downloads/NekoFlashQA/tree\nfor i in $(seq 1 512); do d=part-$((i/32)); mkdir -p ~/storage/downloads/NekoFlashQA/tree/$d; printf 'file-%s\\n' \"$i\" > ~/storage/downloads/NekoFlashQA/tree/$d/file-$i.txt; done","where":{"ru":"Termux HOST","en":"HOST Termux"}},{"ru":"Отправь папку через NekoFlash.","en":"Send directory through NekoFlash.","cmd":"adb push /sdcard/Download/NekoFlashQA/tree /sdcard/Download/NekoFlashQA/"},{"ru":"Проверь число файлов и время/RAM.","en":"Check file count, duration and HOST RAM.","cmd":"adb shell find /sdcard/Download/NekoFlashQA/tree -type f | wc -l"},{"ru":"Сохрани журнал и отметь все отличия.","en":"Keep original logs and record anomalies."}],"expect":{"ru":"512 файлов без пропусков и ложного SUCCESS.","en":"512 files without omissions or false SUCCESS."}},
+  {"id":"ADB-06","group":"adb","stage":"extended","ru":"REV43: отмена adb push -r","en":"REV43: cancel recursive push","intro":{"ru":"Только одноразовые файлы; не останавливать запись разделов.","en":"Disposable files only; not a partition flash."},"steps":[{"ru":"Запусти передачу тестового дерева.","en":"Start disposable recursive transfer."},{"ru":"Нажми Stop во время передачи файлов.","en":"Tap Stop mid-transfer."},{"ru":"Проверь, что следующий файл не запущен, нет SUCCESS.","en":"Check no next file and no false SUCCESS."},{"ru":"Сохрани время, имя последнего файла, логи, скриншот.","en":"Record time, last file, logs and screenshot."}],"expect":{"ru":"Отмена не сбрасывается между файлами.","en":"Cancellation is never reset between files."}},
+  {"id":"USB-02","group":"adb","stage":"extended","ru":"USB/OTG detach и reconnect во время push","en":"USB/OTG detach and reconnect during push","intro":{"ru":"ТОЛЬКО ADB push одноразового файла; не отсоединять при Fastboot DATA.","en":"ADB push of disposable data ONLY; never unplug during Fastboot DATA."},"steps":[{"ru":"Начни передачу тестового файла по ADB.","en":"Begin disposable ADB file transfer."},{"ru":"Отсоедини OTG; проверь завершение с ошибкой, без ложного SUCCESS.","en":"Unplug OTG; check failure and no false SUCCESS."},{"ru":"Подключи заново, разреши TARGET и проверь adb devices.","en":"Reconnect, authorize target and run adb devices.","cmd":"adb devices"},{"ru":"Проверь возможный частичный файл и сохрани логи.","en":"Inspect partial target file and save logs."}],"expect":{"ru":"Нет автоматического повтора или повреждённого файла, принятого за целый.","en":"No automatic replay or partial file accepted as complete."}},
+  {"id":"FB-04","group":"fastboot","stage":"extended","ru":"REV41: Fastboot read-only (post-DATA отдельно)","en":"REV41: read-only Fastboot (post-DATA separate)","intro":{"ru":"Эта проверка НЕ покрывает post-DATA download; для него отдельная лаборатория.","en":"Does NOT exercise download post-DATA; requires separately authorized lab."},"steps":[{"ru":"Вручную открой Fastboot на запасном TARGET.","en":"Enter Fastboot manually on a spare target."},{"ru":"Считай product/current-slot/max-download-size.","en":"Read product/current-slot/max-download-size.","cmd":"fastboot getvar product\nfastboot getvar current-slot\nfastboot getvar max-download-size"},{"ru":"Проверь единичную отправку команд и сохранение INFO-логов.","en":"Check no command replay and preserve INFO logs."},{"ru":"Для post-DATA отметь BLOCKED, если нет отдельного разрешения на лабораторный тест.","en":"Mark post-DATA BLOCKED without separate lab authorization."}],"expect":{"ru":"Read-only связь устойчива; post-DATA остаётся непроверенным при отсутствии лаборатории.","en":"Read-only stable; post-DATA unverified without lab."}},
+  {"id":"CI-02","group":"basic","stage":"today","ru":"REV43: CI и аппаратные результаты — не путать","en":"REV43: distinguish CI from hardware results","intro":{"ru":"PR CI зелёный, но merged DEV API26 красный (два UI таймаута).","en":"PR CI passed; merged DEV API26 failed on two UI timeouts."},"steps":[{"ru":"Сверь PR CI run 41247325391 (build/API26/API34 PASS).","en":"Verify PR CI run 41247325391 (all PASS)."},{"ru":"Проверь merged DEV run 41248168147: API26 FAIL, API34 PASS.","en":"Check merged DEV run 41248168147: API26 FAIL, API34 PASS."},{"ru":"Укажи установленную APK, модель HOST/TARGET, версии Android и дату.","en":"Record installed APK, host/target models, OS and date."},{"ru":"Не ставь PASS для аппаратных проверок без реального выполнения.","en":"Never mark unperformed physical checks PASS."}],"expect":{"ru":"Отчёт содержит только фактические результаты.","en":"Report contains observed results only."}}
+];
+
+const KEY = 'nekoflash_insiders_rev43_testkit_v3';
+const LEGACY_KEY = 'nekoflash_insiders_rev29_testkit_v2';
+const LEGACY_OLD_KEY = 'nekoflash_insiders_rev25_testkit_v1';
+const SOURCE_REVISION = 'REV43';
+const BUILD_SHA = 'bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5';
+const APK_SHA256 = ''; // REV43 artifact digest must be computed from the actual APK.
+const APK_FILENAME = 'NekoFlash-6.0.0-alpha11-debug.apk';
+const STATUSES = ['', 'pass', 'fail', 'blocked', 'skip'];
+const CATS = ['all', 'basic', 'adb', 'fastboot', 'ui'];
+let storageWorks = true;
+const openTests = new Set();
+let attachedFiles = [];
+// Browser permission is always explicit; no hard-coded filesystem access.
+let logFolderHandle = null;
+let logFolderSnapshot = [];
+let logFolderName = '';
+let logFolderMode = 'none'; // 'live' means the directory is read fresh at ZIP creation.
+const LOG_FOLDER_DB = 'nekoflash-rev29-log-folder-v1';
+const LOG_FOLDER_KEY = 'selected-log-folder';
+
+let state = {
+  lang: 'ru',
+  filter: 'all',
+  round: 'today',
+  meta: { hostModel: '', hostAndroid: '', targetModel: '', targetAndroid: '', usbInfo: '', build: 'REV43 / PR 27ab796d / DEV bd0d1fbf / 6.0.0-alpha11-dev (234)', suggestions: '' },
+  tests: {}
+};
+
+try {
+  const v = localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || localStorage.getItem(LEGACY_OLD_KEY);
+  if (v) {
+    const old = JSON.parse(v);
+    if (old && typeof old === 'object') {
+      state = {
+        ...state,
+        ...old,
+        lang: old.lang === 'en' ? 'en' : 'ru',
+        filter: CATS.includes(old.filter) ? old.filter : 'all',
+        round: ['today','extended','lab','all'].includes(old.round) ? old.round : 'today',
+        meta: { ...state.meta, ...(old.meta || {}) },
+        tests: old.tests || {}
+      };
+    }
+  }
+  localStorage.setItem('__nf_test__', 'yes');
+  localStorage.removeItem('__nf_test__');
+} catch (err) {
+  storageWorks = false;
+}
+
+let toastTimer;
+if (/REV29|3562bee5/.test(String(state.meta?.build || ''))) { state.meta.build = 'REV43 / PR 27ab796d / DEV bd0d1fbf / 6.0.0-alpha11-dev (234)'; }
+const $ = id => document.getElementById(id);
+const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const t = () => T[state.lang];
+const tr = x => typeof x === 'string' ? x : (x?.[state.lang] ?? '');
+
+const dstate = id => {
+  if (!state.tests[id] || typeof state.tests[id] !== 'object') {
+    state.tests[id] = { status: '', checks: {}, note: '' };
+  }
+  return state.tests[id];
+};
+
+const save = () => {
+  try {
+    localStorage.setItem(KEY, JSON.stringify(state));
+  } catch (err) {
+    storageWorks = false;
+    $('localHint').textContent = t().storageWarn;
+  }
+};
+
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+// REV32: REV31 shell evidence now includes exact binary stdout/stderr files.
+// Only named diagnostic .bin files are collected, not arbitrary firmware images.
+function isRawBinaryLog(name) {
+  return /^(?:log-|trace-|session-summary-|usb-|diagnostic-|session-).+\.bin$/i.test(name);
+}
+function logFileName(name) {
+  return ( /^(?:log-|trace-|session-summary-|usb-|diagnostic-|session-)/i.test(name) &&
+    /\.(?:txt|json|log|gz|csv|zip)$/i.test(name) ) || isRawBinaryLog(name);
+}
+function insideLogFolder(path) {
+  return path.some(p => /^(logs|diagnostic|diagnostics|traces|sessions)$/i.test(p));
+}
+function isLogCandidate(name, path, chosenName) {
+  const extension = /\.(?:txt|json|log|gz|csv|zip)$/i.test(name);
+  const binaryLog = isRawBinaryLog(name);
+  const sourceIsLogs = /^(logs|diagnostics|traces|sessions)$/i.test(chosenName || '');
+  // When the user selects /Download, restrict scanning to NekoFlash, not other apps.
+  const belongs = sourceIsLogs || /nekoflash/i.test(chosenName || '') ||
+    path.some(p => /^nekoflash$/i.test(p));
+  return belongs && (binaryLog || (extension && (logFileName(name) ||
+    (insideLogFolder(path) && !/^(?:README|LICENSE|NOTICE)/i.test(name)))));
+}
+function updateLogFolderStatus() {
+  const x = t();
+  $('logFolderStatus').textContent = logFolderMode === 'live' ? x.logLive(logFolderName)
+    : logFolderMode === 'snapshot' ? x.logSnapshot(logFolderSnapshot.length)
+    : logFolderMode === 'expired' ? x.logNeedPermission : x.logNotConnected;
+}
+
+// An IndexedDB-backed handle can be restored when a browser supports persistent
+// File System Access. file:// and several Android pickers deny that capability:
+// the page still works via a user-selected directory snapshot (webkitdirectory).
+function openLogFolderDb() {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') { reject(Error('IndexedDB unavailable')); return; }
+    const request = indexedDB.open(LOG_FOLDER_DB, 1);
+    request.onupgradeneeded = () => request.result.createObjectStore('handles');
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+async function storedLogFolder(handle) {
+  let db;
+  try {
+    db = await openLogFolderDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').put(handle, LOG_FOLDER_KEY);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (_) { /* Permission remains valid for this page only. */ }
+  finally { if (db) db.close(); }
+}
+async function forgottenLogFolder() {
+  let db;
+  try {
+    db = await openLogFolderDb();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction('handles', 'readwrite');
+      tx.objectStore('handles').delete(LOG_FOLDER_KEY);
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (_) { /* Some file:// origins block IDB. */ }
+  finally { if (db) db.close(); }
+}
+async function restoreLogFolder() {
+  let db;
+  try {
+    db = await openLogFolderDb();
+    const handle = await new Promise((resolve, reject) => {
+      const tx = db.transaction('handles', 'readonly');
+      const req = tx.objectStore('handles').get(LOG_FOLDER_KEY);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+    if (!handle || typeof handle.queryPermission !== 'function') return;
+    logFolderHandle = handle;
+    logFolderName = handle.name;
+    const allowed = await handle.queryPermission({mode: 'read'});
+    logFolderMode = allowed === 'granted' ? 'live' : 'expired';
+    updateLogFolderStatus();
+  } catch (_) { /* No persistent directory access, use picker. */ }
+  finally { if (db) db.close(); }
+}
+async function readLiveLogs(root) {
+  const result = [];
+  async function traverse(dir, path, level) {
+    if (level > 7) return;
+    for await (const [name, entry] of dir.entries()) {
+      if (entry.kind === 'directory') {
+        const selectedIsLogs = /^(logs|diagnostics|traces|sessions)$/i.test(root.name);
+        const rootIsProject = /nekoflash/i.test(root.name);
+        // No recursive traversal through firmware, workspace, downloads, etc.
+        if (selectedIsLogs || (rootIsProject && /^(logs|diagnostics|traces|sessions)$/i.test(name)) ||
+            (!selectedIsLogs && !rootIsProject && /^NekoFlash$/i.test(name)) ||
+            (path.length && (insideLogFolder(path) || path.some(p => /^NekoFlash$/i.test(p))) &&
+             /^(logs|diagnostics|traces|sessions)$/i.test(name))) {
+          await traverse(entry, [...path, name], level + 1);
+        }
+      } else if (entry.kind === 'file' && isLogCandidate(name, path, root.name)) {
+        const file = await entry.getFile();
+        result.push({file, path:[...path, name].join('/')});
+      }
+    }
+  }
+  await traverse(root, [], 0);
+  return result.sort((a,b) => a.path.localeCompare(b.path));
+}
+async function chosenLogs() {
+  if (logFolderMode === 'live' && logFolderHandle) {
+    const permission = await logFolderHandle.queryPermission({mode:'read'});
+    if (permission !== 'granted') {
+      logFolderMode = 'expired';
+      updateLogFolderStatus();
+      throw Error(t().logPermissionError);
+    }
+    const logs = await readLiveLogs(logFolderHandle);
+    if (!logs.length) throw Error(t().logEmpty);
+    return {mode:'live', files:logs};
+  }
+  if (logFolderMode === 'snapshot' && logFolderSnapshot.length) {
+    return {mode:'snapshot', files:logFolderSnapshot};
+  }
+  if (logFolderMode === 'expired') throw Error(t().logPermissionError);
+  return {mode:'none', files:[]};
+}
+async function chooseLogFolder() {
+  // Keep the showDirectoryPicker call directly under click (user activation).
+  if (typeof window.showDirectoryPicker === 'function' && window.isSecureContext) {
+    try {
+      const handle = await window.showDirectoryPicker({mode:'read', id:'nekoflash-logs'});
+      const files = await readLiveLogs(handle);
+      if (!files.length) { toast(t().logEmpty); return; }
+      logFolderHandle = handle;
+      logFolderName = handle.name;
+      logFolderSnapshot = [];
+      logFolderMode = 'live';
+      $('chooseLogFolder').dataset.useFallback = 'false';
+      updateLogFolderStatus();
+      await storedLogFolder(handle);
+      return;
+    } catch (err) {
+      if (err?.name === 'AbortError') { toast(t().logSelectionCancelled); return; }
+      toast(t().logBrowserFallback);
+      // No automatic file chooser after an await: Android may block it for lack
+      // of transient user activation. User can tap the same button again.
+      $('chooseLogFolder').dataset.useFallback = 'true';
+      return;
+    }
+  }
+  $('logFolderFallback').click();
+}
+function snapshotLogFolder(files) {
+  const chosen = files.filter(f => {
+    const parts = String(f.webkitRelativePath || f.name).split('/');
+    const root = parts.shift() || '';
+    return isLogCandidate(f.name, parts.slice(0,-1), root);
+  });
+  if (!chosen.length) { toast(t().logEmpty); return; }
+  logFolderHandle = null;
+  logFolderName = (chosen[0].webkitRelativePath || '').split('/')[0] || 'logs';
+  logFolderSnapshot = chosen.map(file => ({
+    file,
+    path: (file.webkitRelativePath || file.name).split('/').slice(1).join('/') || file.name
+  })).sort((a,b) => a.path.localeCompare(b.path));
+  logFolderMode = 'snapshot';
+  updateLogFolderStatus();
+  forgottenLogFolder();
+}
+
+function renderAttachments() {
+  const x = t();
+  $('fileSummary').textContent = attachedFiles.length ? x.filesSelected(attachedFiles.length) : x.noFiles;
+  $('fileList').innerHTML = attachedFiles.map((f, idx) => {
+    const dir = f.type.startsWith('image/') ? 'screenshots' : f.type.startsWith('video/') ? 'videos' : 'logs';
+    return `<div class="file-row">
+      <span class="file-row-name" title="${e(f.name)}">${e(f.name)}</span>
+      <span class="file-row-meta">
+        <span>${dir}/ · ${formatBytes(f.size)}</span>
+        <button type="button" class="file-remove" data-remove-file="${idx}" aria-label="Remove">×</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function setLanguage(lang) {
+  state.lang = lang === 'en' ? 'en' : 'ru';
+  document.documentElement.lang = state.lang;
+  save();
+  renderStatic();
+  renderTests();
+}
+
+function renderStatic() {
+  const x = t();
+  const ids = {
+    appTitle: 'title',
+    subline: 'sub',
+    progressLabel: 'progress',
+    stepsLabel: 'steps',
+    howTitle: 'how',
+    devicesTitle: 'devices',
+    hostModelLabel: 'hostModel',
+    hostAndroidLabel: 'hostAndroid',
+    targetModelLabel: 'targetModel',
+    targetAndroidLabel: 'targetAndroid',
+    usbInfoLabel: 'usbInfo',
+    buildLabel: 'build',
+    testsTitle: 'tests',
+    expandAllBtn: 'expandAll',
+    collapseAllBtn: 'collapseAll',
+    resetAllBtn: 'resetAll',
+    reportTitle: 'report',
+    reportIntro: 'reportIntro',
+    autoLogsTitle:'autoLogsTitle',
+    autoLogsHelp:'autoLogsHelp',
+    chooseLogFolder:'chooseLogFolder',
+    disconnectLogFolder:'disconnectLogFolder',
+    androidLogFolder:'androidLogFolder',
+    suggestionsLabel: 'suggestions',
+    attachLabel: 'attach',
+    privacy: 'privacy',
+    reportHint: 'reportHint',
+    footer: 'footer',
+    safeText: 'safe',
+    offlineText: 'offline',
+    makeZip: 'zip',
+    copyReportBtn: 'copyReport',
+    exportJson: 'save',
+    importJson: 'load'
+  };
+  for (const [id, k] of Object.entries(ids)) {
+    if ($(id)) $(id).textContent = x[k];
+  }
+  $('howSteps').innerHTML = x.howSteps.map(([n, s]) => `<div class="mini"><strong>${n}</strong><div>${e(s)}</div></div>`).join('');
+  $('search').placeholder = x.search;
+  $('roundSelect').value = state.round;
+  updateRoundCount();
+  $('roundLabel').textContent = x.roundLabel;
+  [...$('roundSelect').options].forEach(opt => {opt.textContent = x.rounds[opt.value];});
+  $('suggestions').placeholder = x.suggestionsPlaceholder;
+  $('localHint').textContent = storageWorks ? x.localHint : x.storageWarn;
+  $('ru').classList.toggle('active', state.lang === 'ru');
+  $('en').classList.toggle('active', state.lang === 'en');
+
+  $('filters').innerHTML = CATS.map(c => {
+    const count = c === 'all' ? TESTS.length : TESTS.filter(o => o.group === c).length;
+    return `<button type="button" data-filter="${c}" class="${state.filter === c ? 'active' : ''}">${e(x.categories[c])}<span class="cnt">(${count})</span></button>`;
+  }).join('');
+
+  Object.entries(state.meta).forEach(([key, value]) => {
+    const el = $(key);
+    if (el && document.activeElement !== el) el.value = value ?? '';
+  });
+
+  renderAttachments();
+  updateLogFolderStatus();
+  updateProgress();
+}
+
+function renderTests() {
+  const query = $('search').value.trim().toLowerCase();
+  const filtered = TESTS.filter(o =>
+    (state.filter === 'all' || o.group === state.filter) &&
+    (state.round === 'all' || (o.stage || 'today') === state.round) &&
+    (!query || [o.id, o.ru, o.en, o.intro.ru, o.intro.en, ...o.steps.flatMap(s => [s.ru, s.en, s.cmd || ''])].join(' ').toLowerCase().includes(query))
+  );
+
+  $('testList').innerHTML = filtered.length ? filtered.map(o => {
+    const st = dstate(o.id);
+    const sel = STATUSES.map(k => `<option value="${k}" ${st.status === k ? 'selected' : ''}>${e(k ? t()[k] : t().notstarted)}</option>`).join('');
+    const steps = o.steps.map((s, idx) => {
+      const checked = !!st.checks[idx];
+      return `<div class="step">
+        <div class="step-row">
+          <input type="checkbox" id="${o.id}-step-${idx}" data-step="${idx}" ${checked ? 'checked' : ''} aria-label="${e(tr(s))}">
+          <div class="step-text ${checked ? 'done' : ''}">
+            <label class="stepline" for="${o.id}-step-${idx}">${e(tr(s))}</label>
+            ${s.cmd ? `<div class="command"><code>${e(s.cmd)}</code><button type="button" class="copy" data-copy="${idx}">${e(t().copy)}</button></div>` : ''}
+            ${s.where ? `<div class="step-hint">${e(tr(s.where))}</div>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    const count = o.steps.filter((s, idx) => st.checks[idx]).length;
+    return `<details class="test" data-test="${e(o.id)}" data-status="${e(st.status)}" ${openTests.has(o.id) ? 'open' : ''}>
+      <summary>
+        <span class="index">${String(TESTS.indexOf(o) + 1).padStart(2, '0')}</span>
+        <span class="test-head">
+          <span class="test-title">${e(tr(o))}</span>
+          <div class="test-sub">${e(o.id)} · ${e(t().categories[o.group])} · <span class="step-progress">${count}/${o.steps.length} ${e(t().stepLabel)}</span></div>
+        </span>
+        <span class="badge-status result-badge">${e(st.status ? t()[st.status] : t().notstarted)}</span>
+        <span class="chevron" aria-hidden="true">⌄</span>
+      </summary>
+      <div class="test-body">
+        <div class="detail-bar">
+          <p class="detail-intro">${e(tr(o.intro))}</p>
+          <button type="button" class="btn ghost sm" data-check-all="${e(o.id)}">✓ ${e(t().checkAllSteps)}</button>
+        </div>
+        ${steps}
+        <div class="expected"><strong>${e(t().expected)}:</strong> ${e(tr(o.expect))}</div>
+        <div class="test-bottom">
+          <div class="field">
+            <label for="${o.id}-status">${e(state.lang === 'ru' ? 'Результат' : 'Result')}</label>
+            <select id="${o.id}-status" data-status-select="true">${sel}</select>
+          </div>
+          <div class="field">
+            <label for="${o.id}-note">${e(t().notes)}</label>
+            <textarea id="${o.id}-note" data-note="true" placeholder="${e(t().noteplaceholder)}">${e(st.note || '')}</textarea>
+          </div>
+        </div>
+      </div>
+    </details>`;
+  }).join('') : '<div class="empty">No matching tests / Тесты не найдены</div>';
+}
+
+function updateRoundCount() {
+  const selected = TESTS.filter(o => state.round === 'all' || (o.stage || 'today') === state.round);
+  const done = selected.filter(o => STATUSES.slice(1).includes(dstate(o.id).status)).length;
+  const ruCount = n => n % 10 === 1 && n % 100 !== 11 ? `${n} проверка`
+    : [2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)
+      ? `${n} проверки` : `${n} проверок`;
+  $('roundCount').textContent = state.lang === 'ru'
+    ? `Выбранный этап: ${ruCount(selected.length)} · результатов ${done}/${selected.length}. Общий прогресс выше: ${ruCount(TESTS.length)}.`
+    : `Selected stage: ${selected.length} checks · results ${done}/${selected.length}. Total progress above covers all ${TESTS.length} checks.`;
+}
+
+function updateProgress() {
+  const vals = TESTS.map(o => dstate(o.id).status);
+  const done = vals.filter(s => STATUSES.slice(1).includes(s)).length;
+  const steps = TESTS.reduce((sum, o) => sum + Object.keys(dstate(o.id).checks || {}).filter(k => dstate(o.id).checks[k] && Number(k) < o.steps.length).length, 0);
+  const maxSteps = TESTS.reduce((sum, o) => sum + o.steps.length, 0);
+
+  $('progressCount').textContent = `${done} / ${TESTS.length}`;
+  $('stepCount').textContent = `${steps} / ${maxSteps}`;
+
+  const percent = Math.round(100 * done / TESTS.length);
+  const stepPercent = maxSteps ? Math.round(100 * steps / maxSteps) : 0;
+
+  $('barInner').style.width = percent + '%';
+  $('barOuter').setAttribute('aria-valuenow', percent);
+  $('stepBarInner').style.width = stepPercent + '%';
+
+  updateRoundCount();
+  $('stats').innerHTML = ['pass', 'fail', 'blocked', 'skip'].map(k =>
+    `<span class="chip" data-stat="${k}">${e(t()[k].split(' — ')[0])}: <b>${vals.filter(v => v === k).length}</b></span>`
+  ).join('');
+}
+
+function updateCard(card) {
+  const o = TESTS.find(x => x.id === card.dataset.test);
+  if (!o) return;
+  const st = dstate(o.id);
+  const n = o.steps.filter((s, i) => st.checks[i]).length;
+  card.dataset.status = st.status;
+  card.querySelector('.step-progress').textContent = `${n}/${o.steps.length} ${t().stepLabel}`;
+  card.querySelector('.result-badge').textContent = st.status ? t()[st.status] : t().notstarted;
+  updateProgress();
+}
+
+async function copyText(value, customMsg) {
+  try {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(value);
+      toast(customMsg || t().copied);
+      return;
+    }
+    const area = document.createElement('textarea');
+    area.value = value;
+    area.style.position = 'fixed';
+    area.style.left = '-10000px';
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand('copy');
+    area.remove();
+    toast(ok ? (customMsg || t().copied) : t().copymanual);
+  } catch (err) {
+    toast(t().copymanual);
+  }
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 20000);
+}
+
+function snapshot() {
+  return {
+    schema: 'nekoflash-rev43-testkit-v3',
+    createdAt: new Date().toISOString(),
+    lang: state.lang,
+    build: state.meta.build,
+    revision: SOURCE_REVISION,
+    sourceCommit: BUILD_SHA,
+    testArtifactCommit: '27ab796db0eb7a6ebcc45043374e9de6dcf879ad',
+    apkFilename: APK_FILENAME,
+    apkSha256: APK_SHA256,
+    phase: state.round,
+    meta: state.meta,
+    tests: Object.fromEntries(TESTS.map(o => [
+      o.id,
+      {
+        status: dstate(o.id).status || 'not_started',
+        checkedSteps: o.steps.map((s, i) => !!dstate(o.id).checks[i]),
+        notes: dstate(o.id).note || '',
+        title: tr(o)
+      }
+    ]))
+  };
+}
+
+function renderReportText(data) {
+  const isRu = state.lang === 'ru';
+  const lines = [
+    isRu ? 'NEKOFLASH 2.0 — ОТЧЁТ ТЕСТИРОВАНИЯ' : 'NEKOFLASH 2.0 — TEST REPORT',
+    `Date (UTC): ${data.createdAt}`,
+    `Build: ${data.meta.build || ''}`,
+    `Revision: ${data.revision || SOURCE_REVISION}`,
+    `Source commit: ${data.sourceCommit || BUILD_SHA}`,
+    `CI commit: ${data.testArtifactCommit || ''}`,
+    `APK: ${data.apkFilename || APK_FILENAME}`,
+    `APK SHA-256: ${data.apkSha256 || APK_SHA256}`,    `Test stage: ${data.phase || state.round}`,
+    'Evidence retention: RAW / LOSSLESS / NO REDACTION',
+    `HOST: ${data.meta.hostModel || ''} / ${data.meta.hostAndroid || ''}`,
+    `TARGET: ${data.meta.targetModel || ''} / ${data.meta.targetAndroid || ''}`,
+    `USB/OTG: ${data.meta.usbInfo || ''}`,
+    '',
+    isRu ? 'РЕЗУЛЬТАТЫ' : 'RESULTS'
+  ];
+  for (const o of TESTS) {
+    const z = data.tests[o.id];
+    lines.push(
+      '',
+      `[${o.id}] ${z.title}`,
+      `Status: ${z.status.toUpperCase()}`,
+      `Completed steps: ${z.checkedSteps.filter(Boolean).length}/${z.checkedSteps.length}`
+    );
+    o.steps.forEach((s, i) => lines.push(`  ${z.checkedSteps[i] ? '[x]' : '[ ]'} ${i + 1}. ${tr(s).replace(/\s+/g, ' ')}`));
+    lines.push(`${isRu ? 'Заметки' : 'Notes'}: ${z.notes || '—'}`);
+  }
+  if (data.evidence) {
+    lines.push('', 'EVIDENCE:',
+      `Auto logs: ${data.evidence.logsIncluded ?? 0}`,
+      `Collection: ${data.evidence.collectionMode || 'none'}`,
+      `Log folder: ${data.evidence.folder || ''}`,
+      `Manifest: evidence-manifest.json`);
+  }
+  lines.push(
+    '',
+    isRu ? 'ОБЩИЕ ПРЕДЛОЖЕНИЯ' : 'GENERAL FEEDBACK',
+    data.meta.suggestions || '—',
+    '',
+    'NekoFlash Insiders • REV43 • Generated locally; no automatic upload; raw evidence is unchanged.'
+  );
+  return lines.join('\r\n') + '\r\n';
+}
+
+function safeFileName(name) {
+  return String(name || 'attachment')
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
+    .replace(/^\.+/, '_')
+    .slice(0, 125) || 'attachment';
+}
+
+const encoder = new TextEncoder();
+const CRC_TABLE = (() => {
+  const tbl = new Uint32Array(256);
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+    tbl[n] = c >>> 0;
+  }
+  return tbl;
+})();
+
+async function blobCRC(blob) {
+  let crc = 0xFFFFFFFF;
+  const chunk = 1024 * 1024;
+  for (let at = 0; at < blob.size; at += chunk) {
+    const buf = new Uint8Array(await blob.slice(at, at + chunk).arrayBuffer());
+    for (let j = 0; j < buf.length; j++) crc = CRC_TABLE[(crc ^ buf[j]) & 255] ^ (crc >>> 8);
+  }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+function getDosDateTime(date = new Date()) {
+  const year = Math.max(1980, date.getFullYear());
+  const dosTime = ((date.getHours() & 0x1f) << 11) | ((date.getMinutes() & 0x3f) << 5) | ((date.getSeconds() >> 1) & 0x1f);
+  const dosDate = (((year - 1980) & 0x7f) << 9) | (((date.getMonth() + 1) & 0x0f) << 5) | (date.getDate() & 0x1f);
+  return { dosTime, dosDate };
+}
+
+async function makeStoreZip(entries) {
+  if (entries.length > 65535) throw Error('Too many entries');
+  const local = [], central = [];
+  let offset = 0;
+  const { dosTime, dosDate } = getDosDateTime();
+
+  for (const ent of entries) {
+    const blob = ent.blob instanceof Blob ? ent.blob : new Blob([ent.blob]);
+    if (blob.size >= 0xFFFFFFFF) throw Error('Single file exceeds ZIP32 limit (4 GiB)');
+    const name = encoder.encode(ent.name);
+    const size = blob.size;
+    const crc = await blobCRC(blob);
+    if (name.length > 65535) throw Error('Filename is too long');
+
+    const l = new Uint8Array(30 + name.length);
+    const v = new DataView(l.buffer);
+    v.setUint32(0, 0x04034b50, true);
+    v.setUint16(4, 20, true);
+    v.setUint16(6, 0x0800, true);
+    v.setUint16(8, 0, true);
+    v.setUint16(10, dosTime, true);
+    v.setUint16(12, dosDate, true);
+    v.setUint32(14, crc, true);
+    v.setUint32(18, size, true);
+    v.setUint32(22, size, true);
+    v.setUint16(26, name.length, true);
+    l.set(name, 30);
+    local.push(l, blob);
+
+    const c = new Uint8Array(46 + name.length);
+    const w = new DataView(c.buffer);
+    w.setUint32(0, 0x02014b50, true);
+    w.setUint16(4, 20, true);
+    w.setUint16(6, 20, true);
+    w.setUint16(8, 0x0800, true);
+    w.setUint16(10, 0, true);
+    w.setUint16(12, dosTime, true);
+    w.setUint16(14, dosDate, true);
+    w.setUint32(16, crc, true);
+    w.setUint32(20, size, true);
+    w.setUint32(24, size, true);
+    w.setUint16(28, name.length, true);
+    w.setUint32(42, offset, true);
+    c.set(name, 46);
+    central.push(c);
+
+    offset += l.byteLength + size;
+    if (offset >= 0xFFFFFFFF) throw Error('Total ZIP size exceeds ZIP32 limit (4 GiB)');
+  }
+
+  const centralSize = central.reduce((a, c) => a + c.byteLength, 0);
+  if (offset + centralSize >= 0xFFFFFFFF) throw Error('Total ZIP size exceeds ZIP32 limit (4 GiB)');
+
+  const end = new Uint8Array(22);
+  const ev = new DataView(end.buffer);
+  ev.setUint32(0, 0x06054b50, true);
+  ev.setUint16(8, entries.length, true);
+  ev.setUint16(10, entries.length, true);
+  ev.setUint32(12, centralSize, true);
+  ev.setUint32(16, offset, true);
+  return new Blob([...local, ...central, end], { type: 'application/zip' });
+}
+
+async function generateZip() {
+  const button = $('makeZip');
+  button.disabled = true;
+  button.textContent = t().zipCreating;
+  try {
+    const snap = snapshot();
+    // Read fresh log handles at the moment of report creation; never silently
+    // mark a report complete if permission has expired or log files vanished.
+    const logs = await chosenLogs();
+    if (logs.mode === 'none' && !window.confirm(t().logMissingConfirm)) return;
+    const items = [];
+    for (const {file, path} of logs.files) {
+      items.push({
+        name: `attachments/nekoflash-logs/${safeFileName(logFolderName)}/` +
+          path.split('/').map(safeFileName).join('/'),
+        blob: file, source: 'automatic-folder', originalPath: path,
+        originalName: file.name, lastModified: file.lastModified
+      });
+    }
+    for (let i = 0; i < attachedFiles.length; i++) {
+      const f = attachedFiles[i];
+      const base = `${String(i + 1).padStart(2, '0')}_${safeFileName(f.name)}`;
+      const dir = f.type.startsWith('image/') ? 'screenshots' : f.type.startsWith('video/') ? 'videos' : 'logs';
+      items.push({ name: `attachments/${dir}/${base}`, blob: f,
+        source:'manual-selection', originalName:f.name, lastModified:f.lastModified });
+    }
+    const paths = new Set();
+    for (const item of items) {
+      if (paths.has(item.name)) throw Error(`Duplicate archive path: ${item.name}`);
+      paths.add(item.name);
+    }
+    const manifest = {
+      schema: 'nekoflash-evidence-manifest-v1',
+      createdAt: new Date().toISOString(),
+      collectionMode: logs.mode,
+      selectedFolder: logFolderName,
+      originalFilesUnmodified: true,
+      rawLogCount: logs.files.length,
+      files: items.map(x => ({zipPath:x.name, originalPath:x.originalPath || x.originalName,
+        originalName:x.originalName, source:x.source, sizeBytes:x.blob.size,
+        lastModifiedMs:x.lastModified}))
+    };
+    snap.evidence = {logsIncluded:logs.files.length, collectionMode:logs.mode, folder:logFolderName};
+    const entries = [
+      { name: 'report.txt', blob: new Blob([renderReportText(snap)], { type: 'text/plain;charset=utf-8' }) },
+      { name: 'progress.json', blob: new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' }) },
+      { name: 'evidence-manifest.json', blob: new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' }) },
+      ...items
+    ];
+    const zip = await makeStoreZip(entries);
+    const device = safeFileName(state.meta.hostModel || 'HOST').replace(/\s+/g, '_');
+    downloadBlob(zip, `NekoFlash_Insiders_AutoLogs_BIN_${device}_${new Date().toISOString().slice(0, 10)}.zip`);
+    toast(logs.files.length ? t().logCollected(logs.files.length) : t().zipDone);
+  } catch (err) {
+    toast(t().zipErr + (err?.message || String(err)));
+  } finally {
+    button.disabled = false;
+    button.textContent = t().zip;
+  }
+}
+
+$('roundSelect').addEventListener('change', ev => {state.round=ev.target.value; save(); renderTests(); updateRoundCount();});
+$('ru').addEventListener('click', () => setLanguage('ru'));
+$('en').addEventListener('click', () => setLanguage('en'));
+
+$('filters').addEventListener('click', ev => {
+  const b = ev.target.closest('[data-filter]');
+  if (!b) return;
+  state.filter = b.dataset.filter;
+  save();
+  renderStatic();
+  renderTests();
+});
+
+$('search').addEventListener('input', renderTests);
+
+$('expandAllBtn').addEventListener('click', () => {
+  TESTS.forEach(o => openTests.add(o.id));
+  renderTests();
+});
+
+$('collapseAllBtn').addEventListener('click', () => {
+  openTests.clear();
+  renderTests();
+});
+
+$('resetAllBtn').addEventListener('click', () => {
+  if (!confirm(t().resetConfirm)) return;
+  state.tests = {};
+  save();
+  renderTests();
+  updateProgress();
+  toast(t().resetDone);
+});
+
+$('testList').addEventListener('toggle', ev => {
+  const card = ev.target.closest('.test');
+  if (!card) return;
+  if (card.open) openTests.add(card.dataset.test);
+  else openTests.delete(card.dataset.test);
+}, true);
+
+$('testList').addEventListener('change', ev => {
+  const card = ev.target.closest('.test');
+  if (!card) return;
+  const o = TESTS.find(x => x.id === card.dataset.test);
+  if (!o) return;
+  const st = dstate(o.id);
+  if (ev.target.hasAttribute('data-step')) {
+    const i = Number(ev.target.dataset.step);
+    st.checks[i] = ev.target.checked;
+    ev.target.closest('.step')?.querySelector('.step-text')?.classList.toggle('done', ev.target.checked);
+  } else if (ev.target.hasAttribute('data-status-select')) {
+    st.status = ev.target.value;
+  }
+  save();
+  updateCard(card);
+});
+
+$('testList').addEventListener('input', ev => {
+  if (!ev.target.hasAttribute('data-note')) return;
+  const card = ev.target.closest('.test');
+  if (!card) return;
+  dstate(card.dataset.test).note = ev.target.value;
+  save();
+});
+
+$('testList').addEventListener('click', ev => {
+  const copyBtn = ev.target.closest('[data-copy]');
+  if (copyBtn) {
+    const card = copyBtn.closest('.test');
+    const o = TESTS.find(x => x.id === card?.dataset.test);
+    const i = Number(copyBtn.dataset.copy);
+    if (o && o.steps[i]?.cmd) copyText(o.steps[i].cmd);
+    return;
+  }
+  const checkAllBtn = ev.target.closest('[data-check-all]');
+  if (checkAllBtn) {
+    const testId = checkAllBtn.dataset.checkAll;
+    const o = TESTS.find(x => x.id === testId);
+    if (!o) return;
+    const st = dstate(o.id);
+    const allChecked = o.steps.every((_, idx) => !!st.checks[idx]);
+    o.steps.forEach((_, idx) => { st.checks[idx] = !allChecked; });
+    save();
+    renderTests();
+    updateProgress();
+  }
+});
+
+document.querySelectorAll('[data-meta]').forEach(el =>
+  el.addEventListener('input', () => {
+    state.meta[el.dataset.meta] = el.value;
+    save();
+  })
+);
+
+$('chooseLogFolder').addEventListener('click', () => {
+  if ($('chooseLogFolder').dataset.useFallback === 'true') {
+    $('logFolderFallback').click();
+  } else {
+    chooseLogFolder();
+  }
+});
+$('androidLogFolder').addEventListener('click', () => $('logFolderFallback').click());
+$('logFolderFallback').addEventListener('change', ev => {
+  if (ev.target.files?.length) snapshotLogFolder([...ev.target.files]);
+  ev.target.value = '';
+});
+$('disconnectLogFolder').addEventListener('click', () => {
+  logFolderHandle = null;
+  logFolderSnapshot = [];
+  logFolderName = '';
+  logFolderMode = 'none';
+  updateLogFolderStatus();
+  forgottenLogFolder();
+});
+restoreLogFolder();
+
+$('attachments').addEventListener('change', ev => {
+  const incoming = [...(ev.target.files || [])];
+  for (const f of incoming) {
+    const exists = attachedFiles.some(x => x.name === f.name && x.size === f.size && x.lastModified === f.lastModified);
+    if (!exists) attachedFiles.push(f);
+  }
+  ev.target.value = '';
+  renderAttachments();
+});
+
+$('fileList').addEventListener('click', ev => {
+  const rm = ev.target.closest('[data-remove-file]');
+  if (!rm) return;
+  const idx = Number(rm.dataset.removeFile);
+  if (idx >= 0 && idx < attachedFiles.length) {
+    attachedFiles.splice(idx, 1);
+    renderAttachments();
+  }
+});
+
+$('makeZip').addEventListener('click', generateZip);
+
+$('copyReportBtn').addEventListener('click', () => {
+  const reportText = renderReportText(snapshot());
+  copyText(reportText, t().reportCopied);
+});
+
+$('exportJson').addEventListener('click', () => {
+  downloadBlob(new Blob([JSON.stringify(snapshot(), null, 2)], { type: 'application/json' }), 'NekoFlash_REV43_progress.json');
+  toast(t().saved);
+});
+
+$('importJson').addEventListener('click', () => $('importFile').click());
+
+$('importFile').addEventListener('change', async ev => {
+  const f = ev.target.files?.[0];
+  if (!f) return;
+  try {
+    const v = JSON.parse(await f.text());
+    if (!['nekoflash-rev29-testkit-v2', 'nekoflash-rev25-testkit-v1'].includes(v.schema) || !v.tests || !v.meta || typeof v.tests !== 'object') {
+      throw Error('Invalid JSON');
+    }
+    if (v.lang === 'en' || v.lang === 'ru') state.lang = v.lang;
+    state.meta = { ...state.meta, ...v.meta };
+    if (v.schema === 'nekoflash-rev25-testkit-v1' && /^REV25/.test(state.meta.build || '')) state.meta.build = 'REV43 / PR 27ab796d / DEV bd0d1fbf / 6.0.0-alpha11-dev (234)';
+    for (const o of TESTS) {
+      const a = v.tests[o.id];
+      if (a) {
+        const st = dstate(o.id);
+        st.status = STATUSES.includes(a.status) ? a.status : '';
+        st.checks = {};
+        if (Array.isArray(a.checkedSteps)) {
+          a.checkedSteps.forEach((c, i) => {
+            if (i < o.steps.length && c) st.checks[i] = true;
+          });
+        }
+        st.note = String(a.notes || '');
+      }
+    }
+    save();
+    renderStatic();
+    renderTests();
+    toast(t().loaded);
+  } catch (err) {
+    toast(t().badImport);
+  } finally {
+    ev.target.value = '';
+  }
+});
+
+renderStatic();
+renderTests();
+</script>
+</body>
+</html>
