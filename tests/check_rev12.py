@@ -27,11 +27,13 @@ assert git_blob in {
     'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',  # REV33 raw-file directory listing
     '6f975b156a643323b2ebc42916086e2d4b2e91e1',  # REV35 packet-safe UTF-8 terminal rendering
     '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e',  # REV36 interactive PTY packet-safe output
+    'cab103cc17fca1840525380d8f9065533bac96de',  # REV37 chunked PTY stdin from CNXN peer maxdata
 }, 'Unreviewed AdbProtocol change'
 if git_blob in {
     'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',
     '6f975b156a643323b2ebc42916086e2d4b2e91e1',
     '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e',
+    'cab103cc17fca1840525380d8f9065533bac96de',
 }:
     # Do not allow the new variant to silently fall back to full-result heap
     # capture, lose raw evidence or bypass path validation.
@@ -41,7 +43,7 @@ if git_blob in {
     pull = (base/'AdbPullPathPolicy.kt').read_text()
     assert 'fun parseListing(reader: Reader)' in pull
     assert 'require(normalize(record).isNotEmpty())' in pull
-if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e'}:
+if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca1840525380d8f9065533bac96de'}:
     # Only UI text rendering changed: raw binary writes and protocol identity
     # must stay untouched; stdout and stderr keep independent decoder state.
     assert 'record.writeStdout(data)' in adb and 'record.writeStderr(data)' in adb
@@ -56,7 +58,7 @@ if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2c
     assert 'StandardCharsets.UTF_8.newDecoder()' in renderer
     assert 'MAX_VIEW_FRAGMENT = 8192' in renderer
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/ShellOutputTextRendererTest.kt').is_file()
-if git_blob == '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e':
+if git_blob in {'3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca1840525380d8f9065533bac96de'}:
     interactive = adb.split('private fun runInteractiveShellV2(')[1].split('data class CapturedShellResult(')[0]
     assert 'ShellOutputTextRenderer(false, onLog)' in interactive
     assert 'ShellOutputTextRenderer(true, onLog)' in interactive
@@ -67,6 +69,16 @@ if git_blob == '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e':
     assert 'stdoutDisplay.finish()' in interactive and 'stderrDisplay.finish()' in interactive
     assert 'display.finish()' in interactive
     assert 'fun flushVisibleFragment()' in renderer
+if git_blob == 'cab103cc17fca1840525380d8f9065533bac96de':
+    assert 'peerMaxPayloadSize = AdbInteractiveInputChunkPolicy.maxWirePayload(header.arg1, MAX_PAYLOAD)' in adb
+    assert 'writeInteractiveStdin(stream, payload, shellV2 = true)' in adb
+    assert 'writeInteractiveStdin(stream, payload, shellV2 = false)' in adb
+    assert 'for (slice in AdbInteractiveInputChunkPolicy.fragments(' in adb
+    assert 'payload.copyOfRange(slice.first, slice.last + 1)' in adb
+    assert 'if (cancelled || stream.closed) return false' in adb
+    assert 'if (!sent) return false' in adb
+    assert (base/'AdbInteractiveInputChunkPolicy.kt').is_file()
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbInteractiveInputChunkPolicyTest.kt').is_file()
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb

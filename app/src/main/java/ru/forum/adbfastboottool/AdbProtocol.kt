@@ -41,6 +41,8 @@ class AdbProtocol(
     private val deviceFeatures = linkedSetOf<String>()
     private var remoteBanner: String = ""
     private var peerProtocolVersion: Int = LOCAL_ADB_VERSION
+    // Device-advertised CNXN maxdata, not the host's own inbound maximum.
+    private var peerMaxPayloadSize: Int = AdbInteractiveInputChunkPolicy.FALLBACK_MAX_PAYLOAD
     private var pendingInboundChecksum: Int? = null
     private var pendingInboundLength: Int = 0
     private var pendingInboundCommand: Long = 0L
@@ -403,6 +405,7 @@ class AdbProtocol(
 
     private fun handleConnectionBanner(header: AdbHeader) {
         peerProtocolVersion = header.arg0
+        peerMaxPayloadSize = AdbInteractiveInputChunkPolicy.maxWirePayload(header.arg1, MAX_PAYLOAD)
         val bannerBytes = readData(header.dataLength)
         remoteBanner = bannerBytes?.toString(Charsets.UTF_8)?.trimEnd('\u0000').orEmpty()
         parseRemoteFeatures(remoteBanner)
@@ -1509,7 +1512,7 @@ class AdbProtocol(
     ) {
         while (!cancelled && !stream.closed) {
             val payload = pollInteractiveShellInput() ?: break
-            if (!writeShellPacket(stream, SHELL_ID_STDIN, payload)) {
+            if (!writeInteractiveStdin(stream, payload, shellV2 = true)) {
                 stream.closed = true
                 break
             }
@@ -1520,6 +1523,27 @@ class AdbProtocol(
                 markInteractiveShellCloseStdinSent()
             }
         }
+    }
+
+    /**
+     * Large pasted input is a byte stream, not one ADB WRTE packet.
+     * Keep individual WRTE frames <= peer CNXN maxdata (including shell/v2
+     * framing), waiting for the existing ACK before every subsequent frame.
+     */
+    private fun writeInteractiveStdin(
+        stream: AdbStream, payload: ByteArray, shellV2: Boolean
+    ): Boolean {
+        val headerBytes = if (shellV2) SHELL_PACKET_HEADER else 0
+        for (slice in AdbInteractiveInputChunkPolicy.fragments(
+            payload.size, peerMaxPayloadSize, headerBytes
+        )) {
+            if (cancelled || stream.closed) return false
+            val bytes = payload.copyOfRange(slice.first, slice.last + 1)
+            val sent = if (shellV2) writeShellPacket(stream, SHELL_ID_STDIN, bytes)
+                else writeAdbStream(stream, bytes)
+            if (!sent) return false
+        }
+        return !cancelled && !stream.closed
     }
 
     private fun consumeInteractiveShellV2Packets(
@@ -1602,7 +1626,7 @@ class AdbProtocol(
     private fun drainInteractiveLegacyInput(stream: AdbStream) {
         while (!cancelled && !stream.closed) {
             val payload = pollInteractiveShellInput() ?: break
-            if (!writeAdbStream(stream, payload)) {
+            if (!writeInteractiveStdin(stream, payload, shellV2 = false)) {
                 stream.closed = true
                 break
             }
