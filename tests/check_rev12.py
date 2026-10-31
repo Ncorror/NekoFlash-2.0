@@ -29,6 +29,7 @@ assert git_blob in {
     '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e',  # REV36 interactive PTY packet-safe output
     'cab103cc17fca1840525380d8f9065533bac96de',  # REV37 chunked PTY stdin from CNXN peer maxdata
     'd027c6a2f196269f139f1a416c3cbc9bceef3ec8',  # REV42 generic ADB stream A_WRTE peer maxdata
+    '794da944cb1a9f35106fd08f5f1f0612e53fe5aa',  # REV43 lazy recursive push and cancellation
 }, 'Unreviewed AdbProtocol change'
 if git_blob in {
     'd6c43f7bfe4732bce5937ebf2f234bdb1e65cc8e',
@@ -36,6 +37,7 @@ if git_blob in {
     '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e',
     'cab103cc17fca1840525380d8f9065533bac96de',
     'd027c6a2f196269f139f1a416c3cbc9bceef3ec8',
+    '794da944cb1a9f35106fd08f5f1f0612e53fe5aa',  # REV43 lazy recursive push and cancellation
 }:
     # Do not allow the new variant to silently fall back to full-result heap
     # capture, lose raw evidence or bypass path validation.
@@ -45,7 +47,7 @@ if git_blob in {
     pull = (base/'AdbPullPathPolicy.kt').read_text()
     assert 'fun parseListing(reader: Reader)' in pull
     assert 'require(normalize(record).isNotEmpty())' in pull
-if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8'}:
+if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8', '794da944cb1a9f35106fd08f5f1f0612e53fe5aa'}:
     # Only UI text rendering changed: raw binary writes and protocol identity
     # must stay untouched; stdout and stderr keep independent decoder state.
     assert 'record.writeStdout(data)' in adb and 'record.writeStderr(data)' in adb
@@ -60,7 +62,7 @@ if git_blob in {'6f975b156a643323b2ebc42916086e2d4b2e91e1', '3057cc39fe64c5b4e2c
     assert 'StandardCharsets.UTF_8.newDecoder()' in renderer
     assert 'MAX_VIEW_FRAGMENT = 8192' in renderer
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/ShellOutputTextRendererTest.kt').is_file()
-if git_blob in {'3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8'}:
+if git_blob in {'3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8', '794da944cb1a9f35106fd08f5f1f0612e53fe5aa'}:
     interactive = adb.split('private fun runInteractiveShellV2(')[1].split('data class CapturedShellResult(')[0]
     assert 'ShellOutputTextRenderer(false, onLog)' in interactive
     assert 'ShellOutputTextRenderer(true, onLog)' in interactive
@@ -71,7 +73,7 @@ if git_blob in {'3057cc39fe64c5b4e2cc67a039f71d06c9f4618e', 'cab103cc17fca184052
     assert 'stdoutDisplay.finish()' in interactive and 'stderrDisplay.finish()' in interactive
     assert 'display.finish()' in interactive
     assert 'fun flushVisibleFragment()' in renderer
-if git_blob in {'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8'}:
+if git_blob in {'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8', '794da944cb1a9f35106fd08f5f1f0612e53fe5aa'}:
     assert 'peerMaxPayloadSize = AdbInteractiveInputChunkPolicy.maxWirePayload(header.arg1, MAX_PAYLOAD)' in adb
     assert 'writeInteractiveStdin(stream, payload, shellV2 = true)' in adb
     assert 'writeInteractiveStdin(stream, payload, shellV2 = false)' in adb
@@ -81,7 +83,7 @@ if git_blob in {'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139
     assert 'if (!sent) return false' in adb
     assert (base/'AdbInteractiveInputChunkPolicy.kt').is_file()
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbInteractiveInputChunkPolicyTest.kt').is_file()
-if git_blob == 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8':
+if git_blob in {'d027c6a2f196269f139f1a416c3cbc9bceef3ec8', '794da944cb1a9f35106fd08f5f1f0612e53fe5aa'}:
     # Bytes inside one logical SYNC request must not be trimmed or re-encoded.
     # A_WRTE is bounded by peer CNXN maxdata, ACKed sequentially.
     stream_writer = adb.split('private fun writeAdbStream(stream: AdbStream, payload: ByteArray): Boolean')[1].split('private fun readAdbStreamExact(')[0]
@@ -96,6 +98,23 @@ if git_blob == 'd027c6a2f196269f139f1a416c3cbc9bceef3ec8':
     assert 'writeSyncData(stream, "DATA", buffer, read)' in adb
     assert 'private val SYNC_DATA_CHUNK = 64 * 1024' in adb
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbInteractiveInputChunkPolicyTest.kt').is_file()
+if git_blob == '794da944cb1a9f35106fd08f5f1f0612e53fe5aa':
+    # REV43 differs from REV42 only in the audited recursive directory path
+    # and the split public/new-operation vs nested/no-reset file writer.
+    push_dir = adb.split('private fun pushDirectory(')[1].split('fun pullFile(')[0]
+    assert 'AdbPushDirectoryWalker(localDir)' in push_dir
+    assert 'walker.scan(checkCancelled)' in push_dir
+    assert 'walker.visitDirectories(checkCancelled)' in push_dir
+    assert 'walker.visitFiles(checkCancelled)' in push_dir
+    assert 'afterDirs != expected' in push_dir and 'afterFiles != expected' in push_dir
+    assert 'pushFileInternal(file, remoteFile, mode, startNewOperation = false)' in push_dir
+    assert 'walkTopDown().toList()' not in push_dir
+    assert 'if (startNewOperation) cancelled = false' in adb
+    assert 'if (cancelled || !isConnected) return false' in adb
+    walker = (base/'AdbPushDirectoryWalker.kt').read_text()
+    assert 'root.walkTopDown()' in walker and '.onEnter' in walker and '.onFail' in walker
+    assert 'Files.isSymbolicLink(' in walker
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbPushDirectoryWalkerTest.kt').is_file()
 assert 'fun sideloadZip(file: File): SideloadResult' in adb
 assert 'source.open(resolver)' in adb
 assert 'return opened.use { reader ->' in adb
