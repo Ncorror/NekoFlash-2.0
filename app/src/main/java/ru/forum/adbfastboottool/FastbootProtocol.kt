@@ -1282,7 +1282,13 @@ class FastbootProtocol(
             return false
         }
 
-        val downloadDone = readUntilFinal(30000) ?: return false
+        // The device can send INFO fragments before the final OKAY/FAIL.
+        // Keep the same 30-second overall budget as the flash path, but
+        // poll in cancellable slices rather than one long USB read.
+        val downloadDone = readUntilFinalWithRetry(
+            singleReadTimeoutMs = FastbootPostDownloadWaitPolicy.READ_SLICE_MS,
+            maxTotalTimeMs = FastbootPostDownloadWaitPolicy.FINAL_TIMEOUT_MS
+        ) ?: return false
         if (downloadDone.type != "OKAY") {
             logFastbootFailure("Device rejected the file after transfer", downloadDone.payload.ifBlank { downloadDone.raw })
             return false
