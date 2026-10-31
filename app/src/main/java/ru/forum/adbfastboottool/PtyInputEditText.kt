@@ -26,13 +26,25 @@ internal class PtyInputEditText @JvmOverloads constructor(
 
     private var rawMode: () -> Boolean = { false }
     private var sink: (ByteArray) -> Boolean = { false }
+    // Shared by the view's InputConnection wrappers and the paste menu.
+    private var composing: String = ""
+    private var previousRawMode: Boolean? = null
 
     fun configurePty(rawMode: () -> Boolean, sink: (ByteArray) -> Boolean) {
         this.rawMode = rawMode
         this.sink = sink
+        composing = ""
+        previousRawMode = null
     }
 
-    private fun raw(): Boolean = runCatching(rawMode).getOrDefault(false)
+    private fun raw(): Boolean {
+        val current = runCatching(rawMode).getOrDefault(false)
+        if (previousRawMode != current) {
+            composing = ""
+            previousRawMode = current
+        }
+        return current
+    }
 
     private fun emit(bytes: ByteArray): Boolean {
         if (bytes.isEmpty()) return true
@@ -56,7 +68,6 @@ internal class PtyInputEditText @JvmOverloads constructor(
         outAttrs.imeOptions = outAttrs.imeOptions or
             EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_FLAG_NO_FULLSCREEN
         return object : InputConnectionWrapper(base, true) {
-            private var composing = ""
 
             override fun setComposingText(text: CharSequence?, newCursorPosition: Int): Boolean {
                 if (!raw()) {
@@ -145,7 +156,7 @@ internal class PtyInputEditText @JvmOverloads constructor(
                 if (event.action != KeyEvent.ACTION_DOWN) {
                     return super.sendKeyEvent(event)
                 }
-                return when (event.keyCode) {
+                val accepted = when (event.keyCode) {
                     KeyEvent.KEYCODE_DEL -> deletePtyText(1, 0, inCodePoints = true)
                     KeyEvent.KEYCODE_ENTER -> emit(byteArrayOf('\n'.code.toByte()))
                     KeyEvent.KEYCODE_TAB -> emit(byteArrayOf('\t'.code.toByte()))
@@ -159,6 +170,10 @@ internal class PtyInputEditText @JvmOverloads constructor(
                         else emit(String(Character.toChars(unicode)).toByteArray(StandardCharsets.UTF_8))
                     }
                 }
+                // Enter, navigation and hardware text terminate composing
+                // input. Backspace is the exception: its prefix survives.
+                if (accepted && event.keyCode != KeyEvent.KEYCODE_DEL) composing = ""
+                return accepted
             }
         }
     }
@@ -168,7 +183,9 @@ internal class PtyInputEditText @JvmOverloads constructor(
             val clipboard = context.getSystemService(ClipboardManager::class.java)
             val clip = clipboard?.primaryClip
             val text = clip?.getItemAt(0)?.coerceToText(context)
-            return text != null && emitText(text)
+            if (text == null || !emitText(text)) return false
+            composing = ""
+            return true
         }
         return super.onTextContextMenuItem(id)
     }
