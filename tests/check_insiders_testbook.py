@@ -40,7 +40,7 @@ scenarios = source.split("const TESTS = [", 1)[1].split("\n];\n", 1)[0]
 ids = re.findall(r"(?:\bid\s*:\s*'|\"id\"\s*:\s*\")([A-Z]+-\d+)", scenarios)
 assert len(ids) >= 40, f"Scenario count unusually low: {len(ids)}"
 assert len(ids) == len(set(ids)), f"Duplicate test IDs: {len(ids) - len(set(ids))}"
-for id_ in ("TERM-04", "TERM-05", "ADB-04", "ADB-05", "ADB-06", "USB-02", "FB-04", "CI-02", "LOG-03"):
+for id_ in ("TERM-06", "TERM-05", "ADB-07", "ADB-08", "ADB-09", "USB-03", "FB-04", "CI-02", "LOG-03"):
     assert id_ in ids, f"Missing REV43 field test: {id_}"
 
 node = shutil.which("node")
