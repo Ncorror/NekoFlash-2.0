@@ -39,6 +39,16 @@ internal class ShellOutputTextRenderer(
         pendingUtf8 = ByteArray(buffer.remaining()).also { buffer.get(it) }
     }
 
+    /**
+     * Show decoded PTY prompts that do not end with a newline. A UTF-8
+     * code point split across USB packets remains in the decoder for the next
+     * accept() call; no fabricated replacement glyph is emitted here.
+     */
+    fun flushVisibleFragment() {
+        check(!finished) { "Shell output renderer is already finished" }
+        emitLine(trimCr = false)
+    }
+
     fun finish() {
         if (finished) return
         finished = true
