@@ -2,6 +2,8 @@
 >
 > **Актуальная точка входа:** [корневой README](../../README.md) и [статус разработки после REV27](../DEVELOPMENT_STATUS.md). Проверенный CI REV27: [41012595076](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41012595076), 19 Android-тестов на API 26 и API 34. [Отдельный список вопросов безопасности и выпуска](../SECURITY_REVIEW_BACKLOG.md).
 >
+> **Текущая REV43 (1 ноября 2026):** [статус DEV и матрица CI](../DEVELOPMENT_STATUS.md), [скачать тестбук Insiders](../insiders/testbook.html), [полевой мануал RU](../testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN](../testing/INSIDERS-FIELD-TEST-REV43-EN.md). Сведения ниже — архив REV5; не использовать старые SHA, CI и команды как подтверждение REV43. Реальные аппаратные PASS для REV43 ещё не подтверждены.
+
 > **Исторические данные:** описание REV22, PR #9, 179 JVM-тестов и 4 Android-теста отражает только прежнюю дату. Для текущей ревизии эти цифры неприменимы.
 
 
