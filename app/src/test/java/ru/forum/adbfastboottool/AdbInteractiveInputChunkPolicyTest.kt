@@ -46,6 +46,23 @@ class AdbInteractiveInputChunkPolicyTest {
         assertFalse(policy.fragments(100_000, 4096, 5).toList().isEmpty())
     }
 
+    @Test fun syncFrameWith64KiBPayloadIsLosslessAcross4KiBWrtes() {
+        // SYNC DATA is a logical stream record: 4-byte ID, 4-byte length,
+        // then 64 KiB data. ADB A_WRTE must respect the old peer maxdata.
+        val data = ByteArray(64 * 1024) { (it * 17).toByte() }
+        val header = byteArrayOf(
+            'D'.code.toByte(), 'A'.code.toByte(),
+            'T'.code.toByte(), 'A'.code.toByte(),
+            0, 0, 1, 0
+        )
+        val frame = header + data
+        val maxdata = policy.maxWirePayload(4096, 1_048_576)
+        val fragments = policy.fragments(frame.size, maxdata, 0).toList()
+        assertTrue(fragments.size > 1)
+        assertTrue(fragments.all { it.last - it.first + 1 <= maxdata })
+        assertArrayEquals(frame, reconstruct(frame, maxdata, framed = 0))
+    }
+
     @Test fun tooSmallOrInvalidFramingIsRejectedRatherThanOverflowing() {
         try {
             policy.fragments(128, 5, 5).toList()
