@@ -20,7 +20,7 @@
 - [Скачать тестовую APK REV43 — архив GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
 - [Инструкция тестировщика RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Статус](docs/DEVELOPMENT_STATUS.md)
 
-[REV44 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) прошла сборку/API26/API34; интеграционный [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) также успешен, но повторный [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) выявил два падения API26 из-за оставшейся открытой клавиатуры. [Текущий аудит REV45](docs/AUDIT-REV45-2026-11-01-RU.md) содержит 49 предупреждений lint, причины и ограничения. Подтверждённых аппаратных PASS REV43 пока нет. Ссылки ниже на релиз NekoFlash 6.0.0-alpha11 относятся к старой версии, не к новой бете.
+[REV44 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) прошла сборку/API26/API34; интеграционный [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) также успешен, но повторный [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) выявил два падения API26 из-за оставшейся открытой клавиатуры. [Текущий аудит REV45](docs/AUDIT-REV45-2026-11-01-RU.md) фиксирует устранение 49 исходных предупреждений lint (0 в CI 41346454626), а также оставшийся тест API 34. Подтверждённых аппаратных PASS REV43 пока нет. Ссылки ниже на релиз NekoFlash 6.0.0-alpha11 относятся к старой версии, не к новой бете.
 
 ---
 
