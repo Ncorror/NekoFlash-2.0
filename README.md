@@ -14,7 +14,7 @@ English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](README_ru.md)
 
 This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta testing**, NOT a signed production release. The standalone `.dev` test APK does not replace the original signed NekoFlash release.
 
-**Telegram testing group — NekoFlash Insiders.** Testers use this group for APK/testbook distribution, discussion and private ZIP reports. The official invitation URL has not been supplied, so no guessed `t.me` link is published. The materials are independently downloadable from GitHub:
+**Telegram testing group — [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** Join to get the latest testing instructions, discuss UI issues and share ZIP reports in the trusted testing group. The materials are also available directly from GitHub:
 
 - [Download standalone offline testbook HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
 - [Download tested REV43 debug APK — GitHub Actions ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
