@@ -47,7 +47,7 @@ This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta te
 
 **Профессиональный режим диагностики:** [политика сохранения сырых журналов и прямого терминала](docs/PROFESSIONAL_RECOVERY_POLICY.md). Журналы не чистятся, не усекaются и не подвергаются автоматическому обезличиванию в рамках защитных изменений. В DEV REV28 (отдельный PR, до подтверждения CI) готовятся разовая проверка критичных GUI-команд и атомарное хранение ADB-идентичности; эти изменения не объявляются опубликованным выпуском.\n\n**История ревизий:** [REV18](docs/source-audit/REV18-AUDIT-2026-10-25-RU.md), [REV21](docs/source-audit/REV21-FASTBOOT-HOST-2026-10-26-RU.md), [REV22](docs/source-audit/REV22-BUNDLED-MKFS-2026-10-26-RU.md), [REV23](docs/source-audit/REV23-RESPARSE-2026-10-27-RU.md), [REV24](docs/source-audit/REV24-SOURCES-2026-10-28-RU.md), [REV25](docs/source-audit/REV25-UI-2026-10-29-RU.md), [историческая сверка с оригиналом](docs/source-audit/REV25-LEGACY-COMPARISON.json). Ранние отчёты относятся к своим коммитам, а не к текущей REV27.
 
-**Команда:** разработчики [Ncorror](https://github.com/Ncorror) и [IQ-HARRY7](https://github.com/IQ-HARRY7).
+**Команда:** автор и текущий разработчик — [Ncorror](https://github.com/Ncorror). [IQ-HARRY7](https://github.com/IQ-HARRY7) добавлен в список участников по просьбе автора проекта; реализация кода и аппаратные тесты за ним пока не подтверждены.
 
 ---
 
@@ -336,10 +336,10 @@ ADB, Fastboot, flashing, sideload and diagnostics operate locally between the ho
 
 Internet/network access is used by the optional Xiaomi / Mi Unlock flow. See [PRIVACY.md](PRIVACY.md) for the data-handling details.
 
-## Developers
+## Team / Команда
 
-- [Ncorror](https://github.com/Ncorror)
-- [IQ-HARRY7](https://github.com/IQ-HARRY7)
+- [Ncorror](https://github.com/Ncorror) — maintainer and current developer / автор и разработчик.
+- [IQ-HARRY7](https://github.com/IQ-HARRY7) — listed as a project team member at the maintainer's request. No implemented code or completed hardware tests are attributed to him yet / указан как участник команды по просьбе автора, без приписывания выполненной разработки или тестов.
 
 ## Documentation
 
