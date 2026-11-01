@@ -1,6 +1,7 @@
 package ru.forum.adbfastboottool
 
 import android.hardware.usb.*
+import android.annotation.SuppressLint
 import java.io.File
 import java.io.RandomAccessFile
 import java.util.ArrayDeque
@@ -28,6 +29,12 @@ class AdbProtocol(
     private val preferredInterfaceIndex: Int? = null,
     private val rawShellLogsDir: File = File(keyDirectory.parentFile ?: keyDirectory, "diagnostics/adb-shell")
 ) {
+    // This is a *target-device* ADB shell path, not an Android host path.
+    // Environment.getExternalStorageDirectory() would refer to the wrong phone.
+    @SuppressLint("SdCardPath")
+    private fun remoteObbDirectory(packageName: String): String =
+        "/sdcard/Android/obb/$packageName"
+
     private val LOCAL_ADB_VERSION = AdbPacketChecksum.VERSION_WITH_CHECKSUM
 
     private var connection: UsbDeviceConnection? = null
@@ -1144,7 +1151,7 @@ class AdbProtocol(
                 ok = false
                 return@forEachIndexed
             }
-            val remoteDir = "/sdcard/Android/obb/$packageName"
+            val remoteDir = remoteObbDirectory(packageName)
             val remoteName = obb.entryName.substringAfterLast('/').ifBlank { obb.file.name.removePrefix("obb-") }
             val remotePath = "$remoteDir/$remoteName"
             onLog("ℹ️ OBB ${index + 1}/${obbs.size}: ${obb.entryName} → $remotePath")
