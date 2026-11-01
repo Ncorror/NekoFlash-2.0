@@ -9,8 +9,8 @@
     <string name="pro_review_queue">очередь прошивки</string>
     <string name="pro_review_execute">ВЫПОЛНИТЬ</string>
     <string name="pro_review_slot_default">по умолчанию / активный</string>
-    <string name="pro_review_queue_count">В очереди: %1$d разделов</string>
-    <string name="pro_review_additional_targets">…и ещё %1$d разделов (полный список в очереди)</string>
+    <plurals name="pro_review_queue_count"><item quantity="one">В очереди: %1$d раздел</item><item quantity="few">В очереди: %1$d раздела</item><item quantity="many">В очереди: %1$d разделов</item><item quantity="other">В очереди: %1$d разделов</item></plurals>
+    <plurals name="pro_review_additional_targets"><item quantity="one">…и ещё %1$d раздел (полный список в очереди)</item><item quantity="few">…и ещё %1$d раздела (полный список в очереди)</item><item quantity="many">…и ещё %1$d разделов (полный список в очереди)</item><item quantity="other">…и ещё %1$d разделов (полный список в очереди)</item></plurals>
     <string name="pro_review_source_changed">Источник или очередь изменились. Проверь параметры ещё раз.</string>
     <string name="app_name">NekoFlash</string>
     <string name="app_name_neko">Neko</string>
@@ -478,7 +478,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev11_slot_switch_unverified">Активный слот не подтверждён: запрошен %1$s, устройство сообщает %2$s.</string>
     <string name="rev11_slot_switch_verified">Активный слот подтверждён: %1$s.</string>
     <string name="rev11_import_started">Импорт файла %1$s в %2$s.</string>
-    <string name="rev11_import_expected_size">Размер исходного файла: %1$d байт.</string>
+    <plurals name="rev11_import_expected_size"><item quantity="one">Размер исходного файла: %1$d байт.</item><item quantity="few">Размер исходного файла: %1$d байта.</item><item quantity="many">Размер исходного файла: %1$d байт.</item><item quantity="other">Размер исходного файла: %1$d байт.</item></plurals>
     <string name="rev11_import_finished">Файл импортирован: %1$s (%2$s).</string>
     <string name="rev11_import_failed">Ошибка импорта файла: %1$s.</string>
     <string name="rev11_picker_open_failed">Не удалось открыть системный выбор файла: %1$s.</string>
