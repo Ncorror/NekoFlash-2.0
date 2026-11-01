@@ -3129,11 +3129,11 @@ class MainActivity : AppCompatActivity() {
                         it.partition + " ← " + it.displayName
                     }
                     val more = if (draft.items.size > 12) {
-                        "\n" + getString(R.string.pro_review_additional_targets, draft.items.size - 12)
+                        "\n" + resources.getQuantityString(R.plurals.pro_review_additional_targets, draft.items.size - 12, draft.items.size - 12)
                     } else ""
                     reviewProfessionalOperation(
                         ProfessionalOperationReviewPolicy.Action.MASS_FLASH,
-                        getString(R.string.pro_review_queue_count, draft.items.size) + "\n" + shown + more,
+                        resources.getQuantityString(R.plurals.pro_review_queue_count, draft.items.size, draft.items.size) + "\n" + shown + more,
                         runQueue,
                     )
                 } else {
