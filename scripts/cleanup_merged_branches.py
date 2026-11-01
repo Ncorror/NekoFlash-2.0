@@ -16,7 +16,8 @@ REPO = "Ncorror/NekoFlash-2.0"
 
 
 def api(path: str, method: str = "GET"):
-    command = ["gh", "api", "-X", method, f"repos/{REPO}/{path}"]
+    endpoint = f"repos/{REPO}" + (f"/{path}" if path else "")
+    command = ["gh", "api", "-X", method, endpoint]
     output = subprocess.check_output(command, text=True)
     return json.loads(output) if output.strip() else None
 
