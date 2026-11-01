@@ -81,7 +81,7 @@ for field in reviewed_fields:
     assert normalized_lines[index].count(attr) == 1, 'Unexpected REV45 Autofill configuration'
     normalized_lines[index] = normalized_lines[index].replace(attr, b'', 1)
 original_flash = b''.join(normalized_lines)
-assert hashlib.sha1(b'blob ' + str(len(original_flash)).encode() + b'\\0' + original_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
+assert hashlib.sha1(b'blob ' + str(len(original_flash)).encode() + b'\0' + original_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
 flash = ET.parse(flash_path).getroot()
 flash_ids = [node.attrib.get(a+'id','') for node in flash.iter()]
 for key in ['fastbootQuickSection','fastbootMassSection','fastbootToolsSection','btnQuickExecute','btnMassExecute','toolBlockInfo','toolBlockPartitions','toolBlockSlots','toolBlockDynamic']:
