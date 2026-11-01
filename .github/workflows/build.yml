@@ -551,6 +551,9 @@ jobs:
 
   insiders-kit:
     name: Package verified Insiders tester kit
+    outputs:
+      artifact_id: ${{ steps.upload.outputs.artifact-id }}
+      artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
     needs: [build, android-filesystems]
     runs-on: ubuntu-latest
     steps:
@@ -565,8 +568,52 @@ jobs:
           cd tester-kit
           sha256sum --check SHA256SUMS.txt
       - uses: actions/upload-artifact@v6
+        id: upload
         with:
           name: NekoFlash-Insiders-Tester-Kit
           path: tester-kit/
           if-no-files-found: error
           retention-days: 90
+
+  insiders-prerelease:
+    name: Pin field kit when the campaign tag changes
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: insiders-kit
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Publish the exact tested ZIP under its new Insiders tag
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PREVIOUS: ${{ github.event.before }}
+          ARTIFACT_ID: ${{ needs.insiders-kit.outputs.artifact_id }}
+          ARTIFACT_DIGEST: ${{ needs.insiders-kit.outputs.artifact_digest }}
+        run: |
+          set -euo pipefail
+          marker=docs/insiders/campaign-tag.txt
+          if git diff --quiet "$PREVIOUS" "$GITHUB_SHA" -- "$marker"; then
+            echo "Campaign tag unchanged"
+            exit 0
+          fi
+          tag=$(cat "$marker")
+          [[ "$tag" =~ ^insiders-rev([1-9][0-9]*)$ ]]
+          revision=REV${BASH_REMATCH[1]}
+          archive="NekoFlash-Insiders-${revision}.zip"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$archive"
+          printf '%s  %s\n' "${ARTIFACT_DIGEST#sha256:}" "$archive" | sha256sum --check
+          if git show-ref --verify --quiet "refs/tags/$tag"; then
+            test "$(git rev-list -n 1 "$tag")" = "$GITHUB_SHA"
+            gh release download "$tag" --pattern "$archive" --dir published
+            cmp "$archive" "published/$archive"
+            exit 0
+          fi
+          gh release create "$tag" "$archive" --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "NekoFlash Insiders $revision · hardware beta" \
+            --notes "Android field-testing kit. Extract the ZIP and open START-HERE.txt. CI: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. ZIP SHA-256: ${ARTIFACT_DIGEST#sha256:}."

@@ -10,9 +10,9 @@ Run ADB and Fastboot from one Android phone to service a second phone over USB O
 
 We are collecting HOST → TARGET reports for the REV45 development build. The debug app installs alongside the original NekoFlash. Physical OTG, reconnect and partition-write results are still pending for this build.
 
-**[Download the Insiders tester kit (ZIP)](https://nightly.link/Ncorror/NekoFlash-2.0/workflows/build/main/NekoFlash-Insiders-Tester-Kit.zip)** · [Official GitHub Actions downloads](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
+**[Download the Insiders tester kit (ZIP)](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [Official GitHub Actions downloads](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
 
-Open the ZIP on the **host** phone. Install the included debug APK, then open `testbook.html` in a browser. The kit includes RU/EN instructions, APK and file checksums, and the source archive for the bundled filesystem tools. To get the ZIP from GitHub itself, sign in, open a successful main run and choose **NekoFlash-Insiders-Tester-Kit** under Artifacts.
+Open the ZIP on the **host** phone. Install the included debug APK, then open `testbook.html` in a browser. The kit includes RU/EN instructions, APK and file checksums, and the source archive for the bundled filesystem tools. For a newer CI snapshot, sign in to GitHub, open a successful main run and choose **NekoFlash-Insiders-Tester-Kit** under Artifacts.
 
 [Field guide](docs/insiders/FIELD-GUIDE-EN.md) · [Offline testbook RU/EN](docs/insiders/testbook.html)
 

@@ -10,9 +10,9 @@ NekoFlash позволяет с одного Android-телефона обслу
 
 Собираем отчёты по DEV-сборке REV45 для связок HOST → TARGET. Тестовая APK ставится рядом с оригинальным NekoFlash. Работа OTG, переподключение и запись разделов на этой сборке ещё требуют проверки на телефонах.
 
-**[Скачать комплект тестировщика Insiders (ZIP)](https://nightly.link/Ncorror/NekoFlash-2.0/workflows/build/main/NekoFlash-Insiders-Tester-Kit.zip)** · [Сборки на GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
+**[Скачать комплект тестировщика Insiders (ZIP)](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [Сборки на GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
 
-Распакуй ZIP на телефоне-**хосте**. Установи debug APK и открой `testbook.html` в браузере. В комплекте есть инструкции RU/EN, контрольные суммы и исходники утилит файловых систем. Для скачивания через сам GitHub войди в аккаунт, открой успешный запуск main и выбери **NekoFlash-Insiders-Tester-Kit** в разделе Artifacts.
+Распакуй ZIP на телефоне-**хосте**. Установи debug APK и открой `testbook.html` в браузере. В комплекте есть инструкции RU/EN, контрольные суммы и исходники утилит файловых систем. Чтобы взять снимок более свежей main для отдельного теста, войди в GitHub, открой успешный запуск main и выбери **NekoFlash-Insiders-Tester-Kit** в разделе Artifacts.
 
 [Инструкция тестировщика](docs/insiders/FIELD-GUIDE-RU.md) · [Offline testbook RU/EN](docs/insiders/testbook.html)
 

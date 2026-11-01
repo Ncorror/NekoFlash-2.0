@@ -1,10 +1,10 @@
 # NekoFlash Insiders · REV45
 
-**[Скачать комплект / Download tester ZIP](https://nightly.link/Ncorror/NekoFlash-2.0/workflows/build/main/NekoFlash-Insiders-Tester-Kit.zip)** · [GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram](https://t.me/+NR_FiUmvXlViOTUy)
+**[Скачать комплект / Download tester ZIP](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram](https://t.me/+NR_FiUmvXlViOTUy)
 
-**RU.** Распакуй ZIP и начни с `START-HERE.txt`. В комплекте лежат проверенная DEV APK, автономный тестбук, две инструкции, сведения о сборке и контрольные суммы. Название артефакта в GitHub Actions — `NekoFlash-Insiders-Tester-Kit`. Его публикация зависит от успешного завершения сборки и обеих эмуляторных проверок. Для прямого скачивания с GitHub войди в аккаунт.
+**RU.** Распакуй ZIP и начни с `START-HERE.txt`. В комплекте лежат проверенная DEV APK, автономный тестбук, две инструкции, сведения о сборке и контрольные суммы. Название артефакта в GitHub Actions — `NekoFlash-Insiders-Tester-Kit`. Его публикация зависит от успешного завершения сборки и обеих эмуляторных проверок. Ссылка выше ведёт на один закреплённый ZIP у тега insiders-rev45.
 
-**EN.** Extract the ZIP and open `START-HERE.txt`. The kit contains the debug APK, offline RU/EN checklist, two field guides, build metadata, checksums, notices and corresponding filesystem-tool sources. For an official GitHub download, sign in, open a successful main run and select `NekoFlash-Insiders-Tester-Kit` under Artifacts.
+**EN.** Extract the ZIP and open `START-HERE.txt`. The kit contains the debug APK, offline RU/EN checklist, two field guides, build metadata, checksums, notices and corresponding filesystem-tool sources. The link above downloads the pinned field-test ZIP. For a newer CI snapshot, sign in, open a successful main run and select `NekoFlash-Insiders-Tester-Kit` under Artifacts.
 
 | File | Use |
 | --- | --- |

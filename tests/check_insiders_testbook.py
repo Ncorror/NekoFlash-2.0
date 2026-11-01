@@ -54,3 +54,7 @@ with tempfile.TemporaryDirectory() as temp:
     js_file.write_text(script, encoding="utf-8")
     subprocess.run([node, "--check", str(js_file)], check=True, cwd=root)
 print(f"PASS Insiders: offline RU/EN testbook, {len(ids)} scenarios, JS parse, AutoLogs BIN and exact CI metadata")
+
+tag = (root / "docs/insiders/campaign-tag.txt").read_text().strip()
+assert re.fullmatch(r"insiders-rev[1-9][0-9]*", tag)
+assert tag == "insiders-" + build["revision"].lower()
