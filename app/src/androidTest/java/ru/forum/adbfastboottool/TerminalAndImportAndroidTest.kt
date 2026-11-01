@@ -278,6 +278,19 @@ class TerminalAndImportAndroidTest {
                 waitUi(scenario, "expanded landscape terminal") {
                     expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
                 }
+                // API34 can report LANDSCAPE and STATE_EXPANDED before its
+                // final system-bar/IME inset frame. Preserve the strict full
+                // visibility assertion, but wait for the final viewport.
+                waitUi(scenario, "landscape terminal controls fully visible") { activity ->
+                    listOf<View>(
+                        activity.findViewById(R.id.btnConsoleClose),
+                        activity.findViewById(R.id.etCommand)
+                    ).all { view ->
+                        val rect = Rect()
+                        view.isShown && view.getGlobalVisibleRect(rect) &&
+                            rect.width() == view.width && rect.height() == view.height
+                    }
+                }
                 scenario.onActivity {
                     visible(it.findViewById(R.id.btnConsoleClose))
                     val editor = it.findViewById<PtyInputEditText>(R.id.etCommand)

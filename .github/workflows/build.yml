@@ -130,7 +130,31 @@ jobs:
           lint = ET.parse('app/build/reports/lint-results-debug.xml').getroot()
           print('Lint severities:', dict(Counter(issue.get('severity') for issue in lint.findall('issue'))))
           print('Lint issue types:', dict(Counter(issue.get('id') for issue in lint.findall('issue'))))
+          for issue in lint.findall('issue'):
+              if issue.get('severity') not in ('Warning', 'Error', 'Fatal'):
+                  continue
+              locations = issue.findall('location')
+              loc = locations[0] if locations else None
+              path = loc.get('file', '?') if loc is not None else '?'
+              line = loc.get('line', '?') if loc is not None else '?'
+              print(f"LINT DETAIL: {issue.get('severity')} {issue.get('id')} "
+                    f"{path}:{line} — {issue.get('message')}")
+          findings = [issue for issue in lint.findall('issue')
+                      if issue.get('severity') in ('Warning', 'Error', 'Fatal')]
+          assert not findings, f"Android Lint must be warning-free: {len(findings)} findings"
           PY
+
+      - name: Upload inspectable lint and JVM reports
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-lint-and-unit-${{ github.sha }}
+          path: |
+            app/build/reports/lint-results-debug.xml
+            app/build/reports/lint-results-debug.html
+            app/build/test-results/testDebugUnitTest/*.xml
+          if-no-files-found: warn
+          retention-days: 30
 
       - name: Prepare Debug artifact
         run: |
@@ -464,11 +488,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: NekoFlash-${{ github.sha }}-debug
           path: emulator-apk
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: NekoFlash-${{ github.sha }}-android-test
           path: emulator-test-apk

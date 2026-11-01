@@ -32,7 +32,15 @@ if git_blob_sha(raw_vm) != expected_blob:
     )
     original = b'                keyDirectory = adbKeyDir,\n'
     assert raw_vm.count(reviewed_change) == 1, 'Unreviewed ADB evidence path change'
+    # REV45 moves the unchanged conservative disk-space condition into a
+    # documented helper. The preflight must still happen *before* any flash.
+    # Normalize exactly this reviewed call-site change; all other VM edits
+    # remain forbidden by the original Git blob integrity check.
+    sparse_before = b'                require(directory.usableSpace >= image.largestPartBytes) {\n'
+    sparse_after = b'                require(hasImmediateSparseSpace(directory, image.largestPartBytes)) {\n'
+    assert raw_vm.count(sparse_after) == 1, 'Unexpected REV45 sparse preflight call-site'
     protected_vm = raw_vm.replace(reviewed_change, original, 1)
+    protected_vm = protected_vm.replace(sparse_after, sparse_before, 1)
     assert git_blob_sha(protected_vm) == expected_blob, (
         'DeviceViewModel changed outside the reviewed REV31 evidence path'
     )
@@ -58,7 +66,22 @@ assert 'switchTab("home")' not in activity.split('private fun openOperationCente
 flash_path = root/'app/src/main/res/layout/page_fastboot.xml'
 raw_flash = flash_path.read_bytes()
 expected_flash_blob = '382822aeb5920f9f73910d0b04e1a55011e4bc05'
-assert hashlib.sha1(b'blob ' + str(len(raw_flash)).encode() + b'\0' + raw_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
+# REV45 makes exactly four non-personal text inputs opt out of Autofill.
+# Strip ONLY those reviewed attributes before comparing against the original
+# protected REV7 layout; every other layout change still fails integrity.
+reviewed_fields = (b'edQuickManualPartition', b'edGetvarKey',
+                   b'edToolPartition', b'edToolLogicalPartition')
+normalized_lines = raw_flash.splitlines(keepends=True)
+for field in reviewed_fields:
+    matches = [i for i, line in enumerate(normalized_lines)
+               if b'<EditText android:id="@+id/' + field + b'"' in line]
+    assert len(matches) == 1, 'Missing or duplicated REV45 Autofill field: ' + field.decode()
+    index = matches[0]
+    attr = b' android:importantForAutofill="no"'
+    assert normalized_lines[index].count(attr) == 1, 'Unexpected REV45 Autofill configuration'
+    normalized_lines[index] = normalized_lines[index].replace(attr, b'', 1)
+original_flash = b''.join(normalized_lines)
+assert hashlib.sha1(b'blob ' + str(len(original_flash)).encode() + b'\0' + original_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
 flash = ET.parse(flash_path).getroot()
 flash_ids = [node.attrib.get(a+'id','') for node in flash.iter()]
 for key in ['fastbootQuickSection','fastbootMassSection','fastbootToolsSection','btnQuickExecute','btnMassExecute','toolBlockInfo','toolBlockPartitions','toolBlockSlots','toolBlockDynamic']:

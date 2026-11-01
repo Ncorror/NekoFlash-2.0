@@ -1,6 +1,6 @@
 # NekoFlash 2.0 — Insiders REV43 field-testing guide (EN)
 
-**Telegram test group: NekoFlash Insiders.** Test APK and offline testbook are intended for distribution there, with raw ZIP logs handled privately. No verified public invite link has been supplied; the direct GitHub downloads below are available.
+**Telegram test group: [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** Use this group for APK/testbook distribution, bug reports and trusted ZIP evidence sharing; never post raw logs in public issues. Direct GitHub downloads remain available below.
 
 **Status, 1 November 2026:** hardware HOST → TARGET testing is being organized. No new REV43 physical-device PASS is verified yet. This is a test manual, **not** a certificate that hardware tests passed.
 

@@ -69,7 +69,6 @@ for key in ("rev11_slot_switch_failed", "rev11_slot_switch_unverified",
 # Every new user-facing message is available in both locales and referenced in Kotlin.
 required_localized_messages = (
     "rev11_import_started",
-    "rev11_import_expected_size",
     "rev11_import_finished",
     "rev11_import_failed",
     "rev11_picker_open_failed",
@@ -98,6 +97,10 @@ import_controller = (ROOT/"app/src/main/java/ru/forum/adbfastboottool/WorkspaceI
 for key in required_localized_messages:
     assert key in en and key in ru, key
     assert "R.string." + key in (main + vm + import_controller), "Unreferenced translation: " + key
+
+# Byte counts need quantity-aware RU/EN grammar, including >2 GiB file sizes.
+assert "rev11_import_expected_size" in plural_en and "rev11_import_expected_size" in plural_ru
+assert "R.plurals.rev11_import_expected_size" in import_controller
 
 # Guard against reintroducing the known fixed English-only messages.
 for literal in (

@@ -47,6 +47,7 @@ import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
+import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
@@ -500,11 +501,11 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnHomeRefreshData).setOnClickListener { refreshDeviceDataFromUi() }
         findViewById<View>(R.id.btnHomeAdvancedToggle).setOnClickListener {
             val details = findViewById<View>(R.id.homeAdvancedInfo)
-            details.visibility = if (details.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            details.isVisible = !details.isVisible
         }
         findViewById<View>(R.id.btnHomeSpecsToggle).setOnClickListener {
             val specs = findViewById<View>(R.id.homeModelSpecs)
-            specs.visibility = if (specs.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+            specs.isVisible = !specs.isVisible
         }
         findViewById<Button>(R.id.btnOperationCenterConsole).apply {
             text = getString(R.string.operation_center_collapse)
@@ -2754,7 +2755,7 @@ class MainActivity : AppCompatActivity() {
                     setTextColor("#F3F6FA".toColorInt())
                     backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_action_tile_background)
                     setOnClickListener {
-                        advanced.visibility = if (advanced.visibility == View.VISIBLE) View.GONE else View.VISIBLE
+                        advanced.isVisible = !advanced.isVisible
                     }
                 })
                 addView(advanced)
@@ -3128,11 +3129,11 @@ class MainActivity : AppCompatActivity() {
                         it.partition + " ← " + it.displayName
                     }
                     val more = if (draft.items.size > 12) {
-                        "\n" + getString(R.string.pro_review_additional_targets, draft.items.size - 12)
+                        "\n" + resources.getQuantityString(R.plurals.pro_review_additional_targets, draft.items.size - 12, draft.items.size - 12)
                     } else ""
                     reviewProfessionalOperation(
                         ProfessionalOperationReviewPolicy.Action.MASS_FLASH,
-                        getString(R.string.pro_review_queue_count, draft.items.size) + "\n" + shown + more,
+                        resources.getQuantityString(R.plurals.pro_review_queue_count, draft.items.size, draft.items.size) + "\n" + shown + more,
                         runQueue,
                     )
                 } else {

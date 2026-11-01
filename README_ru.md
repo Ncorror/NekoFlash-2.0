@@ -14,15 +14,18 @@
 
 Сюда переносим REV26–44 для испытаний Android HOST → TARGET. Это **тестовая DEV APK**, не подписанный стабильный релиз; установленный старый NekoFlash удалять не нужно (пакет `ru.forum.adbfastboottool.dev`).
 
-**Telegram-группа тестирования — NekoFlash Insiders.** В группе распространяем тестовую APK и тестбук, собираем предложения и приватные ZIP с логами. Достоверная ссылка-приглашение пока не предоставлена, поэтому адрес `t.me` не придумываем. Материалы доступны и напрямую из GitHub:
+**Telegram-группа тестирования — [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** Здесь раздаём тестовую APK и тестбук, обсуждаем ошибки интерфейса, собираем предложения и ZIP-отчёты в доверенной группе. Материалы доступны и напрямую из GitHub:
 
 - [Скачать офлайн-тестбук REV43, HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
 - [Скачать тестовую APK REV43 — архив GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
 - [Инструкция тестировщика RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Статус](docs/DEVELOPMENT_STATUS.md)
 
-[REV44 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) прошла сборку/API26/API34; в [одном старом объединённом прогоне DEV](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) API26 имела два UI-таймаута. Подтверждённых аппаратных PASS REV43 пока нет. Ссылки ниже на релиз NekoFlash 6.0.0-alpha11 относятся к старой версии, не к новой бете.
+[REV44 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) прошла сборку/API26/API34; интеграционный [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) также успешен, но повторный [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) выявил два падения API26 из-за оставшейся открытой клавиатуры. [Текущий аудит REV45](docs/AUDIT-REV45-2026-11-01-RU.md) фиксирует устранение 49 исходных предупреждений lint (0 в CI 41346454626), а также оставшийся тест API 34. Подтверждённых аппаратных PASS REV43 пока нет. Ссылки ниже на релиз NekoFlash 6.0.0-alpha11 относятся к старой версии, не к новой бете.
 
 ---
+
+<details>
+<summary>Архив REV5 — старый снимок, не текущее состояние ветки main</summary>
 
 ## Историческая контрольная точка REV5 (архив)
 
@@ -35,6 +38,8 @@
 **CI:** push и Pull Request проверяют lint + Debug APK; подписанный Release в workflow сборки запускается вручную с настроенными secrets. Выпуск по тегу остаётся отдельным workflow. Отсутствие release-ключей не должно делать первоначальный push красным.
 
 ---
+
+</details>
 
 **NekoFlash** — это инструмент для Android USB OTG, предназначенный для управления, обслуживания и прошивки одного Android-устройства напрямую с телефона или планшета — **без ПК** и без root-прав на хост-устройстве.
 

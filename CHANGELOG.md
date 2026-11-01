@@ -14,7 +14,7 @@ The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes 
 
 ## Unreleased NekoFlash 2.0 DEV — REV38–43 (1 November 2026)
 
-**NOT a public APK release.** DEV branch `work/rev26-terminal-imports-20261030`; latest functional merge REV43 `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`. Release `main` remains unchanged.
+**Not a signed production APK release.** REV26–44 DEV work was integrated into `main` for hardware beta testing via [PR #39](https://github.com/Ncorror/NekoFlash-2.0/pull/39), merge commit `34990ea14f21e908f777a0fb22715d1ff399ee81`. Historical DEV base: `work/rev26-terminal-imports-20261030`, functional REV43 merge `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`. Published legacy NekoFlash release assets remain separate; the `main` source is **not** a new official release.
 
 - REV38: Gboard composing deletion, Unicode and emoji Backspace; [PR #31](https://github.com/Ncorror/NekoFlash-2.0/pull/31).
 - REV39–40: native terminal output text selection/copy and avoid unexpected autoscroll while selecting; [PR #32](https://github.com/Ncorror/NekoFlash-2.0/pull/32) / [PR #33](https://github.com/Ncorror/NekoFlash-2.0/pull/33).

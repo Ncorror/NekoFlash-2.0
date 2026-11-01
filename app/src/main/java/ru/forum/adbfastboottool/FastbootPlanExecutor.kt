@@ -41,7 +41,7 @@ internal class FastbootPlanExecutor(
                 if (action.flash) {
                     FirmwareSource.WorkspaceFile(file).open().use {
                         val image = FastbootFlashImage.prepare(it, max, sparseLimit, checkCancelled)
-                        require(!image.needsResparse || directory.usableSpace >= image.largestPartBytes) {
+                        require(!image.needsResparse || hasImmediateSparseSpace(directory, image.largestPartBytes)) {
                             "Not enough temporary storage for a sparse packet: need ${image.largestPartBytes} bytes. No erase was sent."
                         }
                     }

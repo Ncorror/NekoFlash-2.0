@@ -9,7 +9,10 @@ import android.graphics.Rect
 import android.os.Build
 import android.os.LocaleList
 import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import android.widget.Spinner
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatDelegate
@@ -88,6 +91,21 @@ class InterfacePolishAndroidTest {
             Thread.sleep(20)
         }
     }
+    // IME can survive a previous instrumentation Activity on API 26. A focused
+    // manual partition field shrinks the Mass queue to zero visible rows; do
+    // not mistake that for a scrolling/RecyclerView regression.
+    private fun dismissIme(scenario: ActivityScenario<MainActivity>) {
+        scenario.onActivity { activity ->
+            val input = activity.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            input.hideSoftInputFromWindow(activity.window.decorView.windowToken, 0)
+            activity.currentFocus?.clearFocus()
+        }
+        waitUi(scenario) { activity ->
+            ViewCompat.getRootWindowInsets(activity.window.decorView)
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == false
+        }
+    }
+
     private fun fullyVisible(view: View) {
         val rect = Rect()
         assertTrue(view.getGlobalVisibleRect(rect))
@@ -119,6 +137,7 @@ class InterfacePolishAndroidTest {
                 spinner.setSelection(spinner.count - 1)
                 activity.findViewById<EditText>(R.id.edMassManualPartition).setText("vendor_boot_b")
             }
+            dismissIme(scenario)
             AndroidUiCapture.save(scenario, "mass-1000-header.png")
             // The first RecyclerView layout may still be consuming a queued
             // layout pass on API 26. Request scroll after that frame, then
@@ -195,6 +214,8 @@ class InterfacePolishAndroidTest {
     }
 
     private fun capturePages(scenario: ActivityScenario<MainActivity>, prefix: String) {
+        // Preserve the exact visibility assertions with a clean, keyboard-free viewport.
+        dismissIme(scenario)
         waitUi(scenario) { it.resources.configuration.locales[0].language == "ru" }
         tabs.forEach { (tab, page, name) ->
             scenario.onActivity {
