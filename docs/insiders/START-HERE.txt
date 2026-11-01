@@ -1,0 +1,37 @@
+NekoFlash 2.0 Insiders • REV45 • Android hardware beta
+Telegram: https://t.me/+NR_FiUmvXlViOTUy
+
+РУССКИЙ
+1. Распакуй весь ZIP в отдельную папку на телефоне-хосте (Android 8+).
+2. Имя APK, коммит и контрольная сумма указаны в BUILD.txt. При наличии
+   Termux открой каталог распакованного ZIP и выполни sha256sum -c SHA256SUMS.txt.
+3. Установи APK на хост. Оригинальный NekoFlash можно оставить. Если Android
+   сообщает о конфликте подписи с более ранней DEV, сохрани её данные и
+   журналы перед любыми действиями, которые могут их удалить.
+4. Открой testbook.html в браузере с включённым JavaScript. Начни с «Сегодня».
+   Без TARGET можно проверить интерфейс. Для ADB нужен второй телефон с
+   включённой отладкой и кабель данных. Подтверди RSA на TARGET.
+5. Впиши обе модели и версии ОС, запиши результат, шаги и время. Через
+   выбор папки дай доступ к Download/NekoFlash/logs. Сделай ZIP и передай
+   его лично доверенному тестировщику. Экспорт JSON сохраняет прогресс.
+   Подробная инструкция и команды находятся в FIELD-GUIDE-RU.md.
+
+ENGLISH
+1. Extract the entire ZIP into its own folder on the Android 8+ host phone.
+2. Read BUILD.txt for the APK name, commit and digest. With Termux available,
+   run sha256sum -c SHA256SUMS.txt from the extracted folder.
+3. Install the APK on the host. The original NekoFlash can stay installed.
+   If Android reports a signature conflict with an older DEV installation,
+   preserve its data and logs before taking any step that could erase them.
+4. Open testbook.html in a JavaScript-enabled browser and select “Today”.
+   Try the UI without a target. For ADB, connect a second phone over a data
+   cable, enable USB debugging and accept the RSA prompt on the target.
+5. Enter both models and OS versions, the observed result, steps and time.
+   Select Download/NekoFlash/logs in the folder picker. Export a ZIP and
+   send it privately to a trusted tester. JSON export backs up your progress.
+   See FIELD-GUIDE-EN.md for commands and extended tests.
+
+Flash / erase / format / unlock могут удалить данные. Запись разделов —
+только по отдельному плану на запасном TARGET с копией и способом восстановления.
+Partition writes can destroy data. Use a spare, backed-up target with an agreed
+recovery plan for a separately authorized write test. Keep raw report ZIPs private.

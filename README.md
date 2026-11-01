@@ -1,368 +1,55 @@
-<div align="center">
-
-<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="88" alt="NekoFlash">
 
 # NekoFlash 2.0
 
-### Android USB OTG ADB & Fastboot Flashing Tool
+English · [Русский](README_ru.md)
 
-English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](README_ru.md)
+Run ADB and Fastboot from one Android phone to service a second phone over USB OTG. The host needs Android 8.0+ and USB Host support. Use a data-capable cable. Root is optional on the host.
 
-</div>
+**Hardware beta testing · REV45**
 
-## Current testing stage — REV44 in main (1 November 2026)
+We are collecting HOST → TARGET reports for the REV45 development build. The debug app installs alongside the original NekoFlash. Physical OTG, reconnect and partition-write results are still pending for this build.
 
-This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta testing**, NOT a signed production release. The standalone `.dev` test APK does not replace the original signed NekoFlash release.
+**[Download the Insiders tester kit (ZIP)](https://nightly.link/Ncorror/NekoFlash-2.0/workflows/build/main/NekoFlash-Insiders-Tester-Kit.zip)** · [Official GitHub Actions downloads](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
 
-**Telegram testing group — [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** Join to get the latest testing instructions, discuss UI issues and share ZIP reports in the trusted testing group. The materials are also available directly from GitHub:
+Open the ZIP on the **host** phone. Install the included debug APK, then open `testbook.html` in a browser. The kit includes RU/EN instructions, APK and file checksums, and the source archive for the bundled filesystem tools. To get the ZIP from GitHub itself, sign in, open a successful main run and choose **NekoFlash-Insiders-Tester-Kit** under Artifacts.
 
-- [Download standalone offline testbook HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
-- [Download tested REV43 debug APK — GitHub Actions ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
-- [RU tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Current status](docs/DEVELOPMENT_STATUS.md)
+[Field guide](docs/insiders/FIELD-GUIDE-EN.md) · [Offline testbook RU/EN](docs/insiders/testbook.html)
 
-**Verification:** [REV44 PR-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. Integration [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) also passed, but later [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) failed two API26 UI tests with the persistent keyboard visible in captured screenshots. No physical REV43 HOST→TARGET PASS is verified. [REV45 audit, resolved lint findings and remaining emulator tests](docs/AUDIT-REV45-2026-11-01-RU.md). The historical alpha11 release link below is **not** this beta.
+## First test
 
----
+Start with the interface and keyboard. Then connect a second phone, authorize ADB on the target and try `adb devices` and `adb shell getprop ro.product.model`. Record both models, Android versions, build ID and the observed result. Share the report ZIP privately with the test team.
 
-<details>
-<summary>Archive: historical DEV REV27 (30 October 2026); not the current main branch</summary>
+> Flashing, erasing, formatting or unlocking can wipe the target or leave it unable to boot. Test writes only in an agreed lab session with a spare target, a backup and a verified recovery path.
 
-## Историческая DEV REV27 и общая документация (архивный раздел)
+## Inside the app
 
-> Ниже сохранён исторический снимок ревизии 27 и общие сведения об архитектуре; старые SHA, результаты CI и ссылки **не описывают актуальную REV43**. Актуальные данные — выше и в `docs/DEVELOPMENT_STATUS.md`.
+The console supports ADB shell, push/pull and APK installation. The Flash tab contains Quick Flash, a Mass Flash queue and Fastboot tools. The app also has recovery Sideload, Xiaomi Unlock, operation reports and raw USB diagnostics.
 
+Android 14 emulator (API 34), REV45. Home shows a disconnected host. The Mass Flash queue contains a test image.
 
-> **Актуальная разработка (30 октября 2026):** рабочая ветка [`work/rev26-terminal-imports-20261030`](https://github.com/Ncorror/NekoFlash-2.0/tree/work/rev26-terminal-imports-20261030), включающая [REV26 (PR #13)](https://github.com/Ncorror/NekoFlash-2.0/pull/13) и [REV27 (PR #14)](https://github.com/Ncorror/NekoFlash-2.0/pull/14). Последний проверенный merge: `8806222d8590`. Это **NekoFlash 2.0**, не NekoFlash Pro. Разработка пока **не объединена в `main` и не является production release**.
+| Home | Terminal | Quick Flash |
+| --- | --- | --- |
+| <img src="docs/screenshots/rev45/portrait-home.png" width="210" alt="Home"> | <img src="docs/screenshots/rev45/terminal-command.png" width="210" alt="Terminal"> | <img src="docs/screenshots/rev45/portrait-quick.png" width="210" alt="Quick Flash"> |
 
-**Назначение:** восстановление, обслуживание и прошивка другого Android-устройства непосредственно с Android-телефона по USB OTG, без ПК и без root на телефоне-хосте. В DEV реализованы ADB, Fastboot, Sideload, Quick/Mass Flash, терминал, интегрированная USB-панель, Центр операций и импорт локальных/SAF-источников. Реальное аппаратное покрытие DEV и возможность безопасного выпуска пока **не подтверждены**.
+| Mass Flash queue | Fastboot tools | ADB Sideload |
+| --- | --- | --- |
+| <img src="docs/screenshots/rev45/mass-saf-queue.png" width="210" alt="Mass Flash queue"> | <img src="docs/screenshots/rev45/portrait-tools.png" width="210" alt="Fastboot tools"> | <img src="docs/screenshots/rev45/portrait-sideload.png" width="210" alt="ADB Sideload"> |
 
-**REV26:** терминальные ADB-команды не сворачивают Console и не открывают посторонний прогресс-диалог; закрытие терминала отделено от отмены операции; история и PTY сохранены. Импорт SAF получил отмену блокирующего чтения через проверку готовности дескриптора, а инструментальные тесты защищают управление при смене ориентации и клавиатуры. [Исправления и CI](https://github.com/Ncorror/NekoFlash-2.0/pull/13).
+## Build and evidence
 
-**REV27:** скрытый терминал не обновляет `RecyclerView` на каждый пакет вывода, а при открытии немедленно синхронизирует строки из актуального буфера. Добавлен инструментальный тест на большие пакеты, закрытие, повторное открытие и вывод до публикации LiveData. [Код REV27](https://github.com/Ncorror/NekoFlash-2.0/pull/14).
+Reference APK and gallery — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`7b54ba1e7080`](https://github.com/Ncorror/NekoFlash-2.0/commit/7b54ba1e70807bdc7cee65a64cff87fd002ce26b). [CI #409](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165/artifacts/13102347829).
 
-**Последний подтверждённый CI для REV27:** [GitHub Actions #41012595076](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41012595076), код `acde18d06865`: **SUCCESS** — основная сборка, JVM, lint, нативные проверки; **19/19 инструментальных тестов на Android API 26 и 19/19 на API 34**, по 28 захваченных состояний интерфейса. Проверка артефактов выполнялась без физической USB-прошивки; количество JVM-тестов и предупреждений lint следует брать из конкретного CI-отчёта, а не из исторических ревизий.
+308 JVM tests passed. Android API 26 and 34 passed 20 instrumentation tests each. Lint reported zero findings. Each new tester kit records its own commit and APK hash in `BUILD.txt`.
 
-**APK и версия:** в `app/build.gradle` пока `versionName=6.0.0-alpha11`, `versionCode=234`; DEV-вариант имеет суффикс `-dev` и `applicationId=ru.forum.adbfastboottool.dev`. Номер REV27 — **этап разработки**, а не новая опубликованная версия APK. Для тестирования используй проверенные артефакты соответствующего GitHub Actions, сверяя SHA/BUILD_ID с нужным коммитом. Не путай их с выпуском исходного NekoFlash, ссылки на который сохранены ниже для истории.
+[Audit / Аудит](docs/insiders/AUDIT-2026-11-02.md) · [Hardware](docs/HARDWARE_VALIDATION.md) · [USB OTG](docs/USB_CONNECTION_TROUBLESHOOTING.md) · [Privacy](PRIVACY.md)
 
-**Важная граница безопасности:** кнопки erase/format/flash, экспорт команд и работа с Mi-сессией требуют отдельного усиления защиты перед релизом. Локальные диагностические журналы могут включать идентификаторы устройства, а санитайзер не гарантирует удаление всех их форм. **Не публикуй сырые логи и не выполняй запись разделов на рабочем устройстве без собственного проверенного плана восстановления.** Подробности: [аудит и открытые вопросы](docs/SECURITY_REVIEW_BACKLOG.md), [приватность](PRIVACY.md).
+For a local debug build, use JDK 17 and the repository’s filesystem tool build steps. See the [build workflow](.github/workflows/build.yml).
 
-**Что дальше:** аппаратные тесты терминала/PT​Y/IME и Android-to-Android USB; аудит импорта и сохранения файлов; защитные подтверждения опасных операций и проверка путей утечки данных; стабилизация ADB/Fastboot; согласование GUI, версий и релизного процесса. Рабочая сводка: [состояние DEV и план](docs/DEVELOPMENT_STATUS.md). Эмуляторные тесты **не подтверждают** восстановление конкретного телефона.
+## Project
 
-**Профессиональный режим диагностики:** [политика сохранения сырых журналов и прямого терминала](docs/PROFESSIONAL_RECOVERY_POLICY.md). Журналы не чистятся, не усекaются и не подвергаются автоматическому обезличиванию в рамках защитных изменений. В DEV REV28 (отдельный PR, до подтверждения CI) готовятся разовая проверка критичных GUI-команд и атомарное хранение ADB-идентичности; эти изменения не объявляются опубликованным выпуском.\n\n**История ревизий:** [REV18](docs/source-audit/REV18-AUDIT-2026-10-25-RU.md), [REV21](docs/source-audit/REV21-FASTBOOT-HOST-2026-10-26-RU.md), [REV22](docs/source-audit/REV22-BUNDLED-MKFS-2026-10-26-RU.md), [REV23](docs/source-audit/REV23-RESPARSE-2026-10-27-RU.md), [REV24](docs/source-audit/REV24-SOURCES-2026-10-28-RU.md), [REV25](docs/source-audit/REV25-UI-2026-10-29-RU.md), [историческая сверка с оригиналом](docs/source-audit/REV25-LEGACY-COMPARISON.json). Ранние отчёты относятся к своим коммитам, а не к текущей REV27.
+Author and maintainer — [Ncorror](https://github.com/Ncorror). Project collaborator — [IQ-HARRY7](https://github.com/IQ-HARRY7).
 
-**Команда:** автор и текущий разработчик — [Ncorror](https://github.com/Ncorror). [IQ-HARRY7](https://github.com/IQ-HARRY7) добавлен в список участников по просьбе автора проекта; реализация кода и аппаратные тесты за ним пока не подтверждены.
+[Apache 2.0](LICENSE) · [Artwork](ASSETS_LICENSE.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Previous README and release history](https://github.com/Ncorror/NekoFlash-2.0/blob/7b54ba1e70807bdc7cee65a64cff87fd002ce26b/README.md)
 
----
-
-</details>
-
-## Исходная документация NekoFlash (историческая версия)
-
-# NekoFlash
-
-**NekoFlash** is an Android USB OTG flashing tool for controlling, servicing, and flashing another Android device directly from a phone or tablet — **without a PC** and without root on the host device.
-
-It implements **ADB and Fastboot directly over Android USB Host** and supports recovery/boot image flashing, ADB Sideload, device diagnostics, and Xiaomi Mi Unlock workflows.
-
-### What you can do
-
-- Connect **Android-to-Android over USB OTG / USB-C**.
-- Use **ADB** shell, push/pull, APK installation, reboot commands, and ADB Sideload.
-- Use **Fastboot** for diagnostics, partition discovery, flashing, booting, erasing, formatting, slot switching, and supported OEM commands.
-- Flash `recovery`, `boot`, `init_boot`, `vendor_boot`, `dtbo`, `vbmeta`, or another selected partition with **Quick Flash**.
-- Flash compatible custom recovery images such as **TWRP** directly from an Android phone.
-- Perform supported **Xiaomi Mi Unlock** workflows using Fastboot over USB.
-- Work without desktop `adb`, desktop `fastboot`, or a Windows/Linux/macOS computer.
-
-> [!WARNING]
-> Flashing, erasing, formatting, changing slots, or unlocking a bootloader can cause data loss or make a device unbootable. Always verify the target device, image, partition, and slot before writing.
-
-
-<!-- NEKOFLASH_DOWNLOAD_START -->
-## Download
-
-Latest release: **v6.0.0-alpha11**
-
-[![Download APK](https://img.shields.io/badge/Download%20APK-NekoFlash%206.0.0--alpha11-brightgreen?style=for-the-badge&logo=android)](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha11/NekoFlash-6.0.0-alpha11.apk)
-
-- [NekoFlash v6.0.0-alpha11 APK](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha11/NekoFlash-6.0.0-alpha11.apk)
-- [APK SHA-256](https://github.com/Ncorror/NekoFlash/releases/download/v6.0.0-alpha11/NekoFlash-6.0.0-alpha11.apk.sha256)
-
-The APK is distributed through GitHub Releases assets, not GitHub Packages. Official release assets also include signing and build metadata.
-<!-- NEKOFLASH_DOWNLOAD_END -->
-## Installation
-
-1. Download the latest NekoFlash APK from the **Download** section above.
-2. Optionally verify the APK with the published SHA-256 checksum.
-3. Allow your browser or file manager to install apps from unknown sources when Android asks.
-4. Install NekoFlash on the Android phone or tablet that will act as the USB host.
-5. Connect the target Android device using a data-capable USB OTG / USB-C cable.
-6. Select the required mode in NekoFlash: **ADB**, **Recovery / ADB Sideload**, or **Fastboot**.
-
-No PC is required for the documented USB flashing workflows.
-
-## Screenshots
-
-| Welcome | Device / Home | Quick Flash |
-|---|---|---|
-| <img src="docs/screenshots/welcome.png" width="220" alt="NekoFlash welcome screen on Android"> | <img src="docs/screenshots/home.png" width="220" alt="NekoFlash Android USB OTG device home screen"> | <img src="docs/screenshots/quick-flash.png" width="220" alt="NekoFlash Quick Flash recovery and boot image interface"> |
-
-| ADB Sideload | Terminal & Logs | Xiaomi Mi Unlock |
-|---|---|---|
-| <img src="docs/screenshots/sideload.png" width="220" alt="NekoFlash ADB Sideload interface"> | <img src="docs/screenshots/terminal.png" width="220" alt="NekoFlash built-in ADB Fastboot terminal and logs"> | <img src="docs/screenshots/unlock.png" width="220" alt="NekoFlash Xiaomi Mi Unlock interface"> |
-
-<!-- NEKOFLASH_USB_NOTE_START -->
-## USB-C / ADB connection note
-
-When using a direct USB-C to USB-C cable, Android may sometimes negotiate the wrong USB data role or USB power role.
-
-Expected connection:
-
-- the phone running NekoFlash acts as the USB host;
-- the phone running NekoFlash provides bus power;
-- the target/patient phone appears as the connected USB device;
-- power flows from the NekoFlash host phone to the target/patient phone.
-
-Incorrect USB role:
-
-- the NekoFlash host phone shows that it is charging from the target/patient device;
-- the target/patient device behaves as the USB host;
-- an unexpected device appears first;
-- normal Android ADB `DEVICE` mode does not attach to the intended target.
-
-If this happens, unplug and reconnect the cable, swap cable ends, rotate the USB-C connector, or try another data-capable USB-C cable until the intended target device is detected.
-
-Do not start flash, sideload or shell operations while the detected device is not the intended target.
-
-This issue is documented for normal Android ADB `DEVICE` mode. Fastboot and Recovery/SIDELOAD are separate modes and remain covered by their own validation tests.
-<!-- NEKOFLASH_USB_NOTE_END -->
-<!-- NEKOFLASH_LEGAL_SUMMARY_START -->
-## License and independence
-
-NekoFlash is licensed under the Apache License 2.0.
-
-NekoFlash is an independent project and is not affiliated with or endorsed by Google, Xiaomi, MiForge, Termux or any referenced open-source project.
-
-NekoFlash does not require Termux, desktop adb/fastboot, MiFlash, MiForge, Google Play Services or vendor cloud services for the documented USB workflows. Android platform APIs, build tools and declared open-source dependencies remain under their own licenses.
-
-See also:
-
-- [USB connection troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md)
-- [Legal review](docs/LEGAL_REVIEW.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
-<!-- NEKOFLASH_LEGAL_SUMMARY_END -->
-
-NekoFlash is an Android USB Host utility for working with a second Android device directly from a phone or tablet. The host connects over USB OTG (including Type-C to Type-C), uses Android USB Host APIs, and does not require root on the host.
-
-**Current source version:** `6.0.0-alpha11` (`versionCode 234`). The published GitHub release is `v6.0.0-alpha11`.
-
-## Features
-
-- **ADB:** discovery/authentication, shell, push, pull, APK install, reboot services and ADB Sideload.
-- **Fastboot:** diagnostics, `getvar`, partition inventory, `flash`, `boot`, `erase`, `format`, `set_active`, OEM/flashing commands and raw Fastboot commands supported by the connected bootloader.
-- **Quick Flash:** direct image flashing to `recovery`, `boot`, `init_boot`, `vendor_boot`, `dtbo`, `vbmeta` or a manually entered partition. Slotted partitions can target the current slot or all reported slots.
-- **Mi Unlock:** Xiaomi account/unlock flow using official Xiaomi HTTPS endpoints and Fastboot over USB.
-- **Diagnostics:** compact logs, protocol traces, session summaries and sanitized sharing/export helpers.
-- **Operation Center:** persistent Home task surface with a large current action, percentage/indeterminate progress, `step X of Y`, nearby queue steps, result details, reports access and explicit cancellation. Cancellation has its own safe-cleanup state instead of freezing the last flashing percentage.
-- **Live operation strip:** compact non-blocking progress/status strip above every workflow page while work is active; it keeps both the current step and the safety/status message visible, and tapping it opens and scrolls directly to the full Operation Center. Successful/cancelled results clear automatically after a short confirmation window, while failed/verify-pending results stay visible until reviewed or dismissed. Stale progress from an earlier heavy operation is suppressed during later lightweight diagnostics/commands.
-- **Console:** persistent compact terminal/log dock that never auto-expands for operations; it opens only on explicit user action and exposes command history while expanded.
-
-NekoFlash does not bundle desktop `adb` or `fastboot` executables. ADB/Fastboot protocol traffic is implemented inside the app and sent through the Android USB Host transport.
-
-## Requirements and safety
-
-- Android 8.0 / API 26 or newer on the host device;
-- USB Host / OTG support;
-- a data-capable USB cable or OTG adapter;
-- a target device in ADB, Recovery/ADB Sideload or Fastboot mode;
-- ADB authorization when requested by the target;
-- firmware/images that are correct for the target device.
-
-Flashing, erasing, formatting, slot changes and bootloader unlocking can cause data loss or leave a device unable to boot. Verify the device, partition, slot and file before every write operation.
-
-NekoFlash serializes long USB operations so only one operation owns the active endpoint at a time. It does not automatically retry ambiguous mid-stream Fastboot DATA writes because the peer may already have consumed an unknown prefix of the payload.
-
-## Runtime architecture
-
-```text
-Android UI / MainActivity
-        |
-        v
-DeviceViewModel / single operation owner
-        |
-        +--> AdbProtocol --------------------> Android USB Host
-        |
-        +--> FastbootProtocol ---> NativeUsbfsBackend (JNI/C++ usbfs)
-                              \--> UsbRequest / bulk-transfer fallback
-```
-
-`DeviceViewModel` owns the active USB session, foreground/wake-lock lifecycle and progress publication. `AdbProtocol` implements ADB authentication, packet dispatch, shell, Sync transfers, install and `sideload-host`. `FastbootProtocol` implements command/response handling, partition/slot discovery and real DATA/mutation operations.
-
-Native USBFS is the high-throughput Fastboot DATA backend. It uses bounded URB pipelining and explicit ownership rules. If the backend cannot prove that all submitted URBs have returned from the kernel, the backend is treated as poisoned and is not reused in the same process.
-
-## Build
-
-Current toolchain:
-
-| Component | Version / value |
-|---|---|
-| JDK | 17 |
-| Gradle Wrapper | 8.13 |
-| Android Gradle Plugin | 8.13.2 |
-| Kotlin | 2.3.21 |
-| compileSdk | 36 |
-| targetSdk | 34 |
-| minSdk | 26 |
-
-Debug build:
-
-```bash
-chmod +x gradlew
-./gradlew --no-daemon --warning-mode all :app:lintDebug :app:assembleDebug
-```
-
-Or package the debug APK under `forum-build/`:
-
-```bash
-bash scripts/build-apk.sh debug
-```
-
-### Signed release build
-
-Production release APKs must be signed with the permanent NekoFlash release key. Define:
-
-```bash
-export NEKOFLASH_RELEASE_STORE_FILE=/absolute/path/to/nekoflash-release.jks
-export NEKOFLASH_RELEASE_STORE_PASSWORD='...'
-export NEKOFLASH_RELEASE_KEY_ALIAS='...'
-export NEKOFLASH_RELEASE_KEY_PASSWORD='...'
-```
-
-Then run:
-
-```bash
-bash scripts/build-apk.sh release
-```
-
-The release helper verifies the keystore certificate, runs release lint/build checks, verifies the produced APK with `apksigner`, and writes the APK plus its SHA-256 checksum to `forum-build/`.
-
-Pinned release certificate SHA-256:
-
-```text
-b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e
-```
-
-Unsigned production APKs are not official release artifacts.
-
-## GitHub Actions and release flow
-
-`.github/workflows/build.yml` is the source-of-truth build check for reviewed commits. `.github/workflows/release.yml` is tag-driven and requires the pushed tag to match `v${versionName}`. It builds the signed APK, verifies the signing certificate, generates the APK checksum and publishes the GitHub Release.
-
-Required repository secrets:
-
-```text
-NEKOFLASH_KEYSTORE_BASE64
-NEKOFLASH_STORE_PASSWORD
-NEKOFLASH_KEY_ALIAS
-NEKOFLASH_KEY_PASSWORD
-```
-
-Before tagging a release candidate:
-
-1. merge the reviewed PR into protected `main`;
-2. obtain green GitHub Actions for the exact merged commit;
-3. perform the required physical USB hardware smoke on that exact source/build;
-4. verify the release version and signing identity;
-5. create and push the annotated tag matching `versionName`.
-
-The published `v6.0.0-alpha10.2` release corresponds to `versionName` `6.0.0-alpha10.2` and `versionCode 233`. Do not recreate or retag an existing release.
-
-For the **next** tag-driven release, bump `versionName` / `versionCode` first, validate the exact merged commit, and then create a tag that exactly matches `v${versionName}` as required by `release.yml`.
-
-Physical-device evidence retained by the project is indexed in [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md), with device-specific reports for:
-
-- [POCO X7 Pro (`rodin`)](docs/evidence/POCO_X7_PRO_ALPHA10.md);
-- [POCO X3 Pro (`vayu`)](docs/evidence/POCO_X3_PRO_ALPHA10_1.md).
-
-## Termux-only maintainer workflow
-
-Initial setup:
-
-```bash
-bash scripts/termux-bootstrap.sh
-gh auth login
-gh auth setup-git
-```
-
-Start from current `main`:
-
-```bash
-cd "$HOME/NekoFlash"
-git switch main
-git pull --ff-only origin main
-git status --short
-```
-
-Publish reviewed local changes through a short-lived PR branch:
-
-```bash
-bash scripts/termux-publish.sh "docs: prepare release"
-```
-
-Import a reviewed source ZIP first when needed:
-
-```bash
-bash scripts/termux-publish.sh \
-  --source-zip "$HOME/storage/downloads/NekoFlash-source.zip" \
-  --sha256 "EXPECTED_ZIP_SHA256" \
-  "chore: import reviewed source"
-```
-
-Watch and merge the PR only after required checks are green:
-
-```bash
-gh pr checks --repo Ncorror/NekoFlash --watch PR_URL
-gh pr merge --repo Ncorror/NekoFlash --merge --delete-branch PR_URL
-```
-
-Run or collect GitHub Actions evidence:
-
-```bash
-bash scripts/termux-ci.sh
-bash scripts/termux-ci.sh --run-id RUN_ID
-bash scripts/termux-ci.sh --run-id RUN_ID --with-apk
-```
-
-Do not force-push protected `main` and do not commit build outputs, local signing material, account secrets, raw device identifiers or unsanitized diagnostic logs.
-
-## Privacy and network access
-
-ADB, Fastboot, flashing, sideload and diagnostics operate locally between the host Android device and the USB-connected target. The source tree contains no analytics, advertising or third-party crash-reporting SDK.
-
-Internet/network access is used by the optional Xiaomi / Mi Unlock flow. See [PRIVACY.md](PRIVACY.md) for the data-handling details.
-
-## Team / Команда
-
-- [Ncorror](https://github.com/Ncorror) — maintainer and current developer / автор и разработчик.
-- [IQ-HARRY7](https://github.com/IQ-HARRY7) — listed as a project team member at the maintainer's request. No implemented code or completed hardware tests are attributed to him yet / указан как участник команды по просьбе автора, без приписывания выполненной разработки или тестов.
-
-## Documentation
-
-The public documentation is intentionally small:
-
-- [CHANGELOG.md](CHANGELOG.md) — release-level history;
-- [docs/UI_UX_AUDIT.md](docs/UI_UX_AUDIT.md) — current UI/UX, localization and non-blocking Console audit;
-- [docs/HARDWARE_VALIDATION.md](docs/HARDWARE_VALIDATION.md) — retained physical-device evidence and release hardware boundary;
-- [PRIVACY.md](PRIVACY.md) — privacy/network behavior;
-- [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) — bundled dependencies, attribution and non-bundled reference acknowledgements;
-- [ASSETS_LICENSE.md](ASSETS_LICENSE.md) — branded artwork licensing.
-
-Implementation detail that changes with the code belongs in source comments and Git history rather than in parallel planning/state documents.
-
-## License and project identity
-
-Source code, documentation, build scripts and ordinary UI resources are licensed under Apache License 2.0 unless a file or notice states otherwise. See [LICENSE](LICENSE) and [NOTICE](NOTICE).
-
-The launcher and welcome-screen artwork listed in [ASSETS_LICENSE.md](ASSETS_LICENSE.md) are excluded from the Apache-2.0 grant.
-
-NekoFlash is an independent project and is not affiliated with or endorsed by Google, Xiaomi, MiForge, Termux or the referenced open-source projects. Product names and trademarks belong to their respective owners.
+Topics — `android` `usb-otg` `usb-host` `adb` `fastboot` `adb-sideload` `android-recovery` `hardware-testing`

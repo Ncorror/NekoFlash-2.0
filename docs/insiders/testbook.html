@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050505">
-<meta name="description" content="Offline RU/EN NekoFlash 2.0 REV43 hardware field-test book, original BIN logs and ZIP reports.">
-<title>NekoFlash 2.0 · Insiders Hardware Testbook REV43</title>
+<meta name="description" content="Offline RU/EN NekoFlash 2.0 REV45 hardware field-test book, original BIN logs and ZIP reports.">
+<title>NekoFlash 2.0 · Insiders Hardware Testbook REV45</title>
 <style>
 :root {
   color-scheme: dark;
@@ -532,9 +532,9 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 <main class="page">
   <header class="top">
     <div>
-      <div class="eyebrow">NekoFlash · Insiders · REV43</div>
+      <div class="eyebrow">NekoFlash · Insiders · REV45</div>
       <h1 id="appTitle">Тестбук NekoFlash 2.0</h1>
-      <p class="muted" id="subline">Полевые тесты DEV REV43 · HOST → TARGET · исходные логи в ZIP · офлайн.</p>
+      <p class="muted" id="subline">Полевые тесты DEV REV45 · HOST → TARGET · исходные логи в ZIP · офлайн.</p>
     </div>
     <div class="lang" role="group" aria-label="Language">
       <button id="ru" class="active" type="button">RU</button>
@@ -573,12 +573,12 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 
 
 
-  <section class="card" id="rev43status" style="border-color:#82430d">
-    <h2>REV43 · Hardware testing / Аппаратные испытания</h2>
+  <section class="card" id="buildStatus" style="border-color:#82430d">
+    <h2>REV45 · Hardware testing / Аппаратные испытания</h2>
     <p class="small-help"><a href="https://t.me/+NR_FiUmvXlViOTUy" rel="noopener noreferrer">Telegram: NekoFlash Insiders · группа тестировщиков / tester group</a></p>
-    <p class="muted">RU: начинаем полевую проверку HOST → TARGET. Реальные PASS пока не подтверждены. PR CI: build/API26/API34 PASS; merged DEV CI: API26 FAIL (2 UI wait-timeout), API34 PASS. Не путай CI с проверкой USB на телефоне.</p>
-    <p class="muted">EN: HOST → TARGET field campaign begins; no new physical PASS is verified yet. PR CI succeeded; merged DEV CI failed API26 on two UI timeouts, API34 passed.</p>
-    <p class="small-help"><a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391">REV43 PR CI</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147">merged DEV CI</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171">Download REV43 test APK / Скачать тестовую APK (artifact ZIP)</a></p>
+    <p>Проверки сборки и эмуляторов пройдены. Здесь записываются результаты с твоего HOST и TARGET.</p>
+    <p>Build and emulator checks passed. Record what you observe on your own host and target.</p>
+    <p><a id="ciLink">GitHub Actions</a> · <code id="buildRef"></code></p>
   </section>
   <section class="card" id="devices">
     <h2 id="devicesTitle">Устройства и сборка</h2>
@@ -667,8 +667,7 @@ h3 { font-size: 15px; margin: 0 0 8px; }
     </div>
     <p class="small-help" id="reportHint"></p>
     <div class="linkbar">
-      <a href="https://github.com/Ncorror/NekoFlash-2.0/pull/18" target="_blank" rel="noopener noreferrer">REV43 · PR #18</a>
-      <a href="https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171" target="_blank" rel="noopener noreferrer" id="apkLink">DEV APK · REV43 CI</a>
+      <a id="apkLink" target="_blank" rel="noopener noreferrer">APK · GitHub Actions artifacts</a>
     </div>
   </section>
 
@@ -683,7 +682,7 @@ const T = {
     title: 'Тестбук NekoFlash 2.0',
     roundLabel: 'Этап тестирования',
     rounds: {today:'Сегодня — диагностика без записи разделов',extended:'Расширенный тест на запасном TARGET',lab:'Лаборатория — отдельное разрешение',all:'Все проверки'},
-    sub: 'Полевые тесты DEV REV43 · HOST → TARGET · исходные логи в ZIP · офлайн.',
+    sub: 'Полевые тесты DEV REV45 · HOST → TARGET · исходные логи в ZIP · офлайн.',
     progress: 'Результаты тестов',
     steps: 'Отмечено шагов',
     how: 'Как пользоваться',
@@ -754,7 +753,7 @@ const T = {
     save: 'Сохранить прогресс JSON',
     load: 'Загрузить прогресс',
     reportHint: 'ZIP: report.txt, progress.json, evidence-manifest.json, свежие исходные логи (если разрешён доступ) и ручные вложения. ZIP без сжатия: точные байты исходных файлов. В Telegram отправляй как документ.',
-    footer: 'Офлайн-тестбук REV43 · без аналитики, сервера и автоматической отправки · профессиональные логи без потерь · Black & Orange 2.0.',
+    footer: 'Офлайн-тестбук REV45 · без аналитики, сервера и автоматической отправки · профессиональные логи без потерь · Black & Orange 2.0.',
     filesSelected: n => `Ручных вложений: ${n}. После перезагрузки потребуется выбрать их заново.`,
     zipCreating: 'Собираю ZIP-отчёт…',
     zipDone: 'ZIP создан. Проверь папку загрузок.',
@@ -769,7 +768,7 @@ const T = {
     title: 'NekoFlash 2.0 Test Kit',
     roundLabel:'Test stage',
     rounds: {today:'Today — read-only / disposable data',extended:'Extended tests on spare TARGET',lab:'Lab — separate authorization required',all:'All checks'},
-    sub: 'REV43 DEV hardware checks, original binary logs and offline ZIP reporting.',
+    sub: 'REV45 DEV hardware checks, original binary logs and offline ZIP reporting.',
     progress: 'Test results',
     steps: 'Steps checked',
     how: 'How to use',
@@ -840,7 +839,7 @@ const T = {
     save: 'Export progress JSON',
     load: 'Import progress',
     reportHint: 'ZIP includes report.txt, progress.json, evidence-manifest.json, fresh original logs (with folder permission), and manual files. No compression or redaction. Send as a Telegram document.',
-    footer: 'Offline REV43 checklist · no analytics, backend or automatic upload · full professional diagnostics · Black & Orange 2.0.',
+    footer: 'Offline REV45 checklist · no analytics, backend or automatic upload · full professional diagnostics · Black & Orange 2.0.',
     filesSelected: n => `${n} manual file(s). Reselect them after reopening the page.`,
     zipCreating: 'Creating ZIP report…',
     zipDone: 'ZIP created. Check your Downloads folder.',
@@ -853,13 +852,15 @@ const T = {
   }
 };
 
+const KIT = {"revision": "REV45", "sourceCommit": "7b54ba1e70807bdc7cee65a64cff87fd002ce26b", "testArtifactCommit": "7b54ba1e70807bdc7cee65a64cff87fd002ce26b", "runId": "41354284165", "apkFilename": "NekoFlash-6.0.0-alpha11-debug.apk", "apkSha256": "0da7ff4dc5b623e126b028b6c5c6bcd8346e08bdb52622cef7f2826208bc519c"};
+const BUILD_LABEL = KIT.revision + " / " + KIT.sourceCommit.slice(0, 12) + " / CI " + KIT.runId;
 const TESTS = [
   {id:'SETUP-01',group:'basic',ru:'Установка и проверка APK',en:'Installation and APK verification',intro:{ru:'На HOST. Нужен Debug APK из этого комплекта, versionCode 234. Устанавливай без удаления оригинального NekoFlash.',en:'On HOST. Install the checked Debug APK from this kit, versionCode 234, without removing original NekoFlash.'},steps:[
-    {ru:'Распакуй набор REV43 и найди NekoFlash-6.0.0-alpha11-debug.apk рядом с этим HTML; либо скачай официальный GitHub Actions artifact.',en:'Unpack the REV43 kit and find NekoFlash-6.0.0-alpha11-debug.apk next to this HTML; alternatively use the GitHub Actions artifact.'},
+    {ru:'Распакуй набор REV45 и найди APK рядом с этим HTML; либо скачай официальный GitHub Actions artifact.',en:'Unpack the REV45 kit and find the APK next to this HTML; alternatively use the GitHub Actions artifact.'},
     {ru:'Установи APK на HOST. Старый NekoFlash не удаляй.',en:'Install the APK on HOST; do not uninstall the original NekoFlash.'},
     {ru:'Открой приложение и разреши запрошенный доступ.',en:'Launch the app and grant the necessary requested permissions.'},
-    {ru:'Дополнительно проверь SHA-256 APK в Termux на HOST (если он есть и файл в Download).',en:'Optionally check APK SHA-256 in Termux on HOST (when available and the file is in Download).',cmd:'sha256sum ~/storage/downloads/NekoFlash-6.0.0-alpha11-debug.apk',where:{ru:'Termux на HOST; перед первым доступом к Download выполни termux-setup-storage.',en:'Termux on HOST; run termux-setup-storage first if needed.'}}
-  ],expect:{ru:'APK запускается отдельно от оригинального приложения. SHA-256: вычисли SHA-256 установленного REV43 APK отдельно / compute SHA-256 from your downloaded APK.',en:'APK launches independently from the original. SHA-256: вычисли SHA-256 установленного REV43 APK отдельно / compute SHA-256 from your downloaded APK.'}},
+    {ru:'Дополнительно проверь SHA-256 APK в Termux на HOST (если он есть и файл в Download).',en:'Optionally check APK SHA-256 in Termux on HOST (when available and the file is in Download).',cmd:'sha256sum -c SHA256SUMS.txt',where:{ru:'Termux на HOST, в каталоге распакованного набора.',en:'HOST Termux, inside the extracted kit directory.'}}
+  ],expect:{ru:'APK запускается отдельно от оригинального приложения. SHA-256 = ' + KIT.apkSha256,en:'APK launches independently from the original. SHA-256 = ' + KIT.apkSha256}},
   {id:'UI-01',group:'basic',ru:'Вкладки и навигация',en:'Tabs and navigation',intro:{ru:'Без USB. Проверяем пять вкладок и разделы прошивки, не нажимая запуск записи.',en:'No USB. Check five main tabs and Flash sections without executing writes.'},steps:[
     {ru:'Открой Главная, Прошивка, Sideload, Unlock и Настройки.',en:'Open Home, Flash, Sideload, Unlock and Settings.'},
     {ru:'В Прошивке переключи Быстрая / Массовая / Инструменты.',en:'Switch Quick Flash / Mass Flash / Tools.'},
@@ -867,7 +868,7 @@ const TESTS = [
     {ru:'Сверни приложение, вернись и проверь сохранение состояния.',en:'Background and restore the app; verify the UI state.'},
     {ru:'Закрой и повторно открой приложение.',en:'Close and relaunch the app.'}
   ],expect:{ru:'Нет вылетов, зависаний, исчезнувших кнопок или неуместных автоматических действий.',en:'No crashes, freezes, missing controls or unintended automatic operations.'}},
-  {id:'UI-02',group:'basic',ru:'Шрифт, ориентация, RU/EN',en:'Font scaling, rotation and RU/EN',intro:{ru:'Проверяем мобильную вёрстку актуальной DEV REV43.',en:'Validate current REV43 mobile layout.'},steps:[
+  {id:'UI-02',group:'basic',ru:'Шрифт, ориентация, RU/EN',en:'Font scaling, rotation and RU/EN',intro:{ru:'Проверяем мобильную вёрстку актуальной DEV REV45.',en:'Validate current REV45 mobile layout.'},steps:[
     {ru:'Проверь все вкладки с обычным шрифтом.',en:'Check all tabs with normal system font size.'},
     {ru:'Увеличь системный шрифт примерно до 130% и повтори проверку.',en:'Increase system font to roughly 130% and repeat.'},
     {ru:'Поверни экран горизонтально и обратно.',en:'Rotate to landscape and back.'},
@@ -966,7 +967,7 @@ const TESTS = [
     {ru:'Прикрепи файлы в блоке «Собрать отчёт» ниже.',en:'Attach evidence files in the report section below.'},
     {ru:'Создай ZIP, затем отправь его в Telegram как документ.',en:'Create ZIP, then send it to Telegram as a document.'}
   ],expect:{ru:'Один ZIP с report.txt, progress.json и выбранными файлами БЕЗ изменения исходных логов. Архив без шифрования — передавай только в доверенный канал.',en:'One ZIP with report.txt, progress.json and ORIGINAL attachments unchanged. The archive is not encrypted; share via trusted channels only.'}},
-  {"id":"BUILD-02","group":"basic","stage":"today","ru":"Сверка DEV APK / SHA / CI","en":"Verify DEV APK / SHA / CI","intro":{"ru":"Важно: одинаковое имя alpha11 не означает одинаковый код.","en":"The same alpha11 filename can refer to different commits."},"steps":[{"ru":"Проверь версию 6.0.0-alpha11-dev / code 234 / dev-пакет.","en":"Check version 6.0.0-alpha11-dev / code 234 / dev package."},{"ru":"Найди APK из комплекта и проверь SHA-256 в Termux.","en":"Locate the bundled APK and verify SHA-256 in Termux.","cmd":"sha256sum ~/storage/downloads/NekoFlash-6.0.0-alpha11-debug.apk","where":{"ru":"Termux на HOST после распаковки","en":"Termux on HOST after extraction"}},{"ru":"Сверь SHA-256 с результатом SETUP-01 или файлом SHA256SUMS.txt из комплекта.","en":"Match SHA-256 against SETUP-01 expected result or SHA256SUMS.txt in the kit."},{"ru":"Проверь, что скачанная сборка из CI #41247325391.","en":"Verify the original artifact is from CI #41247325391."}],"expect":{"ru":"SHA совпадает; версия и package правильные; старый NekoFlash установлен отдельно.","en":"Hash matches; version and package are correct; old NekoFlash remains separate."}},
+  {"id":"BUILD-02","group":"basic","stage":"today","ru":"Сверка DEV APK / SHA / CI","en":"Verify DEV APK / SHA / CI","intro":{"ru":"Важно: одинаковое имя alpha11 не означает одинаковый код.","en":"The same alpha11 filename can refer to different commits."},"steps":[{"ru":"Проверь версию 6.0.0-alpha11-dev / code 234 / dev-пакет.","en":"Check version 6.0.0-alpha11-dev / code 234 / dev package."},{"ru":"Найди APK из комплекта и проверь SHA-256 в Termux.","en":"Locate the bundled APK and verify SHA-256 in Termux.","cmd":"sha256sum -c SHA256SUMS.txt","where":{"ru":"Termux в папке распакованного комплекта","en":"Termux inside the extracted kit folder"}},{"ru":"Сверь SHA-256 с результатом SETUP-01 или файлом SHA256SUMS.txt из комплекта.","en":"Match SHA-256 against SETUP-01 expected result or SHA256SUMS.txt in the kit."},{"ru":"Проверь, что скачанная сборка из запуска CI, указанного в BUILD.txt.","en":"Verify the original artifact is from the run listed in BUILD.txt."}],"expect":{"ru":"SHA совпадает; версия и package правильные; старый NekoFlash установлен отдельно.","en":"Hash matches; version and package are correct; old NekoFlash remains separate."}},
   {"id":"TERM-02","group":"basic","stage":"today","ru":"REV26: закрытие vs остановка и старые 100%","en":"REV26: close vs stop / stale 100%","intro":{"ru":"Проверь известный старый дефект при ADB без TARGET и с авторизованным TARGET.","en":"Regression for accidental terminal collapse or global 100% progress popup."},"steps":[{"ru":"Открой терминал и набери adb devices.","en":"Open Console and enter adb devices.","cmd":"adb devices"},{"ru":"Убедись, что Console не свернулась и Центр операций не перекрыл ввод.","en":"Check Console stays open and global Operations dialog does not steal focus."},{"ru":"Нажми только «Закрыть терминал», снова открой и проверь сохранение вывода.","en":"Use Close only, reopen and check output is retained."},{"ru":"При длительной читающей команде попробуй отдельную кнопку Stop.","en":"For a long read-only command, check the separate Stop button."},{"ru":"Сделай скрин при ошибочном диалоге или ложном 100%.","en":"Screenshot any stale 100% dialog or unexpected collapse."}],"expect":{"ru":"Закрытие панели не отменяет текущую операцию; Stop обрабатывается отдельно.","en":"Closing panel does not cancel a command; Stop is independent."}},
   {"id":"TERM-03","group":"adb","stage":"today","ru":"REV27: длинный вывод и повторное открытие","en":"REV27: long output / reopen","intro":{"ru":"Без прошивки. Стресс-тест именно UI и записываемого журнала.","en":"No flashing; tests UI viewport and persistent raw evidence."},"steps":[{"ru":"С подключённым TARGET выполни чтение списка системных свойств.","en":"With TARGET connected, query system properties.","cmd":"adb shell getprop"},{"ru":"Во время прокрутки закрой и открой Console 5 раз.","en":"Close/reopen Console five times while scrolling."},{"ru":"Прокрути в начало и конец, проверь скорость и зависания.","en":"Scroll to beginning/end; observe stalls and latency."},{"ru":"Открой лог-файлы NekoFlash и проверь, что ранние строки остаются в исходной диагностике.","en":"Inspect NekoFlash raw logs and check early entries are still available."}],"expect":{"ru":"UI остаётся отзывчивым, видимая история ограничена интерфейсом, но исходный лог полный.","en":"UI responsive; viewport is bounded but persistent logs remain complete."}},
   {"id":"TERM-04","group":"basic","stage":"today","ru":"IME и масштаб 130% / поворот","en":"IME / 130% font / rotation","intro":{"ru":"Проверить физическую клавиатуру Android, шторку и Back.","en":"Test real Android keyboard handling, Back and rotation."},"steps":[{"ru":"Открой Console с IME и увеличь масштаб системного шрифта.","en":"Open Console with IME and increase system font size."},{"ru":"Поверни HOST портрет → альбомный → портрет.","en":"Rotate HOST portrait → landscape → portrait."},{"ru":"Нажми Back: сперва должна уйти IME, а не закрыться/сброситься Console.","en":"Press Back; IME should dismiss before Console loses state."},{"ru":"Повтори ввод/историю после поворота и возврата.","en":"Check command input/history after rotation."}],"expect":{"ru":"Команды, ввод и фокус не теряются; навигация предсказуема.","en":"Input, focus and history remain stable."}},
@@ -984,7 +985,7 @@ const TESTS = [
   {"id":"LOG-01","group":"basic","stage":"today","ru":"Сырые журналы после длительной сессии","en":"Raw logs after long session","intro":{"ru":"Профессиональная диагностика: журналы НЕ чистим. Проверяем, что исходные строки остались.","en":"Professional diagnostics: raw logs MUST remain unchanged."},"steps":[{"ru":"Создай несколько обычных ошибок и запросов без TARGET.","en":"Produce harmless errors and device queries without TARGET.","cmd":"fastboot devices"},{"ru":"Найди каталоги log- и trace- в Download/NekoFlash.","en":"Locate log- and trace- segment files under Download/NekoFlash."},{"ru":"Закрой и открой приложение. Проверь, что прежние сессии на месте.","en":"Restart app and verify previous sessions remain."},{"ru":"Проверь точные серийники/ошибки в полном локальном логе, если они присутствуют.","en":"Verify exact serials/error codes remain in full local logs, if present."}],"expect":{"ru":"Ни один старый сегмент не удалён автоматически; журнал точный.","en":"No prior segment auto-deleted; raw evidence exact."}},
   {"id":"LOG-02","group":"basic","stage":"today","ru":"Экспорт, оригиналы и приватная отправка","en":"Evidence export and trusted sharing","intro":{"ru":"Нажми «Подключить логи», выбери NekoFlash/logs, затем собери ZIP. Разрешение на чтение выдаётся только через браузер; ZIP не зашифрован.","en":"Connect NekoFlash/logs with the folder picker, then create ZIP. Browser read permission is required; ZIP is unencrypted."},"steps":[{"ru":"Выбери папку Download/NekoFlash/logs один раз; скриншоты и видео приложи вручную.","en":"Choose Download/NekoFlash/logs once; attach screenshots and videos manually."},{"ru":"Создай ZIP, проверь evidence-manifest.json и наличие log- / trace- / session-summary-; сравни оригиналы по SHA-256.","en":"Create ZIP; inspect evidence-manifest.json and all log-/trace-/session-summary- files; compare original SHA-256."},{"ru":"Экспортируй JSON-прогресс и проверь повторный импорт.","en":"Export progress JSON and import it back."},{"ru":"Отправляй полные данные только в доверенный личный чат, не публичный issue.","en":"Share full evidence only in private trusted channel, not public issue."}],"expect":{"ru":"Содержимое вложений побайтово не изменено; все отметки и комментарии на месте.","en":"Attachments byte-exact; all statuses/notes retained."}},
   {"id":"LOG-03","group":"basic","stage":"today","ru":"Автосбор логов в ZIP — новый режим","en":"Auto-collect logs into ZIP — new mode","intro":{"ru":"Проверь доступ к папке без сторонних разрешений APK. HTML не может читать файлы без твоего выбора; сырые данные не изменяются.","en":"Grant folder read access using the browser. No NekoFlash APK permissions are changed; all raw data remains untouched."},"steps":[{"ru":"В тестбуке нажми «Подключить / обновить логи» и выбери Download/NekoFlash/logs. Если этот выбор недоступен — «Android: разовый выбор папки».","en":"Tap Connect / refresh logs, choose Download/NekoFlash/logs; if unsupported use Android: choose folder once."},{"ru":"Вернись в NekoFlash и создай новую тестовую диагностическую запись; старые журналы не удаляй.","en":"Generate a new harmless diagnostic entry in NekoFlash; do not delete any older logs."},{"ru":"Создай ZIP в тестбуке; для постоянного доступа новая запись включится сама. В разовом режиме ещё раз обнови папку перед ZIP.","en":"Generate a ZIP; new logs appear automatically in live mode. Refresh the folder first in snapshot mode."},{"ru":"Проверь evidence-manifest.json, количество и имена log-/trace-/session-summary- файлов, затем точные SHA-256 исходника и вложения.","en":"Inspect evidence-manifest.json, log/trace/session filenames, and compare SHA-256 of source and ZIP copies."},{"ru":"При запрете доступа убедись, что ZIP не создаётся тихо без логов и что тестбук просит выбрать папку заново.","en":"With folder permission revoked, ensure the page does not silently export without logs and prompts to reconnect."}],"expect":{"ru":"Логи собираются без ручного прикрепления каждого файла, без очистки и потери данных. На неподдерживаемом Android требуется выбор папки перед отчётом.","en":"Raw logs included without attaching every file, with no redaction or data loss. Unsupported Android pickers require folder reselection."}},
-  {"id":"CI-01","group":"basic","stage":"today","ru":"Проверка исходного CI и номера сборки","en":"Source CI and build provenance","intro":{"ru":"Эмуляторный PASS — база для тестов, не доказательство USB-совместимости конкретного телефона.","en":"CI emulator PASS is a prerequisite, not proof of physical USB compatibility."},"steps":[{"ru":"Открой ссылку на Actions #41247325391 внизу страницы или в README_RU_EN.txt.","en":"Open GitHub Actions #41247325391 from the page footer or README_RU_EN.txt."},{"ru":"Проверь CI SHA 27ab796d и merge HEAD 3562bee5.","en":"Check CI SHA 27ab796d and merged HEAD 3562bee5."},{"ru":"Убедись, что build, API26 и API34 были SUCCESS (20 тестов на каждом).","en":"Check build, API26 and API34 SUCCESS (20 tests each)."},{"ru":"Сверь локальный APK SHA-256; чужую alpha11 сборку не подменяй.","en":"Verify local APK SHA-256; avoid any other alpha11 build."}],"expect":{"ru":"Коммит и APK совпадают с проверенной REV43; аппаратные испытания начинаются отдельно.","en":"Commit/APK match checked REV43; physical validation starts separately."}},
+  {"id":"CI-01","group":"basic","stage":"today","ru":"Проверка исходного CI и номера сборки","en":"Source CI and build provenance","intro":{"ru":"Эмуляторный PASS — база для тестов, не доказательство USB-совместимости конкретного телефона.","en":"CI emulator PASS is a prerequisite, not proof of physical USB compatibility."},"steps":[{"ru":"Открой ссылку на Actions вверху страницы или в BUILD.txt.","en":"Open GitHub Actions from the build panel or BUILD.txt."},{"ru":"Сверь коммит CI с BUILD.txt.","en":"Compare the CI commit with BUILD.txt."},{"ru":"Убедись, что build, API26 и API34 были SUCCESS (20 тестов на каждом).","en":"Check build, API26 and API34 SUCCESS (20 tests each)."},{"ru":"Сверь локальный APK SHA-256; чужую alpha11 сборку не подменяй.","en":"Verify local APK SHA-256; avoid any other alpha11 build."}],"expect":{"ru":"Коммит и APK совпадают с проверенной REV45; аппаратные испытания начинаются отдельно.","en":"Commit/APK match checked REV45; physical validation starts separately."}},
   {"id":"TERM-06","group":"basic","stage":"today","ru":"REV38: Gboard, Unicode и Backspace","en":"REV38: Gboard, Unicode and Backspace","intro":{"ru":"Тест ввода, не прошивки.","en":"Input-only test, not flashing."},"steps":[{"ru":"Набери и исправь «привет мир» через Gboard.","en":"Type and correct «привет мир» with Gboard."},{"ru":"Вставь «Кот 🐈‍⬛ Байт 🌙», удали часть строки и набери снова.","en":"Paste «Кот 🐈‍⬛ Байт 🌙», delete part, type again."},{"ru":"Перейди в adb shell, проверь Backspace, Enter и выход.","en":"Enter adb shell, check Backspace, Enter and exit.","cmd":"adb shell"}],"expect":{"ru":"Нет испорченных UTF-8 символов, двойного ввода или зависшего IME.","en":"No corrupted UTF-8, duplicates or stuck IME."}},
   {"id":"TERM-05","group":"basic","stage":"today","ru":"REV39–40: копирование вывода и автопрокрутка","en":"REV39–40: console text selection and scrolling","intro":{"ru":"Только чтение; логи не очищать.","en":"Read-only; do not clear logs."},"steps":[{"ru":"Открой терминал и получи длинный вывод.","en":"Open console and generate long output.","cmd":"adb shell getprop"},{"ru":"Долгим нажатием выдели строку и скопируй.","en":"Long-press, select and copy a visible line."},{"ru":"При выделении получи новый вывод; проверь, что текст не уехал вниз.","en":"Receive additional output while selected; no unexpected jump."},{"ru":"Сними выделение; проверь обычную автопрокрутку.","en":"Clear selection and check normal auto-follow."}],"expect":{"ru":"Копирование верно, выделение не сбивается.","en":"Exact copy and stable selection."}},
   {"id":"ADB-07","group":"adb","stage":"extended","ru":"REV42: A_WRTE maxdata на старом TARGET","en":"REV42: A_WRTE maxdata with older TARGET","intro":{"ru":"Без устройства с малым maxdata пометь BLOCKED.","en":"Mark BLOCKED without a small-maxdata target."},"steps":[{"ru":"Подключи старый Android с разрешённой USB-отладкой.","en":"Connect authorized older Android target."},{"ru":"Отправь одноразовый файл, не системный образ.","en":"Send a disposable file, not a system image.","cmd":"adb push /sdcard/Download/NekoFlashQA/probe.bin /sdcard/Download/NekoFlashQA/probe.bin"},{"ru":"Проверь размер и SHA-256 на HOST/TARGET; приложи исходные логи.","en":"Compare sizes/hashes on HOST and TARGET; attach original logs."}],"expect":{"ru":"Все A_WRTE в пределах peer maxdata, байты файла совпадают.","en":"Each A_WRTE respects peer maxdata, content exact."}},
@@ -992,16 +993,12 @@ const TESTS = [
   {"id":"ADB-09","group":"adb","stage":"extended","ru":"REV43: отмена adb push -r","en":"REV43: cancel recursive push","intro":{"ru":"Только одноразовые файлы; не останавливать запись разделов.","en":"Disposable files only; not a partition flash."},"steps":[{"ru":"Запусти передачу тестового дерева.","en":"Start disposable recursive transfer."},{"ru":"Нажми Stop во время передачи файлов.","en":"Tap Stop mid-transfer."},{"ru":"Проверь, что следующий файл не запущен, нет SUCCESS.","en":"Check no next file and no false SUCCESS."},{"ru":"Сохрани время, имя последнего файла, логи, скриншот.","en":"Record time, last file, logs and screenshot."}],"expect":{"ru":"Отмена не сбрасывается между файлами.","en":"Cancellation is never reset between files."}},
   {"id":"USB-03","group":"adb","stage":"extended","ru":"USB/OTG detach и reconnect во время push","en":"USB/OTG detach and reconnect during push","intro":{"ru":"ТОЛЬКО ADB push одноразового файла; не отсоединять при Fastboot DATA.","en":"ADB push of disposable data ONLY; never unplug during Fastboot DATA."},"steps":[{"ru":"Начни передачу тестового файла по ADB.","en":"Begin disposable ADB file transfer."},{"ru":"Отсоедини OTG; проверь завершение с ошибкой, без ложного SUCCESS.","en":"Unplug OTG; check failure and no false SUCCESS."},{"ru":"Подключи заново, разреши TARGET и проверь adb devices.","en":"Reconnect, authorize target and run adb devices.","cmd":"adb devices"},{"ru":"Проверь возможный частичный файл и сохрани логи.","en":"Inspect partial target file and save logs."}],"expect":{"ru":"Нет автоматического повтора или повреждённого файла, принятого за целый.","en":"No automatic replay or partial file accepted as complete."}},
   {"id":"FB-04","group":"fastboot","stage":"extended","ru":"REV41: Fastboot read-only (post-DATA отдельно)","en":"REV41: read-only Fastboot (post-DATA separate)","intro":{"ru":"Эта проверка НЕ покрывает post-DATA download; для него отдельная лаборатория.","en":"Does NOT exercise download post-DATA; requires separately authorized lab."},"steps":[{"ru":"Вручную открой Fastboot на запасном TARGET.","en":"Enter Fastboot manually on a spare target."},{"ru":"Считай product/current-slot/max-download-size.","en":"Read product/current-slot/max-download-size.","cmd":"fastboot getvar product\nfastboot getvar current-slot\nfastboot getvar max-download-size"},{"ru":"Проверь единичную отправку команд и сохранение INFO-логов.","en":"Check no command replay and preserve INFO logs."},{"ru":"Для post-DATA отметь BLOCKED, если нет отдельного разрешения на лабораторный тест.","en":"Mark post-DATA BLOCKED without separate lab authorization."}],"expect":{"ru":"Read-only связь устойчива; post-DATA остаётся непроверенным при отсутствии лаборатории.","en":"Read-only stable; post-DATA unverified without lab."}},
-  {"id":"CI-02","group":"basic","stage":"today","ru":"REV43: CI и аппаратные результаты — не путать","en":"REV43: distinguish CI from hardware results","intro":{"ru":"PR CI зелёный, но merged DEV API26 красный (два UI таймаута).","en":"PR CI passed; merged DEV API26 failed on two UI timeouts."},"steps":[{"ru":"Сверь PR CI run 41247325391 (build/API26/API34 PASS).","en":"Verify PR CI run 41247325391 (all PASS)."},{"ru":"Проверь merged DEV run 41248168147: API26 FAIL, API34 PASS.","en":"Check merged DEV run 41248168147: API26 FAIL, API34 PASS."},{"ru":"Укажи установленную APK, модель HOST/TARGET, версии Android и дату.","en":"Record installed APK, host/target models, OS and date."},{"ru":"Не ставь PASS для аппаратных проверок без реального выполнения.","en":"Never mark unperformed physical checks PASS."}],"expect":{"ru":"Отчёт содержит только фактические результаты.","en":"Report contains observed results only."}}
+  {"id":"CI-02","group":"basic","stage":"today","ru":"REV45: CI и аппаратные результаты — не путать","en":"REV45: distinguish CI from hardware results","intro":{"ru":"Сборка, эмуляторы и физические телефоны дают разные свидетельства.","en":"Build, emulator and physical-device evidence are recorded separately."},"steps":[{"ru":"Сверь успешный запуск CI по ссылке в этом тестбуке.","en":"Check the successful run linked in this testbook."},{"ru":"Открой результаты инструментальных тестов на API 26 и 34.","en":"Inspect instrumentation results on API 26 and 34."},{"ru":"Укажи установленную APK, модель HOST/TARGET, версии Android и дату.","en":"Record installed APK, host/target models, OS and date."},{"ru":"Не ставь PASS для аппаратных проверок без реального выполнения.","en":"Never mark unperformed physical checks PASS."}],"expect":{"ru":"Отчёт содержит только фактические результаты.","en":"Report contains observed results only."}}
 ];
 
-const KEY = 'nekoflash_insiders_rev43_testkit_v3';
-const LEGACY_KEY = 'nekoflash_insiders_rev29_testkit_v2';
-const LEGACY_OLD_KEY = 'nekoflash_insiders_rev25_testkit_v1';
-const SOURCE_REVISION = 'REV43';
-const BUILD_SHA = 'bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5';
-const APK_SHA256 = ''; // REV43 artifact digest must be computed from the actual APK.
-const APK_FILENAME = 'NekoFlash-6.0.0-alpha11-debug.apk';
+const SCHEMA = 'nekoflash-rev45-testkit-v4';
+const IMPORT_SCHEMAS = [SCHEMA, 'nekoflash-rev43-testkit-v3', 'nekoflash-rev29-testkit-v2', 'nekoflash-rev25-testkit-v1'];
+const KEY = SCHEMA + ':' + KIT.apkSha256;
 const STATUSES = ['', 'pass', 'fail', 'blocked', 'skip'];
 const CATS = ['all', 'basic', 'adb', 'fastboot', 'ui'];
 let storageWorks = true;
@@ -1019,12 +1016,13 @@ let state = {
   lang: 'ru',
   filter: 'all',
   round: 'today',
-  meta: { hostModel: '', hostAndroid: '', targetModel: '', targetAndroid: '', usbInfo: '', build: 'REV43 / PR 27ab796d / DEV bd0d1fbf / 6.0.0-alpha11-dev (234)', suggestions: '' },
+  meta: { hostModel: '', hostAndroid: '', targetModel: '', targetAndroid: '', usbInfo: '', build: BUILD_LABEL, suggestions: '' },
+  provenance: KIT,
   tests: {}
 };
 
 try {
-  const v = localStorage.getItem(KEY) || localStorage.getItem(LEGACY_KEY) || localStorage.getItem(LEGACY_OLD_KEY);
+  const v = localStorage.getItem(KEY);
   if (v) {
     const old = JSON.parse(v);
     if (old && typeof old === 'object') {
@@ -1046,7 +1044,6 @@ try {
 }
 
 let toastTimer;
-if (/REV29|3562bee5/.test(String(state.meta?.build || ''))) { state.meta.build = 'REV43 / PR 27ab796d / DEV bd0d1fbf / 6.0.0-alpha11-dev (234)'; }
 const $ = id => document.getElementById(id);
 const e = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const t = () => T[state.lang];
@@ -1480,15 +1477,11 @@ function downloadBlob(blob, filename) {
 
 function snapshot() {
   return {
-    schema: 'nekoflash-rev43-testkit-v3',
+    schema: SCHEMA,
     createdAt: new Date().toISOString(),
     lang: state.lang,
     build: state.meta.build,
-    revision: SOURCE_REVISION,
-    sourceCommit: BUILD_SHA,
-    testArtifactCommit: '27ab796d100387b3530bd88a6faf28e48d1c717c',
-    apkFilename: APK_FILENAME,
-    apkSha256: APK_SHA256,
+    ...state.provenance,
     phase: state.round,
     meta: state.meta,
     tests: Object.fromEntries(TESTS.map(o => [
@@ -1509,11 +1502,12 @@ function renderReportText(data) {
     isRu ? 'NEKOFLASH 2.0 — ОТЧЁТ ТЕСТИРОВАНИЯ' : 'NEKOFLASH 2.0 — TEST REPORT',
     `Date (UTC): ${data.createdAt}`,
     `Build: ${data.meta.build || ''}`,
-    `Revision: ${data.revision || SOURCE_REVISION}`,
-    `Source commit: ${data.sourceCommit || BUILD_SHA}`,
+    `Revision: ${data.revision || 'unknown'}`,
+    `Source commit: ${data.sourceCommit || 'unknown'}`,
     `CI commit: ${data.testArtifactCommit || ''}`,
-    `APK: ${data.apkFilename || APK_FILENAME}`,
-    `APK SHA-256: ${data.apkSha256 || APK_SHA256}`,    `Test stage: ${data.phase || state.round}`,
+    `APK: ${data.apkFilename || 'unknown'}`,
+    `APK SHA-256: ${data.apkSha256 || 'unknown'}`,
+    `Test stage: ${data.phase || state.round}`,
     'Evidence retention: RAW / LOSSLESS / NO REDACTION',
     `HOST: ${data.meta.hostModel || ''} / ${data.meta.hostAndroid || ''}`,
     `TARGET: ${data.meta.targetModel || ''} / ${data.meta.targetAndroid || ''}`,
@@ -1544,7 +1538,7 @@ function renderReportText(data) {
     isRu ? 'ОБЩИЕ ПРЕДЛОЖЕНИЯ' : 'GENERAL FEEDBACK',
     data.meta.suggestions || '—',
     '',
-    'NekoFlash Insiders • REV43 • Generated locally; no automatic upload; raw evidence is unchanged.'
+    'NekoFlash Insiders • REV45 • Generated locally; no automatic upload; raw evidence is unchanged.'
   );
   return lines.join('\r\n') + '\r\n';
 }
@@ -1736,6 +1730,9 @@ $('collapseAllBtn').addEventListener('click', () => {
 $('resetAllBtn').addEventListener('click', () => {
   if (!confirm(t().resetConfirm)) return;
   state.tests = {};
+  state.provenance = KIT;
+  state.meta.build = BUILD_LABEL;
+  $('build').value = BUILD_LABEL;
   save();
   renderTests();
   updateProgress();
@@ -1854,7 +1851,7 @@ $('copyReportBtn').addEventListener('click', () => {
 });
 
 $('exportJson').addEventListener('click', () => {
-  downloadBlob(new Blob([JSON.stringify(snapshot(), null, 2)], { type: 'application/json' }), 'NekoFlash_REV43_progress.json');
+  downloadBlob(new Blob([JSON.stringify(snapshot(), null, 2)], { type: 'application/json' }), 'NekoFlash_REV45_progress.json');
   toast(t().saved);
 });
 
@@ -1865,12 +1862,16 @@ $('importFile').addEventListener('change', async ev => {
   if (!f) return;
   try {
     const v = JSON.parse(await f.text());
-    if (!['nekoflash-rev29-testkit-v2', 'nekoflash-rev25-testkit-v1'].includes(v.schema) || !v.tests || !v.meta || typeof v.tests !== 'object') {
+    if (!IMPORT_SCHEMAS.includes(v.schema) || !v.tests || !v.meta || typeof v.tests !== 'object') {
       throw Error('Invalid JSON');
     }
     if (v.lang === 'en' || v.lang === 'ru') state.lang = v.lang;
-    state.meta = { ...state.meta, ...v.meta };
-    if (v.schema === 'nekoflash-rev25-testkit-v1' && /^REV25/.test(state.meta.build || '')) state.meta.build = 'REV43 / PR 27ab796d / DEV bd0d1fbf / 6.0.0-alpha11-dev (234)';
+    state.meta = { ...state.meta, ...v.meta, build: String(v.meta.build || v.build || '') };
+    state.provenance = Object.fromEntries(Object.keys(KIT).map(key =>
+      [key, typeof v[key] === 'string' ? v[key] : '']
+    ));
+    state.tests = {};
+    if (['today', 'extended', 'lab', 'all'].includes(v.phase)) state.round = v.phase;
     for (const o of TESTS) {
       const a = v.tests[o.id];
       if (a) {
@@ -1896,6 +1897,10 @@ $('importFile').addEventListener('change', async ev => {
   }
 });
 
+const runUrl = 'https://github.com/Ncorror/NekoFlash-2.0/actions/runs/' + KIT.runId;
+$('ciLink').href = runUrl;
+$('apkLink').href = runUrl + '#artifacts';
+$('buildRef').textContent = BUILD_LABEL;
 renderStatic();
 renderTests();
 </script>

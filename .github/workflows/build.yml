@@ -67,7 +67,7 @@ jobs:
       - name: Publish standalone offline Insiders testbook
         uses: actions/upload-artifact@v6
         with:
-          name: NekoFlash-Insiders-Testbook-REV43-${{ github.sha }}
+          name: NekoFlash-Insiders-Testbook-REV45-reference-${{ github.sha }}
           path: docs/insiders/testbook.html
           if-no-files-found: error
           retention-days: 90
@@ -548,3 +548,25 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+
+  insiders-kit:
+    name: Package verified Insiders tester kit
+    needs: [build, android-filesystems]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v7
+        with:
+          name: NekoFlash-${{ github.sha }}-debug
+          path: kit-input
+      - name: Stage and verify offline kit
+        run: |
+          python3 scripts/package_insiders.py kit-input tester-kit --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
+          cd tester-kit
+          sha256sum --check SHA256SUMS.txt
+      - uses: actions/upload-artifact@v6
+        with:
+          name: NekoFlash-Insiders-Tester-Kit
+          path: tester-kit/
+          if-no-files-found: error
+          retention-days: 90
