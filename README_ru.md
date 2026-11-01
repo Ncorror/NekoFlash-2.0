@@ -14,7 +14,7 @@
 
 Сюда переносим REV26–44 для испытаний Android HOST → TARGET. Это **тестовая DEV APK**, не подписанный стабильный релиз; установленный старый NekoFlash удалять не нужно (пакет `ru.forum.adbfastboottool.dev`).
 
-**Telegram-группа тестирования — NekoFlash Insiders.** В группе распространяем тестовую APK и тестбук, собираем предложения и приватные ZIP с логами. Достоверная ссылка-приглашение пока не предоставлена, поэтому адрес `t.me` не придумываем. Материалы доступны и напрямую из GitHub:
+**Telegram-группа тестирования — [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** Здесь раздаём тестовую APK и тестбук, обсуждаем ошибки интерфейса, собираем предложения и ZIP-отчёты в доверенной группе. Материалы доступны и напрямую из GitHub:
 
 - [Скачать офлайн-тестбук REV43, HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
 - [Скачать тестовую APK REV43 — архив GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
