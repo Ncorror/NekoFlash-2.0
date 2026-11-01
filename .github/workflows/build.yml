@@ -488,11 +488,11 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: NekoFlash-${{ github.sha }}-debug
           path: emulator-apk
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v7
         with:
           name: NekoFlash-${{ github.sha }}-android-test
           path: emulator-test-apk
