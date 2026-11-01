@@ -15,7 +15,7 @@ English
 
 **Status: TESTING STARTING / NO NEW REV43 HARDWARE PASS VERIFIED.** The qualifications below were performed on the **earlier alpha10** device/release line. They are historical evidence only and do not validate the revised DEV ADB/PTY/Fastboot code.
 
-**Telegram tester group:** NekoFlash Insiders. APK and offline testbook are being prepared for sharing there; no unverified invitation URL is published. Direct GitHub test downloads remain available.
+**Telegram tester group:** [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy). Debug APK and offline testbook are shared there; raw ZIP reports should go to trusted testers rather than public GitHub issues. GitHub downloads remain available.
 
 Field-test materials:
 - [Offline downloadable RU/EN REV43 testbook](insiders/testbook.html) · [RU manual](testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN manual](testing/INSIDERS-FIELD-TEST-REV43-EN.md).
