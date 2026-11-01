@@ -20,9 +20,12 @@ This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta te
 - [Download tested REV43 debug APK — GitHub Actions ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
 - [RU tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Current status](docs/DEVELOPMENT_STATUS.md)
 
-**Verification:** [REV44 exact-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. An earlier merged DEV [API26 run failed two UI waits](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147). New physical REV43 HOST→TARGET passes remain unverified. The historical alpha11 release link in the archive does not refer to this beta.
+**Verification:** [REV44 PR-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. Integration [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) also passed, but later [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) failed two API26 UI tests with the persistent keyboard visible in captured screenshots. No physical REV43 HOST→TARGET PASS is verified. [REV45 audit, lint warnings and open tasks](docs/AUDIT-REV45-2026-11-01-RU.md). The historical alpha11 release link below is **not** this beta.
 
 ---
+
+<details>
+<summary>Archive: historical DEV REV27 (30 October 2026); not the current main branch</summary>
 
 ## Историческая DEV REV27 и общая документация (архивный раздел)
 
@@ -50,6 +53,8 @@ This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta te
 **Команда:** автор и текущий разработчик — [Ncorror](https://github.com/Ncorror). [IQ-HARRY7](https://github.com/IQ-HARRY7) добавлен в список участников по просьбе автора проекта; реализация кода и аппаратные тесты за ним пока не подтверждены.
 
 ---
+
+</details>
 
 ## Исходная документация NekoFlash (историческая версия)
 
