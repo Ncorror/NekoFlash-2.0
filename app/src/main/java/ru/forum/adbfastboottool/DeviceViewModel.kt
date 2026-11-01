@@ -1495,7 +1495,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             var completed = 0L
             var result = FastbootProtocol.FlashResult.ok()
             try {
-                require(directory.usableSpace >= image.largestPartBytes) {
+                require(hasImmediateSparseSpace(directory, image.largestPartBytes)) {
                     "Not enough temporary storage for a sparse packet: need ${image.largestPartBytes} bytes"
                 }
                 log("Resparse ${source.displayName}: ${image.partCount} packets, limit=${image.limitBytes}, expanded=${image.expandedBytes}, download=${image.downloadBytes}")
