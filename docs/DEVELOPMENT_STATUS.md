@@ -21,7 +21,7 @@
 
 ## Где скачать тестбук
 
-[**Скачать автономный REV43 HTML прямо из main**](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html). Он поддерживает RU/EN, этапы, чекбоксы, статусы и свободные замечания, JSON-прогресс, ZIP-отчёт с исходными `log-*`, `trace-*.bin`, `session-summary-*` и фотографиями. Он не отправляет файлы на сервер и требует ручного разрешения на папку логов. Каждый успешный build CI также экспортирует тестбук как отдельный скачиваемый GitHub Actions artifact. Для тестовой группы указан точный идентификатор **NekoFlash Insiders**, но ссылка-приглашение не опубликована и не должна подставляться наугад.
+[**Скачать автономный REV43 HTML прямо из main**](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html). Он поддерживает RU/EN, этапы, чекбоксы, статусы и свободные замечания, JSON-прогресс, ZIP-отчёт с исходными `log-*`, `trace-*.bin`, `session-summary-*` и фотографиями. Он не отправляет файлы на сервер и требует ручного разрешения на папку логов. Каждый успешный build CI также экспортирует тестбук как отдельный скачиваемый GitHub Actions artifact. Тестовая Telegram-группа: **[NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy)** (ссылка предоставлена автором проекта).
 
 **Внимание:** GitHub Actions artifact APK — отдельный ZIP; не путать с архивом отчёта. SHA-256 старой REV29 APK не относится к REV43: проверь новый APK самостоятельно. Не удаляй установленную стабильную версию NekoFlash.
 
