@@ -17,6 +17,24 @@ main = (base/'MainActivity.kt').read_text()
 # REV18 reviewed receive-file, listing and unique-block progress fixes.
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
+# REV45: lint mistook a path on the *remote ADB target* for one on the
+# Android host. Normalize only this narrowly reviewed helper extraction back
+# to REV43 before applying the original whole-file integrity checks.
+rev45_helper = (
+    b'    // This is a *target-device* ADB shell path, not an Android host path.\n'
+    b'    // Environment.getExternalStorageDirectory() would refer to the wrong phone.\n'
+    b'    @SuppressLint("SdCardPath")\n'
+    b'    private fun remoteObbDirectory(packageName: String): String =\n'
+    b'        "/sdcard/Android/obb/$packageName"\n\n'
+)
+if b'remoteObbDirectory(packageName)' in data:
+    assert data.count(rev45_helper) == 1, 'Unreviewed target OBB path helper'
+    assert data.count(b'val remoteDir = remoteObbDirectory(packageName)') == 1
+    assert data.count(b'import android.annotation.SuppressLint\n') == 1
+    data = data.replace(b'import android.annotation.SuppressLint\n', b'', 1)
+    data = data.replace(rev45_helper, b'', 1)
+    data = data.replace(b'val remoteDir = remoteObbDirectory(packageName)',
+                        b'val remoteDir = "/sdcard/Android/obb/$packageName"', 1)
 git_blob = hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 # Allow only exact audited ADB source variants. REV31 added lossless disk
 # spooling, REV33 file-backed directory parsing, REV35 UTF-8 display rendering.
