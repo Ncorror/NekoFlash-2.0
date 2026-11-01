@@ -69,7 +69,11 @@ internal class WorkspaceImportController(private val application: Application, p
                     current.name.ifBlank { uri.lastPathSegment?.substringAfterLast('/') ?: "imported-${System.currentTimeMillis()}" }))
                 publish(current)
                 log(application.getString(R.string.rev11_import_started, current.name, workspace.absolutePath))
-                current.expected?.let { log(application.getString(R.string.rev11_import_expected_size, it)) }
+                current.expected?.let { size ->
+                    // Preserve Russian plural rules for files larger than Int.MAX_VALUE.
+                    val quantity = (size % 100L).toInt()
+                    log(application.resources.getQuantityString(R.plurals.rev11_import_expected_size, quantity, size))
+                }
                 var lastProgressAt = 0L
                 val target = WorkspaceFileImporter.importFile(workspace, application.packageName,
                     current.name, current.expected, cancellation,
