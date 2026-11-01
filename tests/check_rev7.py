@@ -32,7 +32,15 @@ if git_blob_sha(raw_vm) != expected_blob:
     )
     original = b'                keyDirectory = adbKeyDir,\n'
     assert raw_vm.count(reviewed_change) == 1, 'Unreviewed ADB evidence path change'
+    # REV45 moves the unchanged conservative disk-space condition into a
+    # documented helper. The preflight must still happen *before* any flash.
+    # Normalize exactly this reviewed call-site change; all other VM edits
+    # remain forbidden by the original Git blob integrity check.
+    sparse_before = b'                require(directory.usableSpace >= image.largestPartBytes) {\\n'
+    sparse_after = b'                require(hasImmediateSparseSpace(directory, image.largestPartBytes)) {\\n'
+    assert raw_vm.count(sparse_after) == 1, 'Unexpected REV45 sparse preflight call-site'
     protected_vm = raw_vm.replace(reviewed_change, original, 1)
+    protected_vm = protected_vm.replace(sparse_after, sparse_before, 1)
     assert git_blob_sha(protected_vm) == expected_blob, (
         'DeviceViewModel changed outside the reviewed REV31 evidence path'
     )
