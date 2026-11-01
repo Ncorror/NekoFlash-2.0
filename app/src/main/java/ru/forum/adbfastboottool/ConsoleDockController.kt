@@ -21,6 +21,7 @@ import com.google.android.material.bottomsheet.BottomSheetBehavior
 internal class ConsoleDockController(
     private val activity: AppCompatActivity,
     private val consoleOutput: RecyclerView,
+    private val onExpanded: () -> Unit = {},
 ) {
     private val root: View by lazy { activity.findViewById(R.id.rootCoordinator) }
     private val panel: View by lazy { activity.findViewById(R.id.consolePanel) }
@@ -38,6 +39,7 @@ internal class ConsoleDockController(
     private var focusCommandWhenExpanded: Boolean = false
     private var imeVisible: Boolean = false
     private var lastPeekLine: String = ""
+    private var bodyHeightUpdateQueued: Boolean = false
 
     /** True while the Console body is visible above its collapsed peek height. */
     var isExpanded: Boolean = false
@@ -49,23 +51,25 @@ internal class ConsoleDockController(
             isFitToContents = false
             isHideable = false
             skipCollapsed = false
-            isDraggable = true
+            isDraggable = false
             halfExpandedRatio = HALF_EXPANDED_RATIO
-            expandedOffset = 0
-            peekHeight = activity.resources.getDimensionPixelSize(
-                R.dimen.console_collapsed_height,
+            // Leave the fixed USB panel accessible while the terminal owns the
+            // entire remaining working area.
+            expandedOffset = activity.resources.getDimensionPixelSize(
+                R.dimen.usb_panel_height,
             )
+            peekHeight = 0 // REV6: terminal is visible only after explicit open().
             saveFlags = BottomSheetBehavior.SAVE_ALL
             state = BottomSheetBehavior.STATE_COLLAPSED
             addBottomSheetCallback(
                 object : BottomSheetBehavior.BottomSheetCallback() {
                     override fun onStateChanged(bottomSheet: View, newState: Int) {
                         renderState(newState)
-                        bottomSheet.post { updateVisibleBodyHeight(bottomSheet) }
+                        scheduleVisibleBodyHeightUpdate()
                     }
 
                     override fun onSlide(bottomSheet: View, slideOffset: Float) {
-                        updateVisibleBodyHeight(bottomSheet)
+                        scheduleVisibleBodyHeightUpdate()
                     }
                 },
             )
@@ -75,19 +79,21 @@ internal class ConsoleDockController(
         header.setOnClickListener(toggleSheet)
         handle.setOnClickListener(toggleSheet)
 
-        commandInput.setOnFocusChangeListener { _, hasFocus ->
-            if (hasFocus && behavior.state != BottomSheetBehavior.STATE_EXPANDED) {
-                behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            }
-        }
+        // Only explicit UI actions open the sheet. IME focus callbacks can
+        // arrive after collapse or during Activity recreation; responding by
+        // expanding again makes the Close button feel stuck.
 
         bindWindowInsets()
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            updateVisibleBodyHeight()
+            val headerHeight = activity.findViewById<View>(R.id.usbHeader).height
+            if (headerHeight > 0 && behavior.expandedOffset != headerHeight) {
+                behavior.expandedOffset = headerHeight
+            }
+            scheduleVisibleBodyHeightUpdate()
         }
 
         renderState(behavior.state)
-        root.post { updateVisibleBodyHeight() }
+        scheduleVisibleBodyHeightUpdate()
     }
 
     /** Updates the single-line preview shown while the Console is collapsed. */
@@ -113,10 +119,9 @@ internal class ConsoleDockController(
 
     /** Returns the Console to its compact persistent header. */
     fun collapse() {
-        focusCommandWhenExpanded = false
-        if (imeVisible || commandInput.hasFocus()) {
-            hideCommandIme()
-        }
+        // Drop focus even when insets report IME already hidden. This also
+        // prevents a delayed IME visibility callback from re-opening the sheet.
+        hideCommandIme()
         if (behavior.state != BottomSheetBehavior.STATE_COLLAPSED) {
             behavior.state = BottomSheetBehavior.STATE_COLLAPSED
         }
@@ -126,7 +131,7 @@ internal class ConsoleDockController(
      * Handles the Console-specific part of Back navigation.
      *
      * Priority is deliberately local and predictable: hide the IME first,
-     * then step the sheet from expanded to half-expanded and finally collapsed.
+     * then close the terminal.
      * Returning false delegates the remaining Back action to [MainActivity].
      */
     fun handleBack(): Boolean {
@@ -141,25 +146,16 @@ internal class ConsoleDockController(
             else -> ConsoleSheetPolicy.StableState.TRANSIENT
         }
 
-        return when (ConsoleSheetPolicy.backAction(imeOrCommandActive, stableState)) {
-            ConsoleSheetPolicy.BackAction.HIDE_IME -> {
+        return when {
+            imeOrCommandActive -> {
                 hideCommandIme()
                 true
             }
-
-            ConsoleSheetPolicy.BackAction.HALF_EXPAND -> {
-                focusCommandWhenExpanded = false
-                commandInput.clearFocus()
-                behavior.state = BottomSheetBehavior.STATE_HALF_EXPANDED
-                true
-            }
-
-            ConsoleSheetPolicy.BackAction.COLLAPSE -> {
+            stableState != ConsoleSheetPolicy.StableState.COLLAPSED -> {
                 collapse()
                 true
             }
-
-            ConsoleSheetPolicy.BackAction.DELEGATE -> false
+            else -> false
         }
     }
 
@@ -191,6 +187,9 @@ internal class ConsoleDockController(
         if (!isExpanded) peek.text = compactPeekText()
 
         if (state == BottomSheetBehavior.STATE_EXPANDED) {
+            // Catch the RecyclerView up only when the user opens the terminal.
+            // Offscreen bursts must not keep reformatting and notifying rows.
+            onExpanded()
             scrollOutputToBottom()
             focusPendingCommandInput()
         }
@@ -203,6 +202,23 @@ internal class ConsoleDockController(
      * slice, the RecyclerView bottom and command bar stay below the window in
      * half-expanded state.
      */
+    /**
+     * One body remeasure per display frame even when BottomSheet callbacks,
+     * root layout and IME insets arrive together. Height and bottom bar still
+     * follow the actual current sheet top; no intermediate resize is discarded
+     * from the next frame's observable state.
+     */
+    private fun scheduleVisibleBodyHeightUpdate() {
+        if (bodyHeightUpdateQueued) return
+        bodyHeightUpdateQueued = true
+        panel.postOnAnimation {
+            bodyHeightUpdateQueued = false
+            if (!activity.isDestroyed && !activity.isFinishing) {
+                updateVisibleBodyHeight()
+            }
+        }
+    }
+
     private fun updateVisibleBodyHeight(bottomSheet: View = panel) {
         if (root.height <= 0 || handle.height <= 0 || header.height <= 0) return
 
@@ -228,15 +244,31 @@ internal class ConsoleDockController(
     private fun focusPendingCommandInput() {
         if (!focusCommandWhenExpanded) return
         panel.post {
-            if (!commandInput.isShown || !commandInput.isEnabled) {
+            if (!focusCommandWhenExpanded || behavior.state != BottomSheetBehavior.STATE_EXPANDED || !commandInput.isShown || !commandInput.isEnabled) {
                 focusCommandWhenExpanded = false
                 return@post
             }
+            // Request IME against the actual editable view rather than the
+            // CoordinatorLayout. Some Android 14 emulator keyboards ignore the
+            // first request during the sheet's expansion animation.
             commandInput.requestFocus()
-            WindowInsetsControllerCompat(activity.window, root).show(
+            WindowInsetsControllerCompat(activity.window, commandInput).show(
                 WindowInsetsCompat.Type.ime(),
             )
             focusCommandWhenExpanded = false
+            // One bounded retry, only while the user still has the terminal
+            // open and the command editor focused. Never reopen after Close.
+            commandInput.postDelayed({
+                if (!activity.isFinishing && !activity.isDestroyed &&
+                    behavior.state == BottomSheetBehavior.STATE_EXPANDED &&
+                    commandInput.isShown && commandInput.hasFocus() &&
+                    ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) != true
+                ) {
+                    WindowInsetsControllerCompat(activity.window, commandInput).show(
+                        WindowInsetsCompat.Type.ime(),
+                    )
+                }
+            }, 180L)
         }
     }
 
@@ -250,18 +282,13 @@ internal class ConsoleDockController(
             val nextImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
             if (nextImeVisible != imeVisible) {
                 imeVisible = nextImeVisible
-                behavior.isDraggable = !imeVisible
+                behavior.isDraggable = false
                 panel.requestLayout()
-                panel.post { updateVisibleBodyHeight() }
+                scheduleVisibleBodyHeightUpdate()
             }
 
-            if (
-                imeVisible &&
-                commandInput.hasFocus() &&
-                behavior.state != BottomSheetBehavior.STATE_EXPANDED
-            ) {
-                behavior.state = BottomSheetBehavior.STATE_EXPANDED
-            }
+            // Window insets report keyboard visibility; they do not get to
+            // override the user's explicit Collapse action.
 
             // Do not consume or duplicate IME/system-bar insets. `adjustResize`
             // remains the single owner of the available window height.
@@ -277,7 +304,12 @@ internal class ConsoleDockController(
             WindowInsetsCompat.Type.ime(),
         )
         imeVisible = false
-        behavior.isDraggable = true
+        behavior.isDraggable = false
+        // clearFocus() alone may immediately hand focus back to the only
+        // focusable EditText on Android 8 (observed in instrumented REV31 CI).
+        // Give it an explicit, non-editable destination before collapsing.
+        root.isFocusableInTouchMode = true
+        root.requestFocus()
         commandInput.clearFocus()
     }
 

@@ -377,25 +377,45 @@ class FastbootProtocol(
         if (!writeCommand(clean, timeout)) return@withLock false
         sessionState = SessionState.AWAITING_COMMAND_FINAL
 
-        val startedMs = System.currentTimeMillis()
+        // Driver read failures can return immediately. Use monotonic time
+        // for the 120-second deadline and a short cancellable backoff on empty
+        // responses; do not resend commands or alter raw response logging.
+        val startedNs = System.nanoTime()
         var infoLines = 0
         var lastWaitLogSec = 0L
 
         while (!cancelled) {
-            val elapsedMs = System.currentTimeMillis() - startedMs
-            if (elapsedMs >= 120_000L) {
+            val elapsedMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, System.nanoTime())
+            if (elapsedMs >= FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS) {
                 val message = "Terminal Fastboot command timed out: $clean"
                 onLog("❌ $message")
                 markSessionBroken(message)
                 return@withLock false
             }
 
+            val readStartedNs = System.nanoTime()
             val packet = readPacket(2000)
             if (packet == null) {
-                val elapsedSec = elapsedMs / 1000
+                val readFinishedNs = System.nanoTime()
+                val afterReadMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, readFinishedNs)
+                val elapsedSec = afterReadMs / 1000
                 if (elapsedSec / 10 != lastWaitLogSec / 10) {
                     onLog("⏳ Fastboot is waiting for a response... ${elapsedSec} sec")
                     lastWaitLogSec = elapsedSec
+                }
+                val remainingMs =
+                    (FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS - afterReadMs).coerceAtLeast(0L)
+                val backoffMs = FastbootTerminalWaitPolicy.retryDelayMs(
+                    readFinishedNs - readStartedNs, remainingMs
+                )
+                if (backoffMs > 0L && !cancelled) {
+                    try {
+                        Thread.sleep(backoffMs)
+                    } catch (_: InterruptedException) {
+                        Thread.currentThread().interrupt()
+                        onLog("⚠️ Fastboot terminal wait interrupted")
+                        return@withLock false
+                    }
                 }
                 continue
             }
@@ -801,7 +821,7 @@ class FastbootProtocol(
         onLog("Max download size: ${d.maxDownloadSizeRaw ?: "unknown"}${d.maxDownloadSizeBytes?.let { " ($it bytes)" } ?: ""}")
         d.maxFetchSizeRaw?.let { onLog("Max fetch size: $it${d.maxFetchSizeBytes?.let { bytes -> " ($bytes bytes)" } ?: ""}") }
         if (d.unlocked?.equals("no", ignoreCase = true) == true) {
-            onLog("⚠️ WARNING: bootloader reports unlocked=no. Full terminal is available, but fastboot flash will be blocked by the app.")
+            onLog("⚠️ Bootloader reports unlocked=no. The device may reject commands that require an unlocked bootloader.")
         }
     }
 
@@ -880,7 +900,68 @@ class FastbootProtocol(
     fun flashPartition(partition: String, file: File): Boolean =
         flashPartitionDetailed(partition, file).success
 
-    fun flashPartitionDetailed(partition: String, file: File): FlashResult = transactionLock.withLock {
+    fun flashPartitionDetailed(partition: String, file: File): FlashResult =
+        flashPartitionDetailedInternal(partition, file, file.name, file.length(), null)
+
+    /**
+     * Direct SAF Fastboot on Native USBFS only. The descriptor remains owned
+     * by FirmwareSource through all command, DATA, and final-response stages.
+     * No silent transport switch or temporary workspace copy.
+     */
+    internal fun flashPartitionDetailed(
+        partition: String,
+        source: FirmwareSource,
+        resolver: android.content.ContentResolver
+    ): FlashResult {
+        if (source is FirmwareSource.WorkspaceFile) {
+            return flashPartitionDetailed(partition, source.file)
+        }
+        val reader = try {
+            source.open(resolver)
+        } catch (error: Exception) {
+            return FlashResult.fail(
+                FlashStage.VALIDATION, FlashFailureKind.VALIDATION,
+                "Cannot read Fastboot image: ${error.message ?: error.javaClass.simpleName}"
+            )
+        }
+        return reader.use { opened ->
+            val fd = opened.nativeFd
+            if (fd == null || dataTransportMode != DataTransportMode.NATIVE_USBFS) {
+                return@use FlashResult.fail(
+                    FlashStage.VALIDATION, FlashFailureKind.VALIDATION,
+                    "Direct SAF requires Native USBFS and a seekable descriptor; use explicit Import for this provider/transport"
+                )
+            }
+            flashPartitionDetailedInternal(
+                partition, null, source.displayName, opened.sizeBytes, fd
+            )
+        }
+    }
+
+    /** Never enter DATA_OUT unless the bootloader acknowledges the exact payload size. */
+    private fun verifyDownloadDataReply(replyHex: String, expectedBytes: Long): Boolean {
+        return when (val verdict = FastbootDataReplyPolicy.validate(replyHex, expectedBytes)) {
+            is FastbootDataReplyPolicy.Verdict.Accepted -> true
+            is FastbootDataReplyPolicy.Verdict.Invalid -> {
+                markSessionBroken("Invalid Fastboot DATA acknowledgement: '$replyHex'")
+                false
+            }
+            is FastbootDataReplyPolicy.Verdict.Mismatch -> {
+                markSessionBroken(
+                    "Fastboot DATA size mismatch: requested=${verdict.expected}, bootloader=${verdict.actual}"
+                )
+                false
+            }
+        }
+    }
+
+    private fun flashPartitionDetailedInternal(
+        partition: String,
+        file: File?,
+        displayName: String,
+        imageSize: Long,
+        sourceFd: Int?
+    ): FlashResult = transactionLock.withLock {
         if (!ensureSessionReady("flash:$partition")) {
             return@withLock FlashResult.fail(
                 FlashStage.VALIDATION,
@@ -890,7 +971,7 @@ class FastbootProtocol(
             )
         }
 
-        val normalizedPartition = partition.trim().lowercase(Locale.US)
+        val normalizedPartition = partition.trim()
         if (normalizedPartition.isBlank() || !normalizedPartition.matches(Regex("[A-Za-z0-9._:-]+"))) {
             val message = "Invalid partition name: $partition"
             onLog("❌ ERROR: $message")
@@ -901,26 +982,36 @@ class FastbootProtocol(
             onLog("⚠️ Partition $normalizedPartition is not in the standard list. The hard block is removed; the command is allowed in terminal mode.")
         }
 
-        if (!file.exists() || !file.isFile || !file.canRead()) {
-            val message = "File is unavailable: ${file.name}"
+        if (file != null && (!file.exists() || !file.isFile || !file.canRead())) {
+            val message = "File is unavailable: $displayName"
             onLog("❌ ERROR: $message")
             return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
         }
-        if (file.length() <= 0L) {
-            val message = "File is empty: ${file.name}"
+        val sizeRejection = FastbootDownloadSizePolicy.validate(
+            imageSize,
+            effectiveMaxDownloadSizeBytes()
+        )
+        if (sizeRejection != null) {
+            val message = when (sizeRejection.reason) {
+                FastbootDownloadSizePolicy.Reason.EMPTY ->
+                    "File is empty: $displayName"
+                FastbootDownloadSizePolicy.Reason.WIRE_LIMIT ->
+                    "Fastboot download:%08x cannot encode this image size: $imageSize bytes"
+                FastbootDownloadSizePolicy.Reason.DEVICE_LIMIT ->
+                    "Image size $imageSize exceeds device max-download-size ${sizeRejection.maxBytes}"
+            }
             onLog("❌ ERROR: $message")
-            return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
-        }
-        if (file.length() > 0xFFFF_FFFFL) {
-            val message = "Fastboot download supports sizes up to 4 GiB in this implementation"
-            onLog("❌ ERROR: $message")
-            return@withLock FlashResult.fail(FlashStage.VALIDATION, FlashFailureKind.VALIDATION, message)
+            return@withLock FlashResult.fail(
+                FlashStage.VALIDATION,
+                FlashFailureKind.VALIDATION,
+                message
+            )
         }
 
-        val fileSizeMb = file.length().toDouble() / 1024.0 / 1024.0
-        onLog("Flashing $normalizedPartition. File: ${file.name} (${"%.2f".format(fileSizeMb)} MB)")
+        val fileSizeMb = imageSize.toDouble() / 1024.0 / 1024.0
+        onLog("Flashing $normalizedPartition. File: ${displayName} (${"%.2f".format(fileSizeMb)} MB)")
 
-        val hexSize = String.format("%08x", file.length())
+        val hexSize = String.format("%08x", imageSize)
         if (!writeCommand("download:$hexSize", 5000)) {
             return@withLock flashTransportFailure(FlashStage.SEND_DOWNLOAD, "Failed to send download command")
         }
@@ -928,7 +1019,16 @@ class FastbootProtocol(
         val downloadPacket = readUntilDataOrFinal(10000)
             ?: return@withLock flashTransportFailure(FlashStage.WAIT_DATA, "No valid response to download")
         when (downloadPacket.type) {
-            "DATA" -> onLog("Bootloader is ready to receive the image: ${downloadPacket.payload}")
+            "DATA" -> {
+                if (!verifyDownloadDataReply(downloadPacket.payload, imageSize)) {
+                    return@withLock FlashResult.fail(
+                        FlashStage.WAIT_DATA, FlashFailureKind.PROTOCOL,
+                        "Fastboot DATA reply did not match the requested payload size",
+                        sessionCorrupted = true
+                    )
+                }
+                onLog("Bootloader is ready to receive the image: ${downloadPacket.payload}")
+            }
             "FAIL" -> {
                 val message = downloadPacket.payload.ifBlank { downloadPacket.raw }
                 logFastbootFailure("Bootloader rejected download", message)
@@ -941,7 +1041,13 @@ class FastbootProtocol(
             }
         }
 
-        val transfer = transferDownloadPayload(file, "flash:$normalizedPartition")
+        val transfer = if (file != null) {
+            transferDownloadPayload(file, "flash:$normalizedPartition")
+        } else {
+            transferDownloadPayloadNativeUsbfs(
+                null, "flash:$normalizedPartition", imageSize, sourceFd ?: -1
+            )
+        }
         if (!transfer.success) {
             val kind = if (transfer.cancelled) FlashFailureKind.CANCELLED else FlashFailureKind.TRANSPORT
             return@withLock FlashResult.fail(
@@ -956,7 +1062,7 @@ class FastbootProtocol(
         sessionState = SessionState.AWAITING_DATA_FINAL
         val downloadDone = readUntilFinalWithRetry(singleReadTimeoutMs = 2000, maxTotalTimeMs = 30_000)
             ?: return@withLock flashTransportFailure(FlashStage.WAIT_DOWNLOAD_FINAL, "No final response after DATA")
-                .copy(dataBytesTransferred = file.length())
+                .copy(dataBytesTransferred = imageSize)
         if (downloadDone.type != "OKAY") {
             val message = downloadDone.payload.ifBlank { downloadDone.raw }
             logFastbootFailure("Device rejected the image after transfer", message)
@@ -964,24 +1070,24 @@ class FastbootProtocol(
                 FlashStage.WAIT_DOWNLOAD_FINAL,
                 FlashFailureKind.PROTOCOL,
                 message,
-                dataBytesTransferred = file.length()
+                dataBytesTransferred = imageSize
             )
         }
 
         onLog("Writing image to partition $normalizedPartition (this may take several minutes)...")
         if (!writeCommand("flash:$normalizedPartition", 5000)) {
             return@withLock flashTransportFailure(FlashStage.SEND_FLASH, "Failed to send flash command")
-                .copy(dataBytesTransferred = file.length())
+                .copy(dataBytesTransferred = imageSize)
         }
         sessionState = SessionState.AWAITING_COMMAND_FINAL
 
         val flashDone = readUntilFinalWithRetry(singleReadTimeoutMs = 2000, maxTotalTimeMs = 600_000)
             ?: return@withLock flashTransportFailure(FlashStage.WAIT_FLASH_FINAL, "No final flash response")
-                .copy(dataBytesTransferred = file.length())
+                .copy(dataBytesTransferred = imageSize)
 
         if (flashDone.type == "OKAY") {
             onLog("✅ Flashing $normalizedPartition completed successfully!")
-            FlashResult.ok(dataBytesTransferred = file.length())
+            FlashResult.ok(dataBytesTransferred = imageSize)
         } else {
             val message = flashDone.payload.ifBlank { flashDone.raw }
             logFastbootFailure("Partition write ERROR $normalizedPartition", message)
@@ -989,7 +1095,7 @@ class FastbootProtocol(
                 FlashStage.WAIT_FLASH_FINAL,
                 FlashFailureKind.PROTOCOL,
                 message,
-                dataBytesTransferred = file.length()
+                dataBytesTransferred = imageSize
             )
         }
     }
@@ -1049,9 +1155,10 @@ class FastbootProtocol(
             onLog("❌ ERROR: could not create folder: ${parent.absolutePath}")
             return false
         }
-        val partFile = File(outputFile.parentFile ?: File("."), outputFile.name + ".part")
-        if (partFile.exists() && !partFile.delete()) {
-            onLog("❌ ERROR: could not delete temporary file: ${partFile.absolutePath}")
+        val partFile = try {
+            FilePublication.temporarySibling(outputFile)
+        } catch (error: Exception) {
+            onLog("❌ ERROR: cannot create temporary fetch file: ${error.message}")
             return false
         }
 
@@ -1067,9 +1174,9 @@ class FastbootProtocol(
                 if (partitionSize != null && partitionSize > 0L && maxFetch != null) {
                     var offset = 0L
                     while (offset < partitionSize && !cancelled) {
-                        val chunkSize = minOf(maxFetch, partitionSize - offset)
+                        val chunkSize = minOf(maxFetch, partitionSize - offset, FastbootDownloadSizePolicy.WIRE_MAX_BYTES)
                         val command = "fetch:$normalized:$offset:$chunkSize"
-                        val fetched = fetchChunk(command, out, offset, partitionSize) ?: return false
+                        val fetched = fetchChunk(command, out, offset, partitionSize, chunkSize) ?: return false
                         if (fetched <= 0L) {
                             onLog("❌ ERROR fetch: device returned a zero-length chunk")
                             return false
@@ -1078,21 +1185,20 @@ class FastbootProtocol(
                     }
                 } else {
                     val command = "fetch:$normalized"
-                    val fetched = fetchChunk(command, out, 0L, partitionSize ?: -1L)
+                    val fetched = fetchChunk(command, out, 0L, partitionSize ?: -1L, partitionSize?.takeIf { it > 0L })
                     if (fetched == null) return false
                 }
+                out.fd.sync()
             }
             if (cancelled) {
                 onLog("⚠️ fetch cancelled by user")
                 false
             } else {
-                if (outputFile.exists() && !outputFile.delete()) {
-                    onLog("❌ ERROR: could not replace file: ${outputFile.absolutePath}")
-                    false
-                } else if (!partFile.renameTo(outputFile)) {
-                    onLog("❌ ERROR: could not rename .part to the final file")
+                if (partitionSize != null && partitionSize > 0L && partFile.length() != partitionSize) {
+                    onLog("❌ ERROR fetch: size mismatch (${partFile.length()}/$partitionSize bytes)")
                     false
                 } else {
+                    FilePublication.replace(partFile, outputFile)
                     onLog("✅ Fastboot fetch completed: ${outputFile.absolutePath} (${outputFile.length()} bytes)")
                     true
                 }
@@ -1101,6 +1207,12 @@ class FastbootProtocol(
             onLog("❌ ERROR fastboot fetch: ${e.message ?: e.javaClass.simpleName}")
             false
         } finally {
+            if (sessionState != SessionState.IDLE && sessionState != SessionState.CLOSED && sessionState != SessionState.BROKEN) {
+                markSessionBroken("Incomplete Fastboot fetch; reconnect before another command")
+            }
+            if (partFile.exists() && partFile.length() > 0L) {
+                onLog("ℹ️ Incomplete fetch retained: ${partFile.absolutePath}")
+            }
             if (partFile.exists() && partFile.length() == 0L) partFile.delete()
         }
     }
@@ -1126,12 +1238,20 @@ class FastbootProtocol(
             onLog("❌ ERROR: file is unavailable: ${file.name}")
             return false
         }
-        if (file.length() <= 0L) {
-            onLog("❌ ERROR: file is empty: ${file.name}")
-            return false
-        }
-        if (file.length() > 0xFFFF_FFFFL) {
-            onLog("❌ ERROR: Fastboot download supports sizes up to 4 GiB in this implementation")
+        val sizeRejection = FastbootDownloadSizePolicy.validate(
+            file.length(),
+            effectiveMaxDownloadSizeBytes()
+        )
+        if (sizeRejection != null) {
+            val message = when (sizeRejection.reason) {
+                FastbootDownloadSizePolicy.Reason.EMPTY ->
+                    "file is empty: ${file.name}"
+                FastbootDownloadSizePolicy.Reason.WIRE_LIMIT ->
+                    "download:%08x cannot encode ${file.length()} bytes"
+                FastbootDownloadSizePolicy.Reason.DEVICE_LIMIT ->
+                    "file size ${file.length()} exceeds device max-download-size ${sizeRejection.maxBytes}"
+            }
+            onLog("❌ ERROR: $message")
             return false
         }
 
@@ -1146,7 +1266,10 @@ class FastbootProtocol(
 
         val downloadPacket = readUntilDataOrFinal(10000) ?: return false
         when (downloadPacket.type) {
-            "DATA" -> onLog("Bootloader is ready to receive the file: ${downloadPacket.payload}")
+            "DATA" -> {
+                if (!verifyDownloadDataReply(downloadPacket.payload, file.length())) return false
+                onLog("Bootloader is ready to receive the file: ${downloadPacket.payload}")
+            }
             "FAIL" -> { logFastbootFailure("Bootloader rejected download", downloadPacket.payload); return false }
             else   -> { onLog("ERROR: expected DATA, got ${downloadPacket.raw}"); return false }
         }
@@ -1159,7 +1282,13 @@ class FastbootProtocol(
             return false
         }
 
-        val downloadDone = readUntilFinal(30000) ?: return false
+        // The device can send INFO fragments before the final OKAY/FAIL.
+        // Keep the same 30-second overall budget as the flash path, but
+        // poll in cancellable slices rather than one long USB read.
+        val downloadDone = readUntilFinalWithRetry(
+            singleReadTimeoutMs = FastbootPostDownloadWaitPolicy.READ_SLICE_MS,
+            maxTotalTimeMs = FastbootPostDownloadWaitPolicy.FINAL_TIMEOUT_MS
+        ) ?: return false
         if (downloadDone.type != "OKAY") {
             logFastbootFailure("Device rejected the file after transfer", downloadDone.payload.ifBlank { downloadDone.raw })
             return false
@@ -1199,15 +1328,27 @@ class FastbootProtocol(
             return false
         }
 
-        onLog("🔓 Staging unlock data (${encryptDataFile.length()} bytes)...")
-        val hexSize = String.format("%08x", encryptDataFile.length())
+        val unlockBytes = encryptDataFile.length()
+        val sizeRejection = FastbootDownloadSizePolicy.validate(
+            unlockBytes, effectiveMaxDownloadSizeBytes()
+        )
+        if (sizeRejection != null) {
+            onLog("❌ ERROR: unlock data size rejected before Fastboot download: ${sizeRejection.reason} (${unlockBytes} bytes)")
+            return false
+        }
+
+        onLog("🔓 Staging unlock data ($unlockBytes bytes)...")
+        val hexSize = String.format("%08x", unlockBytes)
         if (!writeCommand("download:$hexSize", 5000)) {
             onLog("❌ ERROR: download command failed for unlock")
             return false
         }
         val downloadPacket = readUntilDataOrFinal(10000) ?: return false
         when (downloadPacket.type) {
-            "DATA" -> onLog("Bootloader is ready to receive unlock data")
+            "DATA" -> {
+                if (!verifyDownloadDataReply(downloadPacket.payload, unlockBytes)) return false
+                onLog("Bootloader is ready to receive unlock data")
+            }
             "FAIL" -> { logFastbootFailure("Bootloader rejected download", downloadPacket.payload); return false }
             else   -> { onLog("❌ ERROR: expected DATA, got ${downloadPacket.raw}"); return false }
         }
@@ -1420,7 +1561,9 @@ class FastbootProtocol(
      * Production DATA transfer through Linux usbfs URB ioctls using the raw
      * UsbDeviceConnection file descriptor and a bounded two-URB pipeline.
      */
-    private fun transferDownloadPayloadNativeUsbfs(file: File, label: String, totalBytes: Long): TransferResult {
+    private fun transferDownloadPayloadNativeUsbfs(
+        file: File?, label: String, totalBytes: Long, sourceFd: Int = -1
+    ): TransferResult {
         val conn = connection
         val out = endpointOut
         val preflight = NativeUsbfsBackend.preflightError(conn, out)
@@ -1446,7 +1589,7 @@ class FastbootProtocol(
             "Transfer $label: ${formatBytes(totalBytes)}. " +
                 "transport=${profileLabel}, depth=$pipelineDepth, block=${formatBytes(blockBytes.toLong())}, " +
                 "stall-timeout=${formatDuration(NATIVE_USBFS_URB_TIMEOUT_MS.toLong())}, " +
-                "hard-timeout=${formatDuration(NATIVE_USBFS_HARD_TIMEOUT_MS.toLong())}."
+                "hard-timeout=disabled (progress-based stall detection)."
         )
         onLogVerbose(
             "[fastboot-data] mode=NativeUsbfs endpoint=${endpointDescriptor(activeOut)} " +
@@ -1465,6 +1608,8 @@ class FastbootProtocol(
             connection = activeConnection,
             outEndpoint = activeOut,
             payloadFile = file,
+            payloadFd = sourceFd,
+            payloadSizeBytes = totalBytes,
             blockBytes = blockBytes,
             pipelineDepth = pipelineDepth,
             stallTimeoutMs = NATIVE_USBFS_URB_TIMEOUT_MS,
@@ -2293,7 +2438,7 @@ class FastbootProtocol(
     }
 
     private fun normalizePartitionName(partition: String): String? {
-        val normalized = partition.trim().lowercase()
+        val normalized = partition.trim()
         if (normalized.isBlank() || !normalized.matches(Regex("[A-Za-z0-9._:-]+"))) {
             onLog("❌ ERROR: invalid partition name: $partition")
             return null
@@ -2309,7 +2454,7 @@ class FastbootProtocol(
             clean.startsWith("update-super:")
     }
 
-    private fun fetchChunk(command: String, out: java.io.OutputStream, alreadyFetched: Long, totalSize: Long): Long? {
+    private fun fetchChunk(command: String, out: java.io.OutputStream, alreadyFetched: Long, totalSize: Long, expectedChunkBytes: Long?): Long? {
         if (!writeCommand(command, 5000)) {
             onLog("ERROR: Failed to send command $command")
             return null
@@ -2320,9 +2465,9 @@ class FastbootProtocol(
             "FAIL" -> { onLog("❌ ERROR fetch: ${dataPacket.payload}"); return null }
             else -> { onLog("❌ ERROR fetch: expected DATA, got ${dataPacket.raw}"); return null }
         }
-        val dataSize = parseFastbootDataSize(dataPacket.payload)
-        if (dataSize == null || dataSize < 0L) {
-            onLog("❌ ERROR fetch: invalid DATA size: ${dataPacket.payload}")
+        val dataSize = FastbootFetchPolicy.dataSize(dataPacket.payload, expectedChunkBytes)
+        if (dataSize == null) {
+            markSessionBroken("Invalid fetch DATA size '${dataPacket.payload}', expected=$expectedChunkBytes")
             return null
         }
         if (!readRawDataTo(out, dataSize, alreadyFetched, totalSize)) return null
@@ -2376,6 +2521,15 @@ class FastbootProtocol(
         return try { token.toLong(16) } catch (_: NumberFormatException) { parseFastbootSize(token) }
     }
 
+    /** Host plans must use the same cached value and numeric convention as the DATA preflight. */
+    internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock { effectiveMaxDownloadSizeBytes() }
+
+    private fun effectiveMaxDownloadSizeBytes(): Long? {
+        cachedDiagnostics?.maxDownloadSizeBytes?.takeIf { it > 0L }?.let { return it }
+        if (sessionState != SessionState.IDLE) return null
+        return parseFastbootSize(getVar("max-download-size"))?.takeIf { it > 0L }
+    }
+
     private fun parseFastbootSize(raw: String?): Long? {
         if (raw.isNullOrBlank()) return null
         val token = Regex("0x[0-9A-Fa-f]+|[0-9]+").find(raw)?.value ?: return null
@@ -2408,7 +2562,8 @@ class FastbootProtocol(
         private const val NATIVE_USBFS_PROFILE_LABEL = "Native USBFS pipeline 2×256 KiB"
 
         private const val NATIVE_USBFS_URB_TIMEOUT_MS = 30_000
-        private const val NATIVE_USBFS_HARD_TIMEOUT_MS = 90_000
+        // 0 disables the fixed total deadline; URB completion stalls still time out.
+        private const val NATIVE_USBFS_HARD_TIMEOUT_MS = 0
         // Не whitelist: используется только для мягкого предупреждения в терминальном режиме.
         val TYPICAL_FLASH_PARTITIONS = setOf(
             "boot", "init_boot", "vendor_boot", "recovery", "dtbo", "vbmeta", "vbmeta_system",

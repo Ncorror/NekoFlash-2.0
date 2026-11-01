@@ -7,18 +7,18 @@ import android.hardware.usb.UsbManager
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.SavedStateHandle
 import androidx.core.content.edit
-import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.cancel
@@ -32,6 +32,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Lifecycle-владелец USB-сессии и пользовательских операций NekoFlash.
@@ -40,22 +41,20 @@ import java.util.concurrent.atomic.AtomicLong
  * и публикует прогресс. Mutation-команды передаются напрямую реальному protocol-слою;
  * ViewModel не вводит отдельные host-side разрешения поверх bootloader/ADB.
  */
-class DeviceViewModel(
-    application: Application,
-    private val savedStateHandle: SavedStateHandle
-) : AndroidViewModel(application) {
+class DeviceViewModel(application: Application) : AndroidViewModel(application) {
 
     enum class ConnectionState { NONE, CONNECTING, FASTBOOT, ADB, ERROR }
 
     enum class OperationStepStatus { PENDING, RUNNING, OK, FAILED, SKIPPED, INFO }
 
-    enum class OperationOutcomeKind { SUCCESS, FAILED, CANCELLED, VERIFY_PENDING }
+    enum class OperationOutcomeKind { SUCCESS, FAILED, CANCELLED, VERIFY_PENDING, INTERRUPTED }
 
     sealed class OperationOutcome {
         object Success : OperationOutcome()
         data class Failed(val message: String) : OperationOutcome()
         data class Cancelled(val message: String) : OperationOutcome()
         data class VerifyPending(val message: String) : OperationOutcome()
+        data class Interrupted(val message: String) : OperationOutcome()
     }
 
     private class OperationAbort(val outcome: OperationOutcome) :
@@ -77,11 +76,32 @@ class DeviceViewModel(
         val status: OperationStepStatus = OperationStepStatus.PENDING
     )
 
+    private val recoveryStore = OperationRecoveryStore(File(application.filesDir, "execution-state"))
+    private val checkpointLock = Any()
+    @Volatile private var persistedOperation: PersistedOperation? = null
+    private var lastCheckpointAtMs = 0L
+    @Volatile private var activeServiceOperation: ServiceOwnedOperation? = null
+    @Volatile private var operationProgressSnapshot: OperationProgress? = null
+
     private val _connectionState   = MutableLiveData(ConnectionState.NONE)
     val connectionState: LiveData<ConnectionState> = _connectionState
 
     private val _operationActive   = MutableLiveData(false)
     val operationActive: LiveData<Boolean> = _operationActive
+
+    internal val workspaceImport = WorkspaceImportController(application) { log(it) }
+    internal fun importWorkspaceFile(uri: android.net.Uri, workspace: File): Boolean = synchronized(operationLaunchLock) {
+        if (viewModelCleared.get()) false else workspaceImport.start(uri, workspace)
+    }
+
+    /** Share the launch lock so workspace cleanup cannot race a new USB job. */
+    fun runWorkspaceMaintenanceIfIdle(action: () -> Unit): Boolean = synchronized(operationLaunchLock) {
+        if (workspaceImport.isBusy || operationJob != null || connectionJob?.isCompleted == false ||
+            NativeUsbfsBackend.hasActiveTransfer || NativeUsbfsBackend.backendState().nativeTransferActive
+        ) return@synchronized false
+        action()
+        true
+    }
 
     private val _operationSteps = MutableLiveData<List<OperationStep>>(emptyList())
     val operationSteps: LiveData<List<OperationStep>> = _operationSteps
@@ -101,9 +121,40 @@ class DeviceViewModel(
 
     private val _operationProgress = MutableLiveData<OperationProgress?>(null)
     val operationProgress: LiveData<OperationProgress?> = _operationProgress
+    private data class SparseProgress(val label: String, val before: Long, val bytes: Long, val total: Long)
+    @Volatile private var sparseProgress: SparseProgress? = null
 
     fun postOperationProgress(progress: OperationProgress?) {
+        operationProgressSnapshot = progress
         _operationProgress.postValue(progress)
+        val task = activeServiceOperation
+        if (task == null) {
+            // A later verified Recovery verdict can finalize the persisted pending result.
+            if (progress?.finished == true && progress.outcome != null) synchronized(checkpointLock) {
+                val current = persistedOperation
+                if (current?.phase == PersistedOperationPhase.VERIFY_PENDING && current.title == progress.title) {
+                    val updated = current.copy(detail = progress.detail, percent = progress.percent.coerceIn(-1, 100),
+                        phase = PersistedOperationPhase.valueOf(progress.outcome.name))
+                    persistedOperation = updated
+                    if (updated != current) runCatching { recoveryStore.writeOperation(updated) }
+                        .onFailure { logFileOnly("Recovery verdict checkpoint failed: ${it.message}") }
+                }
+            }
+            return
+        }
+        if (progress == null || !task.tracksProgress) return
+        synchronized(checkpointLock) {
+            val current = persistedOperation ?: return
+            if (current.id != task.id || current.phase != PersistedOperationPhase.RUNNING) return
+            val updated = current.copy(detail = progress.detail, percent = progress.percent.coerceIn(-1, 100))
+            persistedOperation = updated
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastCheckpointAtMs >= 1000L) {
+                lastCheckpointAtMs = now
+                runCatching { recoveryStore.writeOperation(updated) }
+                    .onFailure { logFileOnly("Operation progress checkpoint failed: ${it.message}") }
+            }
+        }
     }
 
     private val _connectionInfo    = MutableLiveData<String?>(null)
@@ -123,12 +174,22 @@ class DeviceViewModel(
 
     private val flashDraftLock = Any()
     private var flashDraftSnapshot: FlashOperationDraft =
-        FlashOperationDraftCodec.decode(savedStateHandle.get<ArrayList<String>>(SAVED_FLASH_QUEUE_DRAFT))
+        runCatching { recoveryStore.readDraft() }.getOrNull() ?: FlashOperationDraft()
     private val _flashOperationDraft = MutableLiveData(flashDraftSnapshot)
     val flashOperationDraft: LiveData<FlashOperationDraft> = _flashOperationDraft
 
-    /** Transient execution object. It is never placed in SavedStateHandle. */
-    data class FlashQueueItem(val partition: String, val file: File)
+    private val quickSourceLock = Any()
+    private var quickSourceGeneration = 0L
+    @Volatile private var quickSourceSnapshot = QuickFlashSourceState()
+    private val _quickFlashSource = MutableLiveData(quickSourceSnapshot)
+    internal val quickFlashSource: LiveData<QuickFlashSourceState> = _quickFlashSource
+    private var queueSourceGeneration = 0L
+    private val pendingQueueSources = mutableMapOf<String, Long>()
+    private val _queueSourceState = MutableLiveData(QueueSourceState())
+    internal val queueSourceState: LiveData<QueueSourceState> = _queueSourceState
+
+    /** Transient execution object. Only the lightweight draft is persisted. */
+    internal data class FlashQueueItem(val partition: String, val selection: FirmwareSelection)
 
     private data class PendingUnlockVerification(
         val product: String,
@@ -139,11 +200,23 @@ class DeviceViewModel(
     )
 
     private data class PendingSideloadVerification(
+        val attemptId: String,
         val packageName: String,
         val packageSize: Long,
-        val device: String?,
+        val serial: String?,
+        val createdAtMs: Long,
+        val boundary: RecoveryLogBoundary?,
+        val transferFinished: Boolean
+    )
+
+    private data class PreparedRecoveryLog(
+        val serial: String,
+        val boundary: RecoveryLogBoundary,
         val createdAtMs: Long
     )
+
+    @Volatile private var preparedRecoveryLog: PreparedRecoveryLog? = null
+    @Volatile private var sideloadGuiAttemptId: String? = null
 
     private fun text(resId: Int, vararg args: Any): String =
         getApplication<Application>().getString(resId, *args)
@@ -155,8 +228,56 @@ class DeviceViewModel(
         text(R.string.security_full_terminal_active)
     )
 
+    private var compactPublishScheduled = false
+    private val publishCompact = Runnable {
+        synchronized(logLock) {
+            compactPublishScheduled = false
+            _logLines.value = lines.toList()
+        }
+    }
+    private fun scheduleCompactPublishLocked() {
+        if (!compactPublishScheduled) {
+            compactPublishScheduled = true
+            mainHandler.postDelayed(publishCompact, CompactLogRenderPolicy.RENDER_DEBOUNCE_MS)
+        }
+    }
     private val _logLines = MutableLiveData(initialLines)
     val logLines: LiveData<List<String>> = _logLines
+
+    private val transcript = TerminalTranscript().apply { append(initialLines.first()) }
+    private val _terminalLines = MutableLiveData(transcript.snapshot())
+    internal val terminalLines: LiveData<List<String>> = _terminalLines
+    private val terminalSubmission = ThreadLocal<Boolean>()
+    @Volatile private var terminalOperationId: String? = null
+    internal val isTerminalOperation: Boolean get() = terminalOperationId != null
+    private var terminalPublishScheduled = false
+    private val publishTerminal = Runnable {
+        synchronized(logLock) {
+            terminalPublishScheduled = false
+            _terminalLines.value = transcript.snapshot()
+        }
+    }
+
+    internal fun <T> withTerminalCommand(action: () -> T): T {
+        val previous = terminalSubmission.get()
+        terminalSubmission.set(true)
+        return try { action() } finally { terminalSubmission.set(previous) }
+    }
+
+    private fun appendTerminalLocked(message: String) {
+        transcript.append(message)
+        if (!terminalPublishScheduled) {
+            terminalPublishScheduled = true
+            mainHandler.postDelayed(publishTerminal, CompactLogRenderPolicy.RENDER_DEBOUNCE_MS)
+        }
+    }
+    internal fun terminalSnapshot(): List<String> = synchronized(logLock) { transcript.snapshot() }
+    internal fun clearTerminal() {
+        synchronized(logLock) {
+            transcript.clear()
+            appendTerminalLocked(text(R.string.log_cleared))
+        }
+    }
 
     private val lines    = initialLines.toMutableList()
     private val logLock  = Any()
@@ -165,6 +286,7 @@ class DeviceViewModel(
     private var logFile: File? = null
     private var traceLogFile: File? = null
     private var logStore: DiagnosticLogStore? = null
+    private var logStorageFailureNotified = false
     private var sessionSummaryFile: File? = null
     private var logFileConfigured = false
     private var configuredWorkspacePath: String? = null
@@ -214,6 +336,35 @@ class DeviceViewModel(
 
     init {
         DiagnosticCrashMarker.install(File(application.filesDir, "diagnostics"), BuildConfig.BUILD_ID)
+        restoreOperationState()
+        runCatching { recoveryStore.readQuickSource() }
+            .onSuccess { it?.let(::checkQuickFlashSource) }
+            .onFailure { log(text(R.string.rev24_source_save_failed, it.message ?: it.javaClass.simpleName)) }
+    }
+
+    internal fun lastPersistedOperation(id: String): PersistedOperation? = persistedOperation?.takeIf { it.id == id }
+
+    private fun restoreOperationState() {
+        try {
+            val previous = recoveryStore.readOperation() ?: return
+            val recovered = previous.afterProcessRestart().let {
+                if (it.phase == PersistedOperationPhase.INTERRUPTED && previous.phase != PersistedOperationPhase.INTERRUPTED) {
+                    it.copy(detail = text(R.string.rev20_interrupted_detail, previous.detail))
+                } else it
+            }
+            persistedOperation = recovered
+            if (recovered != previous) recoveryStore.writeOperation(recovered)
+            val outcome = OperationOutcomeKind.valueOf(recovered.phase.name)
+            postOperationProgress(OperationProgress(recovered.title, recovered.percent, recovered.detail,
+                finished = true, success = outcome == OperationOutcomeKind.SUCCESS, outcome = outcome))
+            if (outcome == OperationOutcomeKind.INTERRUPTED) log(recovered.detail)
+        } catch (error: Exception) {
+            val message = text(R.string.rev20_state_unreadable)
+            log(message)
+            logFileOnly("Operation recovery: ${error.message}")
+            postOperationProgress(OperationProgress(text(R.string.rev20_operation_interrupted), -1, message,
+                finished = true, outcome = OperationOutcomeKind.INTERRUPTED))
+        }
     }
 
     // ─── ЛОГИРОВАНИЕ ─────────────────────────────────────────────────────────
@@ -229,7 +380,7 @@ class DeviceViewModel(
 
         val logsDir = File(workspacePath, "logs")
         if (!logsDir.exists() && !logsDir.mkdirs()) {
-            log("⚠️ Could not create logs folder: ${logsDir.absolutePath}")
+            log("⚠️ " + text(R.string.rev11_log_folder_failed, logsDir.absolutePath))
             return
         }
         val stamp = SimpleDateFormat("yyyy-MM-dd-HH-mm-ss", Locale.US).format(Date())
@@ -237,7 +388,7 @@ class DeviceViewModel(
         val store = try {
             DiagnosticLogStore(logsDir, stamp)
         } catch (e: Exception) {
-            log("⚠️ Could not initialize bounded log store: ${e.message ?: e.javaClass.simpleName}")
+            log("⚠️ " + text(R.string.rev11_log_store_failed, e.message ?: e.javaClass.simpleName))
             return
         }
         logStore = store
@@ -259,7 +410,7 @@ class DeviceViewModel(
         traceLogFile = store.currentTraceFile()
         persistSessionSummary()
         log("Log file: /sdcard/Download/NekoFlash/logs/${createdLog?.name ?: "log-$stamp.txt"}")
-        log("ℹ️ Raw USB/Fastboot trace is separated from the main log and rotates automatically.")
+        log("ℹ️ " + text(R.string.rev11_log_trace_location_info))
     }
 
     fun log(message: String) {
@@ -270,8 +421,10 @@ class DeviceViewModel(
         logInternal(message, declaredLevel = level)
     }
 
-    private fun logInternal(message: String, declaredLevel: DiagnosticLogPolicy.Level?) {
+    private fun logInternal(message: String, declaredLevel: DiagnosticLogPolicy.Level?, protocol: Boolean = false) {
         synchronized(logLock) {
+            TerminalTranscript.select(message, declaredLevel, terminalSubmission.get() == true,
+                protocol, isTerminalOperation)?.let(::appendTerminalLocked)
             val now = System.currentTimeMillis()
             val duplicate = message == lastCompactMessage &&
                 declaredLevel == lastCompactDeclaredLevel &&
@@ -321,7 +474,7 @@ class DeviceViewModel(
     ) {
         lines.add(message)
         while (lines.size > 600) lines.removeAt(0)
-        _logLines.postValue(lines.toList())
+        scheduleCompactPublishLocked()
         val classification = DiagnosticLogPolicy.classify(message, declaredLevel)
         diagnosticSessionTracker.recordCompact(message, classification)
         appendRawToLogFile(formatLogLine(message))
@@ -347,6 +500,7 @@ class DeviceViewModel(
             logFile = logStore?.currentCompactFile() ?: logFile
         } catch (error: Exception) {
             android.util.Log.w("NekoFlash", "Unable to append compact diagnostic log", error)
+            notifyLogStorageFailure(error)
         }
     }
 
@@ -356,7 +510,18 @@ class DeviceViewModel(
             traceLogFile = logStore?.currentTraceFile() ?: traceLogFile
         } catch (error: Exception) {
             android.util.Log.w("NekoFlash", "Unable to append protocol trace", error)
+            notifyLogStorageFailure(error)
         }
+    }
+
+    /** Show a real UI warning once; never claim diagnostic persistence succeeded. */
+    private fun notifyLogStorageFailure(error: Exception) {
+        if (logStorageFailureNotified) return
+        logStorageFailureNotified = true
+        val message = "❌ Diagnostic storage error: ${error.javaClass.simpleName}. Check free space; saved logs may be incomplete."
+        lines.add(message)
+        appendTerminalLocked(message)
+        scheduleCompactPublishLocked()
     }
 
     private fun persistSessionSummary(): File? = try {
@@ -500,15 +665,18 @@ class DeviceViewModel(
             val proto = FastbootProtocol(
                 usbManager = usbManager,
                 device = device,
-                onLog = { msg -> log(msg) },
+                onLog = { msg -> logInternal(msg, declaredLevel = null, protocol = true) },
                 onLogVerbose = { msg -> logFileOnly(msg) },
                 onProgress = { percent, detail ->
-                    val currentProgress = _operationProgress.value
-                    _operationProgress.postValue(
+                    val currentProgress = operationProgressSnapshot
+                    val sparse = sparseProgress
+                    postOperationProgress(
                         OperationProgress(
                             title = currentProgress?.title ?: text(R.string.flash_progress_writing),
-                            percent = percent,
-                            detail = detail
+                            percent = if (sparse != null && percent >= 0)
+                                ((sparse.before.toDouble() + sparse.bytes.toDouble() * percent / 100) * 100 / sparse.total).toInt().coerceIn(0, 100)
+                                else percent,
+                            detail = sparse?.let { "${it.label} · $detail" } ?: detail
                         )
                     )
                 },
@@ -562,10 +730,14 @@ class DeviceViewModel(
                 usbManager = usbManager,
                 device = device,
                 keyDirectory = adbKeyDir,
-                onLog = { msg -> log(msg) },
+                // The exact binary shell streams live beside the public
+                // compact/trace logs, so a tester can include them in a ZIP.
+                // No rotation, sanitization or automatic pruning of raw bytes.
+                rawShellLogsDir = File(workspaceRoot ?: getApplication<Application>().filesDir, "logs"),
+                onLog = { msg -> logInternal(msg, declaredLevel = null, protocol = true) },
                 onProgress = { percent, detail ->
-                    val currentProgress = _operationProgress.value
-                    _operationProgress.postValue(
+                    val currentProgress = operationProgressSnapshot
+                    postOperationProgress(
                         OperationProgress(
                             title = currentProgress?.title ?: text(R.string.flash_progress_writing),
                             percent = percent,
@@ -601,6 +773,15 @@ class DeviceViewModel(
                 _fastbootPartitionInventory.postValue(null)
                 _adbPeerMode.postValue(proto.peerMode)
                 verifyPendingSideloadIfReady(proto)
+                if (proto.peerMode == AdbProtocol.PeerMode.RECOVERY) {
+                    val serial = currentUsbSerial()
+                    val boundary = if (serial != null) proto.captureRecoveryLogBoundary() else null
+                    preparedRecoveryLog = if (serial != null && boundary != null) {
+                        PreparedRecoveryLog(serial, boundary, System.currentTimeMillis())
+                    } else null
+                } else if (proto.peerMode != AdbProtocol.PeerMode.SIDELOAD) {
+                    preparedRecoveryLog = null
+                }
                 _connectionState.postValue(ConnectionState.ADB)
                 diagnosticSessionTracker.recordConnection("ADB", connectedDeviceInfo)
                 persistSessionSummary()
@@ -628,11 +809,12 @@ class DeviceViewModel(
      */
     private suspend fun shutdownCurrentTransportsSafely(reason: String): Boolean {
         val activeOperation = operationJob
+        val serviceOperation = activeServiceOperation
         val nativeStateBefore = NativeUsbfsBackend.backendState()
         // isActive becomes false as soon as a Job enters Cancelling, while its
         // finally block or a blocking JNI call may still be running. Only
         // isCompleted proves that the operation no longer owns the transport.
-        val needsDrain = activeOperation?.isCompleted == false ||
+        val needsDrain = serviceOperation != null || activeOperation?.isCompleted == false ||
             NativeUsbfsBackend.hasActiveTransfer || nativeStateBefore.nativeTransferActive
 
         if (needsDrain) {
@@ -643,6 +825,7 @@ class DeviceViewModel(
 
             val clean = withTimeoutOrNull(TRANSPORT_SHUTDOWN_TIMEOUT_MS) {
                 activeOperation?.join()
+                serviceOperation?.finished?.await()
                 awaitNativeUsbfsIdle()
             } == true
 
@@ -683,7 +866,6 @@ class DeviceViewModel(
         // already had a chance to release these resources. The calls below only
         // clear stale state left by an interrupted non-native operation.
         releaseOperationWakeLock(logRelease = false)
-        FlashOperationService.stop(getApplication())
         _operationActive.postValue(false)
         return true
     }
@@ -730,9 +912,11 @@ class DeviceViewModel(
     }
 
     private fun setOperationSteps(steps: List<OperationStep>) {
-        val safeSteps = steps.take(MAX_OPERATION_STEPS_IN_UI)
-        synchronized(operationStepLock) { operationStepSnapshot = safeSteps }
-        _operationSteps.postValue(safeSteps)
+        // Preserve the complete operation; the RecyclerView controls how many rows
+        // are rendered at once. Truncating the model silently loses real steps.
+        val completeSteps = steps.toList()
+        synchronized(operationStepLock) { operationStepSnapshot = completeSteps }
+        _operationSteps.postValue(completeSteps)
     }
 
     private fun markOperationStep(index: Int, status: OperationStepStatus, subtitle: String? = null) {
@@ -851,9 +1035,9 @@ class DeviceViewModel(
                             "topology=$topology, incomplete=$incomplete, " +
                             "point-queries=${inventory.pointQueryCount}, status=${inventory.finalStatus}"
                     )
+                    // All non-informational warnings must be retained in diagnostics.
                     inventory.warnings
                         .filter { it.severity != FastbootPartitionInventory.WarningSeverity.INFO }
-                        .take(4)
                         .forEach { warning -> log("⚠️ Inventory ${warning.code}: ${warning.message}") }
                 } else {
                     _fastbootPartitionInventory.postValue(null)
@@ -1006,25 +1190,93 @@ class DeviceViewModel(
         mainHandler.post(block)
     }
 
-    fun runFastbootCommand(cmd: String, heavy: Boolean = true) {
+    fun runFastbootCommand(cmd: String, heavy: Boolean = true, expectedSerial: String? = null) {
         startOperation(
             text(R.string.notif_fastboot_command),
             text(R.string.notif_executing, cmd),
-            heavy = heavy
+            heavy = heavy,
+            expectedFastbootSerial = expectedSerial
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val ok = if (heavy) proto.sendCommand(cmd) else proto.runTerminalCommand(cmd)
-            if (!ok) failOperation("Fastboot command failed: $cmd")
+            if (!ok) failOperation(text(R.string.rev11_fastboot_command_failed, cmd))
+        }
+    }
+
+    internal fun runFastbootTerminalPlan(steps: List<FastbootExecutionStep>, expectedSerial: String? = null, sparseLimit: Long = 0) {
+        val heavy = steps.any { it !is FastbootExecutionStep.Raw && it !is FastbootExecutionStep.Inspect && it !is FastbootExecutionStep.PartitionCommand }
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.rev21_preparing_plan),
+            heavy = heavy, expectedFastbootSerial = expectedSerial) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
+            val context = kotlinx.coroutines.currentCoroutineContext()
+            val cache = getApplication<Application>().cacheDir
+            val needsImages = steps.any { it is FastbootExecutionStep.Format || it is FastbootExecutionStep.Wipe || it is FastbootExecutionStep.WipeSuper }
+            // Admission is exclusive. Remove private images left by a killed process before creating this job's directory.
+            if (needsImages) cache.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("fastboot-host-[0-9a-f-]{36}")) }
+                ?.forEach { context.ensureActive(); check(it.deleteRecursively()) { "Could not remove interrupted Fastboot images" } }
+            val directory = if (needsImages) File(cache, "fastboot-host-${UUID.randomUUID()}") else cache
+            if (needsImages) check(directory.mkdirs()) { "Could not create private Fastboot image workspace" }
+            try {
+                val port = object : FastbootPlanPort {
+                    override fun getVar(name: String) = proto.getVar(name)
+                    override fun downloadLimitBytes() = proto.hostDownloadLimitBytes()
+                    override fun targets(partition: String, slot: String?) = proto.resolveSlotPartitionTargets(partition, slot)
+                        ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
+                    override fun command(command: String) = proto.runTerminalCommand(command)
+                    override fun flash(partition: String, file: File) {
+                        val result = flashImage(proto, partition, FirmwareSource.WorkspaceFile(file), sparseLimit) { context.ensureActive() }
+                        if (!result.success) failOperation(formatFlashFailure(partition, result))
+                    }
+                    override fun download(file: File, command: String) {
+                        if (!proto.downloadAndRun(file, command)) failOperation(text(R.string.rev11_fastboot_download_failed, command))
+                    }
+                    override fun fetch(partition: String, file: File) {
+                        if (!proto.fetchPartition(partition, file)) failOperation("Fastboot fetch failed: $partition")
+                    }
+                    override fun inspect(partition: String) {
+                        if (proto.inspectLogicalPartition(partition) == null) failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
+                    }
+                }
+                val formatter = FastbootFilesystemFormatter(
+                    BundledFilesystemTools.fromDirectory(File(getApplication<Application>().applicationInfo.nativeLibraryDir)),
+                    nextData = AndroidImageExtents::nextData, log = ::log)
+                FastbootPlanExecutor(port, formatter, directory, { context.ensureActive() }, ::log, sparseLimit) { detail ->
+                    postOperationProgress(OperationProgress(text(R.string.notif_fastboot_command), -1, detail))
+                }.run(steps)
+            } finally {
+                if (needsImages && !directory.deleteRecursively()) log("Could not remove temporary Fastboot images: ${directory.name}")
+            }
         }
     }
 
 
-    fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload)) {
+    /** A slot switch is complete only when the bootloader reports it back. */
+    fun setActiveSlotAndVerify(slot: String) {
+        require(slot == "a" || slot == "b") { "Invalid slot" }
+        startOperation(
+            text(R.string.notif_fastboot_command),
+            text(R.string.notif_executing, "set_active:$slot")
+        ) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
+            if (!proto.sendCommand("set_active:$slot")) failOperation(text(R.string.rev11_slot_switch_failed, slot))
+            val actual = proto.getVar("current-slot")?.trim()?.removePrefix("_")
+                ?.lowercase(Locale.US)
+            if (actual != slot) {
+                failOperation(text(R.string.rev11_slot_switch_unverified, slot, actual ?: text(R.string.device_bool_unknown)))
+            }
+            proto.currentDiagnostics()?.let { _fastbootDiagnostics.postValue(it) }
+            log("✅ " + text(R.string.rev11_slot_switch_verified, slot))
+        }
+    }
+
+    fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String, expectedSerial: String? = null) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload), expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.downloadAndRun(file, commandAfterDownload)) {
-                failOperation("Fastboot download+run failed: $commandAfterDownload")
+                failOperation(text(R.string.rev11_fastboot_download_failed, commandAfterDownload))
             }
         }
     }
@@ -1033,21 +1285,21 @@ class DeviceViewModel(
     fun runFastbootLogicalPartitionCommand(command: String) {
         startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, command)) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
-            if (!proto.runLogicalPartitionCommand(command)) failOperation("Fastboot logical command failed: $command")
+            if (!proto.runLogicalPartitionCommand(command)) failOperation(text(R.string.rev11_fastboot_logical_failed, command))
         }
     }
 
-    fun inspectFastbootLogicalPartition(partition: String) {
-        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false) {
+    fun inspectFastbootLogicalPartition(partition: String, expectedSerial: String? = null) {
+        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false, expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (proto.inspectLogicalPartition(partition) == null) {
-                failOperation("Could not get logical partition info: $partition")
+                failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
             }
         }
     }
 
-    fun runFastbootFetch(partition: String, outputFile: File, slot: String? = null) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition")) {
+    fun runFastbootFetch(partition: String, outputFile: File, slot: String? = null, expectedSerial: String? = null) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition"), expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
                 ?: failOperation("Could not apply Fastboot slot for $partition")
@@ -1057,9 +1309,9 @@ class DeviceViewModel(
         }
     }
 
-    fun runFastbootPartitionCommand(wirePrefix: String, partition: String, slot: String? = null) {
+    fun runFastbootPartitionCommand(wirePrefix: String, partition: String, slot: String? = null, expectedSerial: String? = null) {
         val label = "$wirePrefix $partition" + slot?.let { " --slot=$it" }.orEmpty()
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false, expectedFastbootSerial = expectedSerial) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
@@ -1076,7 +1328,7 @@ class DeviceViewModel(
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.runService(service)) failOperation("ADB service failed: $service")
             if (AdbServiceCompletionPolicy.expectsOneWayDisconnect(service)) {
-                _operationProgress.postValue(
+                postOperationProgress(
                     OperationProgress(
                         title = text(R.string.notif_adb_command),
                         percent = 100,
@@ -1110,12 +1362,22 @@ class DeviceViewModel(
 
     fun isInteractiveAdbShellActive(): Boolean = adbProtocol?.hasInteractiveShell == true
 
+    fun sendInteractiveAdbShellBytes(payload: ByteArray): Boolean {
+        val proto = adbProtocol
+        return if (proto?.isConnected == true && proto.hasInteractiveShell) {
+            proto.sendInteractiveShellBytes(payload)
+        } else {
+            log(text(R.string.rev15_shell_not_open))
+            false
+        }
+    }
+
     fun sendInteractiveAdbShellInput(line: String) {
         val proto = adbProtocol
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.sendInteractiveShellInput(line)
         } else {
-            log("❌ Interactive adb shell is not open")
+            log(text(R.string.rev15_shell_not_open))
         }
     }
 
@@ -1124,7 +1386,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.sendInteractiveShellInterrupt()
         } else {
-            log("❌ Interactive adb shell is not open")
+            log(text(R.string.rev15_shell_not_open))
         }
     }
 
@@ -1133,7 +1395,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.sendInteractiveShellEof()
         } else {
-            log("❌ Interactive adb shell is not open")
+            log(text(R.string.rev15_shell_not_open))
         }
     }
 
@@ -1142,7 +1404,7 @@ class DeviceViewModel(
         if (proto?.isConnected == true && proto.hasInteractiveShell) {
             proto.stopInteractiveShell()
         } else {
-            log("ℹ️ Interactive adb shell is already closed")
+            log(text(R.string.rev15_shell_already_closed))
         }
     }
 
@@ -1166,7 +1428,8 @@ class DeviceViewModel(
         startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install ${packageFile.name}")) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
-            if (!proto.installPackage(packageFile, options)) failOperation("APK installation failed")
+            val context = kotlinx.coroutines.currentCoroutineContext()
+            if (!proto.installPackage(packageFile, options) { context.ensureActive() }) failOperation("APK installation failed")
         }
     }
 
@@ -1179,16 +1442,80 @@ class DeviceViewModel(
         }
     }
 
-    fun runFlash(partition: String, file: File, slot: String? = null) {
+    fun runFlash(partition: String, file: File, slot: String? = null, expectedSerial: String? = null) =
+        runFlash(partition, FirmwareSource.WorkspaceFile(file), slot, expectedSerial)
+
+    internal fun runFlash(partition: String, source: FirmwareSource, slot: String? = null,
+        expectedSerial: String? = null, expectedSizeBytes: Long? = null) {
         val label = partition + slot?.let { " --slot=$it" }.orEmpty()
-        startOperation(text(R.string.notif_flash_img), text(R.string.notif_flashing_partition, file.name, label)) {
-            val proto = fastbootProtocol ?: failOperation("No Fastboot connection")
-            if (!proto.isConnected) failOperation("No Fastboot connection")
+        startOperation(
+            text(R.string.notif_flash_img),
+            text(R.string.notif_flashing_partition, source.displayName, label),
+            expectedFastbootSerial = expectedSerial
+        ) {
+            val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
-                ?: failOperation("Could not apply Fastboot slot for $partition")
+                ?: failOperation(text(R.string.rev13_fastboot_slot_error, partition))
+            val context = kotlinx.coroutines.currentCoroutineContext()
             targets.forEach { target ->
-                val result = proto.flashPartitionDetailed(target, file)
-                if (!result.success) failOperation(formatFlashFailure(target, result))
+                val result = flashImage(proto, target, source, expectedSizeBytes = expectedSizeBytes) { context.ensureActive() }
+                if (!result.success) {
+                    if (source is FirmwareSource.SafDocument &&
+                        result.stage == FastbootProtocol.FlashStage.VALIDATION
+                    ) {
+                        logFileOnly("Fastboot SAF preflight: ${result.message}")
+                        failOperation(text(R.string.rev13_direct_saf_failed))
+                    }
+                    failOperation(formatFlashFailure(target, result))
+                }
+            }
+        }
+    }
+
+    /** Every entry point uses this host preparation; each packet retains the original DATA/flash transport. */
+    private fun flashImage(proto: FastbootProtocol, partition: String, source: FirmwareSource,
+        sparseLimit: Long = 0, expectedSizeBytes: Long? = null, checkCancelled: () -> Unit): FastbootProtocol.FlashResult {
+        val app = getApplication<Application>()
+        source.open(app.contentResolver).use { opened ->
+            FirmwareSelection.from(source).copy(expectedSizeBytes = expectedSizeBytes).requireSize(opened.sizeBytes)
+            postOperationProgress(OperationProgress(text(R.string.notif_flash_img), -1, text(R.string.rev23_preparing_image, source.displayName)))
+            val image = FastbootFlashImage.prepare(opened, proto.hostDownloadLimitBytes(), sparseLimit, checkCancelled)
+            checkCancelled()
+            if (!image.needsResparse) return when (source) {
+                is FirmwareSource.WorkspaceFile -> proto.flashPartitionDetailed(partition, source.file)
+                is FirmwareSource.SafDocument -> proto.flashPartitionDetailed(partition, source, app.contentResolver)
+            }
+            // Exclusive service admission makes it safe to remove only our interrupted part directories.
+            app.cacheDir.listFiles()?.filter { it.isDirectory && it.name.matches(Regex("fastboot-sparse-[0-9a-f-]{36}")) }
+                ?.forEach { checkCancelled(); check(it.deleteRecursively()) { "Could not remove interrupted sparse packets" } }
+            val directory = File(app.cacheDir, "fastboot-sparse-${UUID.randomUUID()}")
+            check(directory.mkdirs()) { "Could not create sparse packet workspace" }
+            var sent = 0L
+            var completed = 0L
+            var result = FastbootProtocol.FlashResult.ok()
+            try {
+                require(directory.usableSpace >= image.largestPartBytes) {
+                    "Not enough temporary storage for a sparse packet: need ${image.largestPartBytes} bytes"
+                }
+                log("Resparse ${source.displayName}: ${image.partCount} packets, limit=${image.limitBytes}, expanded=${image.expandedBytes}, download=${image.downloadBytes}")
+                image.forEachPart(directory) { part, index, total ->
+                    checkCancelled()
+                    val label = text(R.string.rev23_image_part, index, total)
+                    sparseProgress = SparseProgress(label, sent, part.length(), image.downloadBytes)
+                    log("$label → flash:$partition (${part.length()} bytes)")
+                    val current = proto.flashPartitionDetailed(partition, part)
+                    sent = Math.addExact(sent, current.dataBytesTransferred)
+                    if (current.success) completed++
+                    result = current.copy(dataBytesTransferred = sent,
+                        message = if (current.success) current.message else "$label: ${current.message}. Completed packets: $completed/$total; no automatic retry.")
+                    current.success
+                }
+                return result
+            } finally {
+                sparseProgress = null
+                if (!directory.deleteRecursively()) log("Could not remove sparse packet workspace: ${directory.name}")
+                if (completed < image.partCount) log("Resparse stopped after $completed/${image.partCount} completed packets. Previous writes were not rolled back.")
             }
         }
     }
@@ -1207,12 +1534,99 @@ class DeviceViewModel(
         flashDraftSnapshot
     }
 
+    internal fun currentQuickFlashSelection(): FirmwareSelection? =
+        quickSourceSnapshot.takeIf { it.ready }?.selection
+
+    internal fun selectQuickFlashSource(source: FirmwareSource) = checkQuickFlashSource(FirmwareSelection.from(source))
+
+    internal fun refreshQuickFlashSource() {
+        if (quickSourceSnapshot.checking || operationJob != null) return
+        quickSourceSnapshot.selection?.let(::checkQuickFlashSource)
+    }
+
+    private fun checkQuickFlashSource(selection: FirmwareSelection) {
+        val generation = synchronized(quickSourceLock) { ++quickSourceGeneration }
+        publishQuickSource(generation, QuickFlashSourceState(selection, checking = true))
+        transportScope.launch {
+            // Persist the user's new choice even when its provider is temporarily unavailable.
+            publishQuickSource(generation, QuickFlashSourceState(selection, checking = true), persist = true)
+            try {
+                val checked = selection.verify(getApplication<Application>().contentResolver) { coroutineContext.ensureActive() }
+                publishQuickSource(generation, QuickFlashSourceState(checked, ready = true), persist = true)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                publishQuickSource(generation, QuickFlashSourceState(selection,
+                    error = text(R.string.rev24_source_unavailable, selection.displayName, error.message ?: error.javaClass.simpleName)))
+            }
+        }
+    }
+
+    private fun publishQuickSource(generation: Long, state: QuickFlashSourceState, persist: Boolean = false) {
+        synchronized(quickSourceLock) {
+            if (generation != quickSourceGeneration || viewModelCleared.get()) return
+            if (persist) runCatching { recoveryStore.writeQuickSource(requireNotNull(state.selection)) }
+                .onFailure { log(text(R.string.rev24_source_save_failed, it.message ?: it.javaClass.simpleName)) }
+            quickSourceSnapshot = state
+            mainHandler.post {
+                synchronized(quickSourceLock) {
+                    if (generation == quickSourceGeneration && !viewModelCleared.get()) _quickFlashSource.value = state
+                }
+            }
+        }
+    }
+
+    /** Read/probe a document off the UI thread; stale picker results cannot replace a later choice. */
+    internal fun addFlashQueueSource(partition: String, source: FirmwareSource) {
+        val target = partition.trim()
+        val generation = synchronized(flashDraftLock) {
+            (++queueSourceGeneration).also { pendingQueueSources[target] = it }
+        }
+        publishQueueSourceState()
+        transportScope.launch {
+            val result = runCatching {
+                FirmwareSelection.from(source).verify(getApplication<Application>().contentResolver) { coroutineContext.ensureActive() }
+                    .queueItem(target)
+            }
+            coroutineContext.ensureActive()
+            mainHandler.post {
+                if (viewModelCleared.get()) return@post
+                val current = synchronized(flashDraftLock) {
+                    if (pendingQueueSources[target] != generation) false
+                    else { pendingQueueSources.remove(target); true }
+                }
+                if (!current) return@post
+                result.onSuccess { addFlashQueueItem(it) }.onFailure {
+                    val message = text(R.string.rev24_queue_add_failed, source.displayName, it.message ?: it.javaClass.simpleName)
+                    publishQueueSourceState(message)
+                    log(message)
+                }
+            }
+        }
+    }
+
+    private fun publishQueueSourceState(error: String? = null) {
+        _queueSourceState.value = QueueSourceState(synchronized(flashDraftLock) { pendingQueueSources.keys.toSet() }, error)
+    }
+
+    private fun invalidatePendingQueueSource(partition: String? = null) {
+        synchronized(flashDraftLock) {
+            if (partition == null) pendingQueueSources.clear() else pendingQueueSources.remove(partition)
+        }
+        publishQueueSourceState()
+    }
+
     fun addFlashQueueFile(partition: String, file: File) {
+        invalidatePendingQueueSource(partition.trim())
         val item = runCatching { FlashOperationDraftPolicy.createItem(partition, file) }
             .getOrElse { error ->
                 log("❌ Could not add file to the queue: ${error.message ?: error.javaClass.simpleName}")
                 return
             }
+        addFlashQueueItem(item)
+    }
+
+    private fun addFlashQueueItem(item: FlashQueueDraftItem) {
+        invalidatePendingQueueSource(item.partition)
         val next = runCatching { FlashOperationDraftPolicy.upsert(currentFlashOperationDraft(), item) }
             .getOrElse { error ->
                 log("❌ Could not update queue: ${error.message ?: error.javaClass.simpleName}")
@@ -1222,7 +1636,19 @@ class DeviceViewModel(
         log(text(R.string.flash_queue_updated_log, item.partition, item.displayName))
     }
 
+    fun moveFlashQueueDraftItem(partition: String, direction: Int) {
+        val next = FlashOperationDraftPolicy.move(currentFlashOperationDraft(), partition, direction)
+        publishFlashOperationDraft(next, persist = true)
+    }
+
+    fun removeFlashQueueDraftItem(partition: String) {
+        invalidatePendingQueueSource(partition)
+        val next = FlashOperationDraftPolicy.remove(currentFlashOperationDraft(), partition)
+        publishFlashOperationDraft(next, persist = true)
+    }
+
     fun clearFlashQueueDraft() {
+        invalidatePendingQueueSource()
         publishFlashOperationDraft(
             FlashOperationDraftPolicy.clear(currentFlashOperationDraft()),
             persist = true
@@ -1231,27 +1657,24 @@ class DeviceViewModel(
     }
 
     fun executeFlashQueueDraft() {
+        if (synchronized(flashDraftLock) { pendingQueueSources.isNotEmpty() }) {
+            log(text(R.string.rev24_queue_checking, synchronized(flashDraftLock) { pendingQueueSources.keys.joinToString() }))
+            return
+        }
         val draft = currentFlashOperationDraft()
         if (draft.items.isEmpty()) {
             log(text(R.string.flash_queue_empty_log))
             return
         }
-        val executionItems = ArrayList<FlashQueueItem>(draft.items.size)
-        for (item in draft.items) {
-            val file = FlashOperationDraftPolicy.resolve(item)
-            if (file == null) {
-                log("❌ ${item.partition} ← ${item.displayName}: file is unavailable")
-                return
-            }
-            executionItems += FlashQueueItem(item.partition, file)
-        }
+        val executionItems = draft.items.map { FlashQueueItem(it.partition, FirmwareSelection.from(it)) }
         runFlashQueue(executionItems)
     }
 
     private fun publishFlashOperationDraft(draft: FlashOperationDraft, persist: Boolean) {
         synchronized(flashDraftLock) { flashDraftSnapshot = draft }
         if (persist) {
-            savedStateHandle[SAVED_FLASH_QUEUE_DRAFT] = FlashOperationDraftCodec.encode(draft)
+            runCatching { recoveryStore.writeDraft(draft) }
+                .onFailure { log(text(R.string.rev20_draft_save_failed, it.message ?: it.javaClass.simpleName)) }
         }
         _flashOperationDraft.value = draft
     }
@@ -1260,19 +1683,16 @@ class DeviceViewModel(
         val queue = items.filter { it.partition.isNotBlank() }
         if (queue.isEmpty()) { log(text(R.string.flash_queue_empty_log)); return }
 
-        val order = listOf("vbmeta", "boot", "init_boot", "vendor_boot", "recovery", "dtbo")
-        val sorted = queue.sortedBy { item ->
-            val idx = order.indexOf(item.partition.lowercase())
-            if (idx < 0) order.size else idx
-        }
+        // Never reorder operator-defined targets. Execution order must be visible order.
+        val ordered = queue
 
-        startOperation(text(R.string.notif_flash_img), "Flash queue: ${sorted.size} item(s) Do not disconnect the cable.") {
-            setOperationSteps(sorted.mapIndexed { index, item ->
+        startOperation(text(R.string.notif_flash_img), "Flash queue: ${ordered.size} item(s) Do not disconnect the cable.") {
+            setOperationSteps(ordered.mapIndexed { index, item ->
                 OperationStep(
                     index = index + 1,
-                    total = sorted.size,
-                    title = "flash ${item.partition} ← ${item.file.name}",
-                    subtitle = formatBytesShort(item.file.length()),
+                    total = ordered.size,
+                    title = "flash ${item.partition} ← ${item.selection.displayName}",
+                    subtitle = formatBytesShort(requireNotNull(item.selection.expectedSizeBytes)),
                     status = OperationStepStatus.PENDING
                 )
             })
@@ -1281,11 +1701,30 @@ class DeviceViewModel(
                 markOperationStep(1, OperationStepStatus.FAILED, text(R.string.error_no_fastboot))
                 failOperation("No Fastboot connection")
             }
-            sorted.forEachIndexed { index, item ->
+            val context = kotlinx.coroutines.currentCoroutineContext()
+            // Probe every source before the first download; persisted URI metadata is not a grant.
+            ordered.forEachIndexed { index, item ->
+                try { item.selection.verify(getApplication<Application>().contentResolver) { context.ensureActive() } }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (error: Exception) {
+                    val reason = text(R.string.rev24_source_unavailable, item.selection.displayName, error.message ?: error.javaClass.simpleName)
+                    markOperationStep(index + 1, OperationStepStatus.FAILED, reason)
+                    failOperation(reason)
+                }
+            }
+            ordered.forEachIndexed { index, item ->
                 val stepNumber = index + 1
                 markOperationStep(stepNumber, OperationStepStatus.RUNNING, "fastboot flash ${item.partition}")
-                log("=== FLASH QUEUE ${stepNumber}/${sorted.size}: ${item.partition} ← ${item.file.name} ===")
-                val result = proto.flashPartitionDetailed(item.partition, item.file)
+                log("=== FLASH QUEUE ${stepNumber}/${ordered.size}: ${item.partition} ← ${item.selection.displayName} ===")
+                val result = try {
+                    flashImage(proto, item.partition, item.selection.source(), expectedSizeBytes = item.selection.expectedSizeBytes) { context.ensureActive() }
+                } catch (cancelled: CancellationException) {
+                    markOperationStep(stepNumber, OperationStepStatus.SKIPPED, text(R.string.operation_cancelled))
+                    throw cancelled
+                } catch (error: Exception) {
+                    markOperationStep(stepNumber, OperationStepStatus.FAILED, error.message ?: error.javaClass.simpleName)
+                    throw error
+                }
                 val diagnostics = proto.currentDiagnostics()
                 if (diagnostics != null) _fastbootDiagnostics.postValue(diagnostics)
                 markOperationStep(
@@ -1364,37 +1803,74 @@ class DeviceViewModel(
         unlockVerificationPrefs().edit { clear() }
     }
 
+    private fun currentUsbSerial(): String? =
+        runCatching { connectedUsbTarget?.device?.serialNumber }.getOrNull()?.takeIf { it.isNotBlank() }
+
     private fun sideloadVerificationPrefs() =
         getApplication<Application>().getSharedPreferences(SIDELOAD_VERIFY_PREFS, Context.MODE_PRIVATE)
 
-    private fun persistPendingSideloadVerification(file: File, proto: AdbProtocol) {
-        val device = adbBannerProperty(proto.currentDiagnostics().remoteBanner, "ro.product.device")
+    private fun persistPendingSideloadVerification(source: FirmwareSource): PendingSideloadVerification {
+        val serial = currentUsbSerial()
+        val now = System.currentTimeMillis()
+        val prepared = preparedRecoveryLog
+        preparedRecoveryLog = null // A boundary belongs to one accepted attempt only.
+        val boundary = prepared?.takeIf {
+            it.serial == serial && now - it.createdAtMs in 0L..SIDELOAD_VERIFY_TIMEOUT_MS
+        }?.boundary
+        val attempt = PendingSideloadVerification(
+            UUID.randomUUID().toString(), source.displayName, source.sizeHint ?: -1L,
+            serial, now, boundary, false
+        )
+        sideloadGuiAttemptId = attempt.attemptId
         @Suppress("UseKtx")
-        val saved = sideloadVerificationPrefs()
-            .edit()
-            .putString(SIDELOAD_VERIFY_PACKAGE, file.name)
-            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, file.length())
-            .putString(SIDELOAD_VERIFY_DEVICE, device)
-            .putLong(SIDELOAD_VERIFY_CREATED_AT, System.currentTimeMillis())
+        val saved = sideloadVerificationPrefs().edit().clear()
+            .putString(SIDELOAD_VERIFY_ATTEMPT_ID, attempt.attemptId)
+            .putString(SIDELOAD_VERIFY_PACKAGE, attempt.packageName)
+            .putLong(SIDELOAD_VERIFY_PACKAGE_SIZE, attempt.packageSize)
+            .putString(SIDELOAD_VERIFY_SERIAL, serial)
+            .putLong(SIDELOAD_VERIFY_CREATED_AT, now)
+            .putString(SIDELOAD_VERIFY_BOOT_ID, boundary?.bootId)
+            .putLong(SIDELOAD_VERIFY_LOG_BYTES, boundary?.byteCount ?: -1L)
+            .putString(SIDELOAD_VERIFY_LOG_HASH, boundary?.sha256)
+            .putBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false)
             .commit()
-        if (!saved) {
-            log("⚠️ Could not save ADB Sideload result marker.")
-        }
+        if (!saved) log("⚠️ Could not save ADB Sideload attempt marker.")
+        return attempt
+    }
+
+    private fun markSideloadTransferFinished(attemptId: String) {
+        val prefs = sideloadVerificationPrefs()
+        if (prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null) != attemptId) return
+        @Suppress("UseKtx")
+        val saved = prefs.edit().putBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, true).commit()
+        if (!saved) log("⚠️ Could not persist Sideload transfer completion.")
     }
 
     private fun readPendingSideloadVerification(): PendingSideloadVerification? {
         val prefs = sideloadVerificationPrefs()
+        // Pre-REV19 markers have no attempt ID or unique device identity and cannot be upgraded into proof.
+        val attemptId = prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null).trimToNull() ?: return null
         val packageName = prefs.getString(SIDELOAD_VERIFY_PACKAGE, null).trimToNull() ?: return null
         return PendingSideloadVerification(
+            attemptId = attemptId,
             packageName = packageName,
             packageSize = prefs.getLong(SIDELOAD_VERIFY_PACKAGE_SIZE, -1L),
-            device = prefs.getString(SIDELOAD_VERIFY_DEVICE, null).trimToNull(),
-            createdAtMs = prefs.getLong(SIDELOAD_VERIFY_CREATED_AT, 0L)
+            serial = prefs.getString(SIDELOAD_VERIFY_SERIAL, null).trimToNull(),
+            createdAtMs = prefs.getLong(SIDELOAD_VERIFY_CREATED_AT, 0L),
+            boundary = RecoveryLogBoundary.parse(
+                prefs.getString(SIDELOAD_VERIFY_BOOT_ID, null),
+                prefs.getLong(SIDELOAD_VERIFY_LOG_BYTES, -1L).toString(),
+                prefs.getString(SIDELOAD_VERIFY_LOG_HASH, null)
+            ),
+            transferFinished = prefs.getBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false)
         )
     }
 
-    private fun clearPendingSideloadVerification() {
-        sideloadVerificationPrefs().edit { clear() }
+    private fun clearPendingSideloadVerification(attemptId: String) {
+        val prefs = sideloadVerificationPrefs()
+        if (prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null) == attemptId) {
+            prefs.edit { clear() }
+        }
     }
 
     private fun adbBannerProperty(banner: String, key: String): String? {
@@ -1406,44 +1882,89 @@ class DeviceViewModel(
             .trimToNull()
     }
 
+    /**
+     * A verified Recovery verdict finalizes the *same* pending Sideload GUI
+     * operation. A recent unrelated operation must never be overwritten.
+     * Unknown Recovery results remain unverified, never labelled SUCCESS.
+     */
+    private fun publishSideloadRecoveryVerdict(
+        attemptId: String,
+        message: String,
+        outcome: OperationOutcomeKind
+    ) {
+        val current = _operationProgress.value
+        val sideloadTitle = text(R.string.notif_adb_sideload)
+        if (sideloadGuiAttemptId != attemptId || _operationActive.value == true || (
+                current != null &&
+                    !(current.title == sideloadTitle &&
+                      current.outcome == OperationOutcomeKind.VERIFY_PENDING)
+            )
+        ) {
+            logFileOnly("Recovery verdict saved in diagnostics; a different operation owns the GUI state.")
+            return
+        }
+        postOperationProgress(
+            OperationProgress(
+                title = sideloadTitle,
+                percent = if (outcome == OperationOutcomeKind.SUCCESS) 100 else -1,
+                detail = message,
+                finished = true,
+                success = outcome == OperationOutcomeKind.SUCCESS,
+                outcome = outcome
+            )
+        )
+        persistSessionSummary()
+    }
+
     private fun verifyPendingSideloadIfReady(proto: AdbProtocol) {
         val pending = readPendingSideloadVerification() ?: return
-        if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY) return
+        if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY || !pending.transferFinished) return
 
         val ageMs = System.currentTimeMillis() - pending.createdAtMs
         if (pending.createdAtMs <= 0L || ageMs < 0L || ageMs > SIDELOAD_VERIFY_TIMEOUT_MS) {
-            clearPendingSideloadVerification()
+            clearPendingSideloadVerification(pending.attemptId)
             log("⚠️ ADB Sideload result wait timed out; check the install result on the Recovery screen.")
             return
         }
 
-        val currentDevice = adbBannerProperty(proto.currentDiagnostics().remoteBanner, "ro.product.device")
-        if (pending.device != null) {
-            if (currentDevice == null) return
-            if (!pending.device.equals(currentDevice, ignoreCase = true)) return
+        if (pending.serial == null || pending.serial != currentUsbSerial()) {
+            log(text(R.string.rev19_sideload_identity_unconfirmed))
+            return
         }
 
         log("=== ADB SIDELOAD RESULT ===")
         log("Package: ${pending.packageName} (${pending.packageSize} bytes)")
-        val verification = proto.inspectRecoveryInstallResult()
+        val verification = proto.inspectRecoveryInstallResult(pending.boundary)
+        if (readPendingSideloadVerification()?.attemptId != pending.attemptId) return
         verification.source?.let { log("Recovery source: $it") }
         verification.evidence?.takeIf { it.isNotBlank() }?.let { log("Recovery evidence: $it") }
 
         when (verification.verdict) {
             RecoveryInstallVerifier.Verdict.SUCCESS -> {
-                clearPendingSideloadVerification()
+                clearPendingSideloadVerification(pending.attemptId)
                 log("✅ Recovery reports successful installation: ${verification.message}")
+                publishSideloadRecoveryVerdict(
+                    pending.attemptId,
+                    "Recovery confirmed installation: ${verification.message}",
+                    OperationOutcomeKind.SUCCESS
+                )
             }
             RecoveryInstallVerifier.Verdict.FAILED -> {
-                clearPendingSideloadVerification()
+                clearPendingSideloadVerification(pending.attemptId)
                 val detail = buildString {
                     append(verification.message)
                     verification.evidence?.takeIf { it.isNotBlank() }?.let { append(" · ").append(it) }
                 }
                 log("❌ Recovery reports an install error: $detail")
+                publishSideloadRecoveryVerdict(
+                    pending.attemptId,
+                    "Recovery installation failed: $detail",
+                    OperationOutcomeKind.FAILED
+                )
             }
             RecoveryInstallVerifier.Verdict.UNKNOWN -> {
-                log("ℹ️ Transfer completed; Recovery did not provide a clear install result.")
+                log(text(R.string.rev19_sideload_attempt_unconfirmed))
+                logFileOnly("Sideload ${pending.attemptId}: ${verification.message}")
             }
         }
     }
@@ -1491,7 +2012,7 @@ class DeviceViewModel(
                 clearPendingUnlockVerification()
                 val message = "${pending.operationLabel} confirmed by device: getvar:unlocked=$expectedText"
                 log("🎉 $message")
-                _operationProgress.postValue(
+                postOperationProgress(
                     OperationProgress(
                         title = pending.operationLabel,
                         percent = 100,
@@ -1508,7 +2029,7 @@ class DeviceViewModel(
                 val actualText = if (actualUnlocked) "yes" else "no"
                 val message = "${pending.operationLabel} not confirmed: device reports getvar:unlocked=$actualText, expected $expectedText"
                 log("❌ $message")
-                _operationProgress.postValue(
+                postOperationProgress(
                     OperationProgress(
                         title = pending.operationLabel,
                         percent = 0,
@@ -1522,37 +2043,46 @@ class DeviceViewModel(
         }
     }
 
-    fun runSideload(file: File) {
-        val proto = adbProtocol
-        if (proto?.isConnected != true) {
-            log(text(R.string.error_no_adb))
-            return
-        }
+    fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))
 
-        clearPendingSideloadVerification()
-        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, file.name)) {
-            when (val result = proto.sideloadZip(file)) {
-                AdbProtocol.SideloadResult.TransferComplete -> {
-                    persistPendingSideloadVerification(file, proto)
-                    verificationPending(
-                        "File transfer completed. Recovery decides whether the package is valid; the install result will be read after returning to Recovery if a log is available."
-                    )
+    internal fun runSideload(source: FirmwareSource) {
+        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, source.displayName)) {
+            val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
+            if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
+            if (proto.peerMode != AdbProtocol.PeerMode.SIDELOAD) {
+                failOperation(text(R.string.rev12_sideload_mode_inactive, proto.peerMode.name))
+            }
+            // Admission comes first: a rejected second click cannot clear an active marker.
+            val attempt = persistPendingSideloadVerification(source)
+            var awaitingVerdict = false
+            try {
+                when (val result = proto.sideloadZip(source, getApplication<Application>().contentResolver)) {
+                    AdbProtocol.SideloadResult.TransferComplete -> {
+                        markSideloadTransferFinished(attempt.attemptId)
+                        awaitingVerdict = true
+                        verificationPending(text(R.string.rev12_sideload_verify_pending))
+                    }
+                    is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
+                        markSideloadTransferFinished(attempt.attemptId)
+                        awaitingVerdict = true
+                        verificationPending(text(R.string.rev12_sideload_disconnect_pending, result.percent))
+                    }
+                    AdbProtocol.SideloadResult.Cancelled -> {
+                        throw OperationAbort(OperationOutcome.Cancelled(text(R.string.rev12_sideload_cancelled)))
+                    }
+                    is AdbProtocol.SideloadResult.NotInSideloadMode -> {
+                        failOperation(text(R.string.rev12_sideload_mode_inactive, result.mode.name))
+                    }
+                    is AdbProtocol.SideloadResult.Failed -> {
+                        if (source is FirmwareSource.SafDocument && result.kind == AdbProtocol.SideloadFailureKind.FILE) {
+                            logFileOnly("SAF direct read: ${result.message}")
+                            failOperation(text(R.string.rev12_sideload_saf_unsupported))
+                        }
+                        failOperation(text(R.string.rev12_sideload_failed, result.kind.name, result.message))
+                    }
                 }
-                is AdbProtocol.SideloadResult.TransferClosedBeforeDoneDone -> {
-                    persistPendingSideloadVerification(file, proto)
-                    verificationPending(
-                        "Recovery closed ADB before DONEDONE after ≈${result.percent}% transfer. This is not treated as a transport error; check the final install result on the Recovery screen or after returning to Recovery."
-                    )
-                }
-                AdbProtocol.SideloadResult.Cancelled -> {
-                    throw OperationAbort(OperationOutcome.Cancelled("ADB Sideload cancelled"))
-                }
-                is AdbProtocol.SideloadResult.NotInSideloadMode -> {
-                    failOperation("ADB Sideload is not active. Current mode: ${result.mode.name}")
-                }
-                is AdbProtocol.SideloadResult.Failed -> {
-                    failOperation("ADB Sideload [${result.kind.name}]: ${result.message}")
-                }
+            } finally {
+                if (!awaitingVerdict) clearPendingSideloadVerification(attempt.attemptId)
             }
         }
     }
@@ -1567,11 +2097,12 @@ class DeviceViewModel(
         text: String,
         heavy: Boolean = true,
         prepareFastbootSession: Boolean = true,
+        expectedFastbootSerial: String? = null,
         block: suspend OperationContext.() -> Unit
     ) {
         synchronized(operationLaunchLock) {
             if (viewModelCleared.get()) {
-                log("⚠️ New operation rejected: DeviceViewModel is already finishing safe USB shutdown.")
+                log("⚠️ New operation rejected: USB session is finishing safe shutdown.")
                 return
             }
             if (transportRestartRequired.get()) {
@@ -1582,93 +2113,146 @@ class DeviceViewModel(
                 log("⚠️ USB connect or disconnect is still in progress. Wait for a stable device status.")
                 return
             }
-            if (operationJob?.isCompleted == false || NativeUsbfsBackend.hasActiveTransfer ||
-                NativeUsbfsBackend.backendState().nativeTransferActive
-            ) {
+            // A completed Job can still be delivering its completion callbacks.
+            // The reference is cleared only after state/resources have been finalized.
+            if (operationJob != null || NativeUsbfsBackend.hasActiveTransfer ||
+                NativeUsbfsBackend.backendState().nativeTransferActive) {
                 log("⚠️ Another USB operation is still active. Wait for it to finish first or perform a safe cancel.")
                 return
             }
-
             val gen = operationGeneration.incrementAndGet()
-
-            if (heavy) {
-                releaseOperationWakeLock(logRelease = false)
-                acquireOperationWakeLock()
-                FlashOperationService.start(getApplication(), title, text)
-                _operationProgress.postValue(OperationProgress(title = title, percent = -1, detail = text))
+            val id = UUID.randomUUID().toString()
+            sideloadGuiAttemptId = null
+            val pending = PersistedOperation(id, title, text, System.currentTimeMillis(), -1, PersistedOperationPhase.PREPARING)
+            val result = AtomicReference<OperationOutcome>(OperationOutcome.Success)
+            val task = ServiceOwnedOperation(
+                id, title, text, heavy,
+                cancelTransport = {
+                    synchronized(operationLaunchLock) {
+                        if (activeServiceOperation?.id == id) {
+                            fastbootProtocol?.cancel()
+                            adbProtocol?.cancel()
+                        }
+                    }
+                },
+                onFinished = { completed, cause ->
+                    finishServiceOperation(completed, gen, result.get(), cause)
+                }
+            ) {
+                val context = OperationContext()
+                try {
+                    // This body can start only after the service acknowledges startForeground.
+                    synchronized(checkpointLock) {
+                        val running = pending.copy(phase = PersistedOperationPhase.RUNNING)
+                        recoveryStore.writeOperation(running)
+                        persistedOperation = running
+                        lastCheckpointAtMs = SystemClock.elapsedRealtime()
+                    }
+                    coroutineContext.ensureActive()
+                    acquireOperationWakeLock()
+                    val fastboot = fastbootProtocol
+                    if (prepareFastbootSession && fastboot?.isConnected == true && !fastboot.beginOperation()) {
+                        context.failOperation("Fastboot session is not ready for a new operation. Reconnect the device.")
+                    }
+                    if (expectedFastbootSerial != null) {
+                        if (fastboot?.isConnected != true) context.failOperation(text(R.string.error_no_fastboot))
+                        val actual = FastbootSerialSelection.actual(currentUsbSerial()) { fastboot.getVar("serialno") }
+                        if (!FastbootSerialSelection.matches(expectedFastbootSerial, actual)) {
+                            context.failOperation(text(R.string.rev19_fastboot_serial_mismatch,
+                                expectedFastbootSerial, actual ?: text(R.string.device_bool_unknown)))
+                        }
+                    }
+                    coroutineContext.ensureActive()
+                    context.block()
+                } catch (abort: OperationAbort) {
+                    result.set(abort.outcome)
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (error: Exception) {
+                    val message = error.message ?: error.javaClass.simpleName
+                    result.set(OperationOutcome.Failed(message))
+                    log(text(R.string.operation_error, message))
+                }
             }
+            terminalOperationId = id.takeIf { terminalSubmission.get() == true }
+            activeServiceOperation = task
+            operationJob = task.job
+            synchronized(checkpointLock) { persistedOperation = pending }
+            if (heavy) postOperationProgress(OperationProgress(title, -1, text))
             _operationActive.postValue(true)
             diagnosticSessionTracker.recordOperationStarted(title)
             persistSessionSummary()
+            try {
+                recoveryStore.writeOperation(pending)
+                FlashOperationService.submit(getApplication(), task)
+            } catch (error: Exception) {
+                task.rejectStartup(text(R.string.rev20_state_save_failed, error.message ?: error.javaClass.simpleName))
+            }
+        }
+    }
 
-            val newJob = viewModelScope.launch(Dispatchers.IO, start = CoroutineStart.LAZY) {
-                val context = OperationContext()
-                var outcome: OperationOutcome = OperationOutcome.Success
-                try {
-                    val fastboot = fastbootProtocol
-                    if (prepareFastbootSession && fastboot?.isConnected == true && !fastboot.beginOperation()) {
-                        throw OperationAbort(
-                            OperationOutcome.Failed(
-                                "Fastboot session is not ready for a new operation. Reconnect the device."
-                            )
-                        )
-                    }
-                    context.block()
-                } catch (abort: OperationAbort) {
-                    outcome = abort.outcome
-                } catch (_: CancellationException) {
-                    outcome = OperationOutcome.Cancelled("Operation cancelled")
-                } catch (e: Exception) {
-                    val message = e.message ?: e.javaClass.simpleName
-                    outcome = OperationOutcome.Failed(message)
-                    log(text(R.string.operation_error, message))
-                } finally {
-                    if (gen == operationGeneration.get()) {
-                        _operationActive.postValue(false)
-                        if (heavy) {
-                            releaseOperationWakeLock(logRelease = true)
-                            FlashOperationService.stop(getApplication())
-
-                            val finishedProgress = _operationProgress.value
-                            val outcomeKind = when (outcome) {
-                                OperationOutcome.Success -> OperationOutcomeKind.SUCCESS
-                                is OperationOutcome.Failed -> OperationOutcomeKind.FAILED
-                                is OperationOutcome.Cancelled -> OperationOutcomeKind.CANCELLED
-                                is OperationOutcome.VerifyPending -> OperationOutcomeKind.VERIFY_PENDING
-                            }
-                            val outcomeDetail = when (outcome) {
-                                OperationOutcome.Success -> finishedProgress?.detail.orEmpty()
-                                is OperationOutcome.Failed -> outcome.message
-                                is OperationOutcome.Cancelled -> outcome.message
-                                is OperationOutcome.VerifyPending -> outcome.message
-                            }
-                            val successful = outcome === OperationOutcome.Success
-                            val previousPercent = finishedProgress?.percent ?: 0
-                            _operationProgress.postValue(
-                                OperationProgress(
-                                    title = finishedProgress?.title ?: title,
-                                    percent = if (successful) 100 else previousPercent.coerceAtLeast(0),
-                                    detail = outcomeDetail,
-                                    finished = true,
-                                    success = successful,
-                                    outcome = outcomeKind
-                                )
-                            )
-                        }
-                        val summaryOutcome = when (outcome) {
-                            OperationOutcome.Success -> "SUCCESS"
-                            is OperationOutcome.Failed -> "FAILED"
-                            is OperationOutcome.Cancelled -> "CANCELLED"
-                            is OperationOutcome.VerifyPending -> "VERIFY_PENDING"
-                        }
-                        diagnosticSessionTracker.recordOperationFinished(title, summaryOutcome)
-                        persistSessionSummary()
-                        operationJob = null
-                    }
+    private fun finishServiceOperation(
+        task: ServiceOwnedOperation,
+        generation: Long,
+        reported: OperationOutcome,
+        cause: Throwable?
+    ) {
+        synchronized(operationLaunchLock) {
+            if (generation != operationGeneration.get()) {
+                FlashOperationService.complete(task.id)
+                return
+            }
+            val outcome = when {
+                task.startupFailure != null -> OperationOutcome.Failed(requireNotNull(task.startupFailure))
+                task.serviceLost -> OperationOutcome.Interrupted(text(R.string.rev20_service_lost))
+                cause is CancellationException -> OperationOutcome.Cancelled(text(R.string.operation_cancelled))
+                cause != null -> OperationOutcome.Failed(cause.message ?: cause.javaClass.simpleName)
+                else -> reported
+            }
+            val kind = when (outcome) {
+                OperationOutcome.Success -> OperationOutcomeKind.SUCCESS
+                is OperationOutcome.Failed -> OperationOutcomeKind.FAILED
+                is OperationOutcome.Cancelled -> OperationOutcomeKind.CANCELLED
+                is OperationOutcome.VerifyPending -> OperationOutcomeKind.VERIFY_PENDING
+                is OperationOutcome.Interrupted -> OperationOutcomeKind.INTERRUPTED
+            }
+            val message = when (outcome) {
+                OperationOutcome.Success -> if (task.tracksProgress) operationProgressSnapshot?.detail.orEmpty() else text(R.string.layout_operation_center_completed)
+                is OperationOutcome.Failed -> outcome.message
+                is OperationOutcome.Cancelled -> outcome.message
+                is OperationOutcome.VerifyPending -> outcome.message
+                is OperationOutcome.Interrupted -> outcome.message
+            }
+            val successful = kind == OperationOutcomeKind.SUCCESS
+            val percent = if (successful) 100 else lastPersistedOperation(task.id)?.percent ?: -1
+            releaseOperationWakeLock(logRelease = true)
+            synchronized(checkpointLock) {
+                val record = persistedOperation?.takeIf { it.id == task.id }
+                if (record != null) {
+                    val finished = record.copy(detail = message, percent = percent, phase = PersistedOperationPhase.valueOf(kind.name))
+                    persistedOperation = finished
+                    runCatching { recoveryStore.writeOperation(finished) }
+                        .onFailure { log(text(R.string.rev20_state_save_failed, it.message ?: it.javaClass.simpleName)) }
                 }
             }
-            operationJob = newJob
-            newJob.start()
+            if (terminalOperationId == task.id) {
+                val terminalResult = when (kind) {
+                    OperationOutcomeKind.SUCCESS -> text(R.string.rev26_terminal_completed)
+                    OperationOutcomeKind.CANCELLED -> text(R.string.operation_cancelled)
+                    OperationOutcomeKind.VERIFY_PENDING -> message
+                    else -> null // Failure is emitted by the journal below.
+                }
+                synchronized(logLock) { terminalResult?.let(::appendTerminalLocked) }
+                terminalOperationId = null
+            }
+            postOperationProgress(OperationProgress(task.title, percent, message, finished = true, success = successful, outcome = kind))
+            if (kind == OperationOutcomeKind.FAILED || kind == OperationOutcomeKind.INTERRUPTED) log("❌ $message")
+            diagnosticSessionTracker.recordOperationFinished(task.title, kind.name)
+            persistSessionSummary()
+            _operationActive.postValue(false)
+            FlashOperationService.complete(task.id)
+            activeServiceOperation = null
+            operationJob = null
         }
     }
 
@@ -1679,7 +2263,7 @@ class DeviceViewModel(
                 .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "NekoFlash:FlashOperation")
                 .apply { setReferenceCounted(false); acquire(WAKE_LOCK_TIMEOUT_MS) }
             operationWakeLock = wl
-            log(text(R.string.wake_lock_acquired))
+            logFileOnly(text(R.string.wake_lock_acquired))
         } catch (e: Exception) {
             operationWakeLock = null
             log(text(R.string.wake_lock_error, e.message ?: e.javaClass.simpleName))
@@ -1691,38 +2275,26 @@ class DeviceViewModel(
         operationWakeLock = null
         try {
             if (wl.isHeld) wl.release()
-            if (logRelease) log(text(R.string.wake_lock_released))
+            if (logRelease) logFileOnly(text(R.string.wake_lock_released))
         } catch (e: Exception) {
             if (logRelease) log(text(R.string.wake_lock_release_error, e.message ?: e.javaClass.simpleName))
         }
     }
 
     fun cancelActiveOperation() {
-        val job = operationJob
-        if (job == null || job.isCompleted) {
-            log(text(R.string.operation_cancelled))
-            return
+        synchronized(operationLaunchLock) {
+            val task = activeServiceOperation
+            if (task == null || task.job.isCompleted) {
+                log(text(R.string.operation_cancelled))
+                return
+            }
+            task.cancel("Operation cancellation requested")
+            if (!task.job.isCompleted) {
+                postOperationProgress(operationProgressSnapshot?.copy(
+                    detail = text(R.string.rev20_cancelling_cleanup)
+                ))
+            }
         }
-
-        // Do not publish a false "cancelled" state yet. Native USBFS is a
-        // blocking JNI call and must first DISCARD + REAP every pending URB.
-        // The operation's finally block releases the WakeLock/FGS only after
-        // the native call has actually returned.
-        // Publish coroutine cancellation first, then wake the blocking USB
-        // transport. This closes the narrow race where native could return
-        // before the Job was marked cancelled.
-        job.cancel(CancellationException("Operation cancellation requested"))
-        fastbootProtocol?.cancel()
-        adbProtocol?.cancel()
-        _operationProgress.postValue(
-            _operationProgress.value?.copy(
-                detail = "Cancellation requested. Finishing pending USB URB and closing the session safely…",
-                finished = false,
-                success = false,
-                outcome = null
-            )
-        )
-        log("⏳ Cancel requested. WakeLock and foreground service will remain active until USB cleanup actually finishes.")
     }
 
     // ─── ОТКЛЮЧЕНИЕ ──────────────────────────────────────────────────────────
@@ -1742,6 +2314,7 @@ class DeviceViewModel(
     }
 
     override fun onCleared() {
+        workspaceImport.close()
         mainHandler.removeCallbacksAndMessages(null)
         flushDiagnostics("VIEWMODEL_CLEARED", terminal = true)
         viewModelCleared.set(true)
@@ -1760,13 +2333,11 @@ class DeviceViewModel(
     }
 
     companion object {
-        private const val SAVED_FLASH_QUEUE_DRAFT = "flash_queue_draft_v1"
         private const val WAKE_LOCK_TIMEOUT_MS = 6L * 60L * 60L * 1000L
         private const val TRANSPORT_SHUTDOWN_TIMEOUT_MS = 100_000L
         private const val TRANSPORT_IDLE_POLL_MS = 10L
         private const val MI_UNLOCK_VERIFY_TIMEOUT_MS = 24L * 60L * 60L * 1000L
         private const val SIDELOAD_VERIFY_TIMEOUT_MS = 60L * 60L * 1000L
-        private const val MAX_OPERATION_STEPS_IN_UI = 240
         private const val MI_UNLOCK_VERIFY_PREFS = "mi_unlock_verify"
         private const val SIDELOAD_VERIFY_PREFS = "sideload_verify"
         private const val MI_UNLOCK_VERIFY_PRODUCT = "product"
@@ -1776,7 +2347,12 @@ class DeviceViewModel(
         private const val MI_UNLOCK_VERIFY_CREATED_AT = "created_at"
         private const val SIDELOAD_VERIFY_PACKAGE = "package_name"
         private const val SIDELOAD_VERIFY_PACKAGE_SIZE = "package_size"
-        private const val SIDELOAD_VERIFY_DEVICE = "device"
+        private const val SIDELOAD_VERIFY_ATTEMPT_ID = "attempt_id"
+        private const val SIDELOAD_VERIFY_SERIAL = "serial"
+        private const val SIDELOAD_VERIFY_BOOT_ID = "boot_id"
+        private const val SIDELOAD_VERIFY_LOG_BYTES = "log_bytes"
+        private const val SIDELOAD_VERIFY_LOG_HASH = "log_hash"
+        private const val SIDELOAD_VERIFY_TRANSFER_FINISHED = "transfer_finished"
         private const val SIDELOAD_VERIFY_CREATED_AT = "created_at"
     }
 }

@@ -4,17 +4,16 @@ import java.io.File
 import java.nio.charset.StandardCharsets
 
 /**
- * Bounded two-stream log storage.
+ * Lossless segmented two-stream log storage.
  *
  * COMPACT contains user-relevant events. TRACE contains raw protocol/timing
- * diagnostics. Each stream rotates independently and keeps its newest tail.
+ * diagnostics. Segments rotate by size, but previous files are never pruned.
  */
 class DiagnosticLogStore(
     private val logsDir: File,
     private val stamp: String,
     private val compactSegmentBytes: Long = 2L * 1024L * 1024L,
-    private val traceSegmentBytes: Long = 8L * 1024L * 1024L,
-    private val maxSegmentsPerStream: Int = 5
+    private val traceSegmentBytes: Long = 8L * 1024L * 1024L
 ) {
     enum class Stream { COMPACT, TRACE }
 
@@ -30,11 +29,10 @@ class DiagnosticLogStore(
     init {
         require(compactSegmentBytes >= 64L * 1024L)
         require(traceSegmentBytes >= 64L * 1024L)
-        require(maxSegmentsPerStream >= 1)
         if (!logsDir.exists() && !logsDir.mkdirs()) {
             throw IllegalStateException("Cannot create logs directory: ${logsDir.absolutePath}")
         }
-        pruneDirectory(logsDir)
+        // Never delete historical logs on startup or on segment rollover.
     }
 
     @Synchronized
@@ -58,15 +56,15 @@ class DiagnosticLogStore(
     @Synchronized
     fun writeSessionSummary(json: String): File {
         val file = File(logsDir, "session-summary-$stamp.json")
-        val temp = File(logsDir, ".${file.name}.tmp")
-        temp.writeText(json, Charsets.UTF_8)
-        if (file.exists() && !file.delete()) {
+        val temp = FilePublication.temporarySibling(file)
+        try {
+            temp.outputStream().use { out ->
+                out.write(json.toByteArray(Charsets.UTF_8))
+                out.fd.sync()
+            }
+            FilePublication.replace(temp, file)
+        } finally {
             temp.delete()
-            throw IllegalStateException("Cannot replace ${file.absolutePath}")
-        }
-        if (!temp.renameTo(file)) {
-            temp.delete()
-            throw IllegalStateException("Cannot publish ${file.absolutePath}")
         }
         return file
     }
@@ -86,46 +84,31 @@ class DiagnosticLogStore(
         val prefix = if (state.stream == Stream.COMPACT) "log" else "trace"
         val suffix = if (part == 1) "" else "-part${part.toString().padStart(2, '0')}"
         val file = File(logsDir, "$prefix-$stamp$suffix.txt")
-        if (file.exists() && !file.delete()) {
-            throw IllegalStateException("Cannot replace log segment: ${file.absolutePath}")
+        if (file.exists()) {
+            throw IllegalStateException("Log segment collision; refusing to overwrite: ${file.absolutePath}")
         }
-        file.createNewFile()
+        if (!file.createNewFile()) {
+            throw IllegalStateException("Cannot create log segment: ${file.absolutePath}")
+        }
         state.files.add(file)
-        while (state.files.size > maxSegmentsPerStream) {
-            val oldest = state.files.removeAt(0)
-            runCatching { oldest.delete() }
-        }
+        // All segments remain on disk until an explicit user action removes them.
         return file
     }
 
     companion object {
-        private const val DEFAULT_MAX_FILES = 30
-        private const val DEFAULT_MAX_TOTAL_BYTES = 64L * 1024L * 1024L
-
-        /** Prunes oldest completed log/trace/summary files before a new session starts. */
+        /**
+         * Kept only as a source-compatible shim. Automatic pruning destroys
+         * diagnostic evidence, so it is intentionally disabled for REV8.
+         */
+        @Deprecated("Log retention must be user-controlled; this operation never deletes files")
         fun pruneDirectory(
             dir: File,
-            maxFiles: Int = DEFAULT_MAX_FILES,
-            maxTotalBytes: Long = DEFAULT_MAX_TOTAL_BYTES
+            maxFiles: Int = 30,
+            maxTotalBytes: Long = 64L * 1024L * 1024L
         ) {
-            if (!dir.exists() || !dir.isDirectory) return
-            val newestFirst = dir.listFiles { file ->
-                file.isFile && (
-                    file.name.startsWith("log-") ||
-                        file.name.startsWith("trace-") ||
-                        file.name.startsWith("session-summary-")
-                    )
-            }?.sortedByDescending { it.lastModified() } ?: return
-
-            val retained = newestFirst.take(maxFiles.coerceAtLeast(0)).toMutableList()
-            newestFirst.drop(retained.size).forEach { old -> runCatching { old.delete() } }
-
-            var total = retained.sumOf { it.length().coerceAtLeast(0L) }
-            retained.sortedBy { it.lastModified() }.forEach { oldest ->
-                if (total <= maxTotalBytes) return@forEach
-                val length = oldest.length().coerceAtLeast(0L)
-                if (runCatching { oldest.delete() }.getOrDefault(false)) total -= length
-            }
+            // No-op: compatibility with external callers; no silent deletion.
+            @Suppress("UNUSED_VARIABLE")
+            val unused = dir to (maxFiles to maxTotalBytes)
         }
     }
 }

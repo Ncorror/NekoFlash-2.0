@@ -1,4 +1,5 @@
 #include <jni.h>
+#include "transfer_deadline.h"
 #include <atomic>
 #include <cerrno>
 #include <cstdint>
@@ -483,7 +484,7 @@ Java_ru_forum_adbfastboottool_NativeUsbfsBackend_nativeCancelTransfer(
     } catch (...) {
         // Cancellation must never terminate ART because an unordered_set
         // allocation or mutex operation failed. The caller will keep waiting
-        // for the hard deadline and report cancellation=false.
+        // for transfer completion or a stall and report cancellation=false.
         return JNI_FALSE;
     }
 }
@@ -522,6 +523,7 @@ static jlongArray native_bulk_out_urb_impl(
     jint fd,
     jint endpoint_address,
     jstring payload_path,
+    jint supplied_payload_fd,
     jlong total_bytes,
     jint block_bytes,
     jint pipeline_depth,
@@ -530,8 +532,9 @@ static jlongArray native_bulk_out_urb_impl(
     jlong transfer_token) {
 
     const int64_t started = now_ms();
-    if (fd < 0 || payload_path == nullptr || total_bytes <= 0 || block_bytes <= 0 ||
-        stall_timeout_ms <= 0 || hard_timeout_ms <= 0 || hard_timeout_ms < stall_timeout_ms ||
+    if (fd < 0 || (payload_path == nullptr && supplied_payload_fd < 0) ||
+        total_bytes <= 0 || block_bytes <= 0 ||
+        !nekoflash::TransferDeadline::valid(stall_timeout_ms, hard_timeout_ms) ||
         transfer_token <= 0 || (endpoint_address & 0x80) != 0 || (endpoint_address & 0x0F) == 0) {
         return make_result(env, 0, 0, EINVAL, 0, 0, 0, STAGE_PREFLIGHT);
     }
@@ -550,7 +553,13 @@ static jlongArray native_bulk_out_urb_impl(
 
     UniqueFd payload_fd;
     int open_errno = 0;
-    {
+    if (supplied_payload_fd >= 0) {
+        // Own a dup for the entire URB/drain lifecycle. The Java SAF descriptor
+        // remains valid but cannot be closed by native code.
+        const int duplicated_fd = dup(supplied_payload_fd);
+        if (duplicated_fd < 0) open_errno = errno;
+        payload_fd.reset(duplicated_fd);
+    } else {
         ScopedUtfChars path_chars(env, payload_path);
         if (path_chars.get() == nullptr) {
             transfer_registration.reset();
@@ -618,6 +627,8 @@ static jlongArray native_bulk_out_urb_impl(
     int last_actual = 0;
     int64_t last_submit_failure_stage = STAGE_SUBMIT;
     int64_t last_progress_ms = now_ms();
+    nekoflash::TransferDeadline deadline(started, stall_timeout_ms, hard_timeout_ms);
+    deadline.progress(last_progress_ms);
 
     auto finish = [&](bool success, int error_code, int status, int actual,
                       int64_t stage, int kernel_ioctl_errno = 0) -> jlongArray {
@@ -658,7 +669,7 @@ static jlongArray native_bulk_out_urb_impl(
 
     auto cancellation_stage = [&]() -> int64_t {
         if (control->cancelled.load(std::memory_order_acquire)) return STAGE_CANCELLED;
-        if (now_ms() - started > static_cast<int64_t>(hard_timeout_ms)) {
+        if (deadline.hard_expired(now_ms())) {
             return STAGE_HARD_TIMEOUT;
         }
         return 0;
@@ -674,7 +685,7 @@ static jlongArray native_bulk_out_urb_impl(
             last_submit_failure_stage = STAGE_CANCELLED;
             return false;
         }
-        if (now_ms() - started > static_cast<int64_t>(hard_timeout_ms)) {
+        if (deadline.hard_expired(now_ms())) {
             last_errno = ETIMEDOUT;
             last_submit_failure_stage = STAGE_HARD_TIMEOUT;
             return false;
@@ -695,7 +706,7 @@ static jlongArray native_bulk_out_urb_impl(
                 last_submit_failure_stage = STAGE_CANCELLED;
                 return false;
             }
-            if (now_ms() - started > static_cast<int64_t>(hard_timeout_ms)) {
+            if (deadline.hard_expired(now_ms())) {
                 last_errno = ETIMEDOUT;
                 last_submit_failure_stage = STAGE_HARD_TIMEOUT;
                 return false;
@@ -797,6 +808,7 @@ static jlongArray native_bulk_out_urb_impl(
 
             completed_total += static_cast<int64_t>(slot.requested);
             last_progress_ms = now_ms();
+            deadline.progress(last_progress_ms);
             control->confirmed_bytes.store(completed_total, std::memory_order_release);
             control->last_completion_ms.store(last_progress_ms, std::memory_order_release);
             control->stage.store(STAGE_REAP, std::memory_order_release);
@@ -817,10 +829,10 @@ static jlongArray native_bulk_out_urb_impl(
         }
 
         const int64_t current_ms = now_ms();
-        if (current_ms - last_progress_ms > static_cast<int64_t>(stall_timeout_ms)) {
+        if (deadline.stalled(current_ms)) {
             return finish(false, ETIMEDOUT, last_status, last_actual, STAGE_TIMEOUT);
         }
-        if (current_ms - started > static_cast<int64_t>(hard_timeout_ms)) {
+        if (deadline.hard_expired(current_ms)) {
             return finish(false, ETIMEDOUT, last_status, last_actual, STAGE_HARD_TIMEOUT);
         }
         usleep(REAP_POLL_SLEEP_US);
@@ -836,6 +848,7 @@ Java_ru_forum_adbfastboottool_NativeUsbfsBackend_nativeBulkOutUrb(
     jint fd,
     jint endpoint_address,
     jstring payload_path,
+    jint supplied_payload_fd,
     jlong total_bytes,
     jint block_bytes,
     jint pipeline_depth,
@@ -844,8 +857,8 @@ Java_ru_forum_adbfastboottool_NativeUsbfsBackend_nativeBulkOutUrb(
     jlong transfer_token) {
     try {
         return native_bulk_out_urb_impl(
-            env, thiz, fd, endpoint_address, payload_path, total_bytes, block_bytes,
-            pipeline_depth, stall_timeout_ms, hard_timeout_ms, transfer_token);
+            env, thiz, fd, endpoint_address, payload_path, supplied_payload_fd,
+            total_bytes, block_bytes, pipeline_depth, stall_timeout_ms, hard_timeout_ms, transfer_token);
     } catch (const std::bad_alloc&) {
         // Unknown exceptional escape after native ownership may have begun:
         // preserve process safety by blocking all further native transfers.

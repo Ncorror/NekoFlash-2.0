@@ -10,6 +10,26 @@ English
 
 </div>
 
+
+## NekoFlash 2.0 REV43 — public main beta / Insiders campaign (1 November 2026)
+
+**Status: TESTING STARTING / NO NEW REV43 HARDWARE PASS VERIFIED.** The qualifications below were performed on the **earlier alpha10** device/release line. They are historical evidence only and do not validate the revised DEV ADB/PTY/Fastboot code.
+
+**Telegram tester group:** NekoFlash Insiders. APK and offline testbook are being prepared for sharing there; no unverified invitation URL is published. Direct GitHub test downloads remain available.
+
+Field-test materials:
+- [Offline downloadable RU/EN REV43 testbook](insiders/testbook.html) · [RU manual](testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN manual](testing/INSIDERS-FIELD-TEST-REV43-EN.md).
+- [PR-head CI REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391): build, Android API26/34 PASS.
+- [Merged DEV CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147): build PASS, API34 PASS, API26 FAIL — two interface wait timeouts and missing captures.
+- [Debug APK artifact](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171): `ru.forum.adbfastboottool.dev`, do not uninstall the production app.
+
+Required field evidence: Android HOST/TARGET models, OS, USB cable/role, installed build ID, test stage/status, reproduction, timing, screenshot, and original raw log/trace binaries, sent only through a trusted private channel. Avoid public unique device IDs and credentials. Pending physical cases: TERM-01 IME/rotation, 4-KiB ADB maxdata, large recursive push, Stop/USB detach/reconnect, read-only Fastboot diagnostics, and RAM over long sessions. A plain `fastboot getvar` does not test post-DATA flashing.
+
+No live REV43 USB test data has been added to this public document. The archived section below remains unchanged.
+
+---
+
+
 This document is the public index of NekoFlash physical-device testing. It contains only hardware-validation facts that are useful for release qualification. Raw diagnostic logs, USB traces, account data, device serials, private photographs, chat/continuation notes, recovery archives, temporary plans and operator-state files are intentionally not part of the public repository.
 
 ## Test host

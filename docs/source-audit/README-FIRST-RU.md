@@ -1,3 +1,5 @@
+> **ARCHIVE / АРХИВ REV5:** bilingual contributor documentation is retained as an historical baseline. The up-to-date testing references are [DEV status](../DEVELOPMENT_STATUS.md), [Insiders testbook](../insiders/testbook.html), [RU guide](../testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN guide](../testing/INSIDERS-FIELD-TEST-REV43-EN.md). Legacy ZIP paths and REV5 test outcomes must not be treated as REV43 hardware evidence.
+
 <div align="center">
 
 <img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />

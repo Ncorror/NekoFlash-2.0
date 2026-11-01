@@ -1,6 +1,9 @@
 package ru.forum.adbfastboottool
 
 import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
+import java.security.GeneralSecurityException
 import java.math.BigInteger
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -87,12 +90,20 @@ class AdbKeyStore(
     fun publicKeyPath(): String = publicKeyFile.absolutePath
 
     private fun loadPrivateKeyPair(): KeyPair {
-        val encoded = Base64.getDecoder().decode(privateKeyFile.readText().trim())
-        val keyFactory = KeyFactory.getInstance("RSA")
-        val privateKey = keyFactory.generatePrivate(PKCS8EncodedKeySpec(encoded)) as RSAPrivateCrtKey
-        val publicSpec = RSAPublicKeySpec(privateKey.modulus, privateKey.publicExponent)
-        val publicKey = keyFactory.generatePublic(publicSpec) as RSAPublicKey
-        return KeyPair(publicKey, privateKey)
+        try {
+            val encoded = Base64.getDecoder().decode(privateKeyFile.readText().trim())
+            val keyFactory = KeyFactory.getInstance("RSA")
+            val privateKey = keyFactory.generatePrivate(PKCS8EncodedKeySpec(encoded)) as RSAPrivateCrtKey
+            val publicSpec = RSAPublicKeySpec(privateKey.modulus, privateKey.publicExponent)
+            val publicKey = keyFactory.generatePublic(publicSpec) as RSAPublicKey
+            return KeyPair(publicKey, privateKey)
+        } catch (error: IllegalArgumentException) {
+            // Never delete or silently rotate an ADB identity: a technician may
+            // need the original key to restore an already authorized device.
+            throw IOException("Stored ADB host key cannot be decoded; original file preserved", error)
+        } catch (error: GeneralSecurityException) {
+            throw IOException("Stored ADB host key is invalid; original file preserved", error)
+        }
     }
 
     private fun generateKeyPair(): KeyPair {
@@ -102,12 +113,37 @@ class AdbKeyStore(
     }
 
     private fun savePrivateKey(privateKey: PrivateKey) {
-        val encoded = Base64.getEncoder().encodeToString(privateKey.encoded)
-        privateKeyFile.writeText(encoded)
-        privateKeyFile.setReadable(false, false)
-        privateKeyFile.setWritable(false, false)
-        privateKeyFile.setReadable(true, true)
-        privateKeyFile.setWritable(true, true)
+        // Always stage within the same app-private directory. A crash, ENOSPC
+        // or process kill before rename leaves the previously published key
+        // untouched. Never send host key bytes to logs or shared storage.
+        val staged = File.createTempFile("adbkey-", ".tmp", directory)
+        try {
+            // Set owner-only permissions *before* writing any secret bytes.
+            if (!staged.setReadable(false, false) ||
+                !staged.setWritable(false, false) ||
+                !staged.setReadable(true, true) ||
+                !staged.setWritable(true, true)
+            ) {
+                throw IOException("Cannot restrict staged ADB host key permissions")
+            }
+            val encoded = Base64.getEncoder().encode(privateKey.encoded)
+            FileOutputStream(staged).use { output ->
+                output.write(encoded)
+                output.fd.sync()
+            }
+            // New identities must not overwrite a previous one; if it exists
+            // unexpectedly, preserve it for forensic/authorization recovery.
+            if (privateKeyFile.exists()) {
+                throw IOException("ADB host key already exists; refusing to replace it")
+            }
+            if (!staged.renameTo(privateKeyFile)) {
+                throw IOException("Cannot atomically publish ADB host key")
+            }
+        } finally {
+            // A failed stage is not a usable key; only this temporary file is
+            // disposable. Existing public/private identities remain intact.
+            if (staged.exists()) staged.delete()
+        }
     }
 
     private fun writePublicKeyFileIfNeeded(keyPair: KeyPair) {

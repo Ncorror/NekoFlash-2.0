@@ -10,6 +10,7 @@ English
 
 </div>
 
+
 This document describes the behavior of the current NekoFlash source tree. It is not a substitute for a jurisdiction-specific privacy policy if the application is later distributed through a store or service that requires one.
 
 ## Local device operations
@@ -22,17 +23,17 @@ The current source tree contains no analytics, advertising, third-party crash-re
 
 The optional Mi Unlock workflow requires Internet/network access and communicates over HTTPS with official Xiaomi account and unlock endpoints used by that flow, including `account.xiaomi.com`, `api.account.xiaomi.com` and the bounded regional unlock hosts defined in source.
 
-Mi account identifiers, WebView cookies, `passToken`, `deviceId`, `ssecurity`, service cookies and unlock request data are handled only for the Mi Unlock workflow. The application provides logout/session-clearing behavior for the Mi account flow.
+Mi account identifiers, WebView cookies, `passToken`, `deviceId`, `ssecurity`, service cookies and unlock request data are handled only for the Mi Unlock workflow. **Authentication cookies may remain in Android WebView storage across Back/cancel and future launches until explicit Logout.** The current `MiLoginActivity` reuses valid existing cookies and calls `CookieManager.removeAllCookies` from its Logout action. Closing the screen clears in-memory fields and WebView state, but should **not** be treated as equivalent to logging out of the Xiaomi account. Use the explicit Logout control when the device is shared or when the session must be cleared. This persistence behavior is under review before release.
 
 NekoFlash does not operate its own account, analytics or telemetry backend.
 
 ## Files and logs
 
-NekoFlash uses a workspace in shared storage for selected payloads, imported files, logs, protocol traces and exported diagnostic reports. Local logs can contain commands, device properties, filenames, USB information and operation results.
+NekoFlash uses a workspace in shared storage for selected payloads, imported files, logs, protocol traces and exported diagnostic reports. In the current source, full diagnostic logs and reports may be stored under `/sdcard/Download/NekoFlash/` and include commands, device properties, filenames, USB identifiers and operation results. **Shared-storage files are not app-private**: other apps with sufficient storage privileges can read them. Do not treat raw logs or screenshots as safe to publish.
 
-Sanitized sharing/export paths apply the project's report sanitization logic, but users should still review diagnostic files before sharing them publicly.
+Sanitized sharing/export paths apply the project's report sanitization logic, but **redaction is not a complete guarantee**: for example, a serial supplied as `fastboot -s SERIAL getvar all` is not covered by the current `serial:` / `serial=` pattern. The "Copy terminal" action copies a raw transcript to Android's clipboard, which may contain identifiers and sensitive paths. **Review and manually redact exported material before sending it to anyone**; prefer short, purpose-specific test logs rather than full sessions.
 
-The application declares broad storage access because the current distribution model expects direct access to firmware and diagnostic files. Application backup is disabled in the Android manifest.
+The ADB host private key is currently persisted as an app-private PKCS#8 file (`adbkey.pk8`), not a non-exportable Android Keystore key. The application declares broad storage access because the current distribution model expects direct access to firmware and diagnostic files. Android application backup is disabled. Changes to raw-log storage and export sanitization are tracked in [the security backlog](docs/SECURITY_REVIEW_BACKLOG.md).
 
 ## Permissions relevant to data handling
 

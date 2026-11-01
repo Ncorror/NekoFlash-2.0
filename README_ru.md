@@ -10,7 +10,21 @@
 
 </div>
 
-## Контрольная точка разработки REV5
+## Актуальная тестовая ветка main — NekoFlash 2.0 REV44 (1 ноября 2026)
+
+Сюда переносим REV26–44 для испытаний Android HOST → TARGET. Это **тестовая DEV APK**, не подписанный стабильный релиз; установленный старый NekoFlash удалять не нужно (пакет `ru.forum.adbfastboottool.dev`).
+
+**Telegram-группа тестирования — NekoFlash Insiders.** В группе распространяем тестовую APK и тестбук, собираем предложения и приватные ZIP с логами. Достоверная ссылка-приглашение пока не предоставлена, поэтому адрес `t.me` не придумываем. Материалы доступны и напрямую из GitHub:
+
+- [Скачать офлайн-тестбук REV43, HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
+- [Скачать тестовую APK REV43 — архив GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
+- [Инструкция тестировщика RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Статус](docs/DEVELOPMENT_STATUS.md)
+
+[REV44 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) прошла сборку/API26/API34; в [одном старом объединённом прогоне DEV](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) API26 имела два UI-таймаута. Подтверждённых аппаратных PASS REV43 пока нет. Ссылки ниже на релиз NekoFlash 6.0.0-alpha11 относятся к старой версии, не к новой бете.
+
+---
+
+## Историческая контрольная точка REV5 (архив)
 
 > **Статус:** проект в разработке. Это полный Android-исходник оригинального NekoFlash 6.0.0-alpha11 с первым переносом согласованного экрана **Sideload REV3**. Это **не NekoFlash Pro** и **не готовый APK NekoFlash 2.0**. Остальной утверждённый дизайн REV2/REV4 ещё не перенесён в Android-код. Не выполняйте разблокировку без отдельного разрешения владельца устройства.
 

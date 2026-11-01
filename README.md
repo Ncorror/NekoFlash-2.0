@@ -10,17 +10,50 @@ English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](README_ru.md)
 
 </div>
 
-## Development Checkpoint REV5
+## Current testing stage — REV44 in main (1 November 2026)
 
-> **Status:** Project in active development. This is the complete Android source tree of the original NekoFlash 6.0.0-alpha11 with the initial migration of the approved **Sideload REV3** screen. This is **not NekoFlash Pro** and **not a finished NekoFlash 2.0 APK**. The remaining approved REV2/REV4 design has not yet been ported to Android code. Do not perform unlocking without explicit authorization from the device owner.
+This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta testing**, NOT a signed production release. The standalone `.dev` test APK does not replace the original signed NekoFlash release.
 
-- [REV5 Audit and Implementation Roadmap](docs/source-audit/NEKOFLASH2-REV5-AUDIT-AND-ROADMAP-RU.md)
-- [Approved Design and Checkpoint Decisions](docs/design-approved/README.md)
-- [Baseline Details and Local Verification](docs/source-audit/README-FIRST-RU.md)
+**Telegram testing group — NekoFlash Insiders.** Testers use this group for APK/testbook distribution, discussion and private ZIP reports. The official invitation URL has not been supplied, so no guessed `t.me` link is published. The materials are independently downloadable from GitHub:
 
-**CI:** Push and Pull Request verify lint + Debug APK; signed Release in build workflow is triggered manually with configured secrets. Release by tag remains an independent workflow. Missing release signing keys will not fail an initial push.
+- [Download standalone offline testbook HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
+- [Download tested REV43 debug APK — GitHub Actions ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
+- [RU tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Current status](docs/DEVELOPMENT_STATUS.md)
+
+**Verification:** [REV44 exact-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. An earlier merged DEV [API26 run failed two UI waits](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147). New physical REV43 HOST→TARGET passes remain unverified. The historical alpha11 release link in the archive does not refer to this beta.
 
 ---
+
+## Историческая DEV REV27 и общая документация (архивный раздел)
+
+> Ниже сохранён исторический снимок ревизии 27 и общие сведения об архитектуре; старые SHA, результаты CI и ссылки **не описывают актуальную REV43**. Актуальные данные — выше и в `docs/DEVELOPMENT_STATUS.md`.
+
+
+> **Актуальная разработка (30 октября 2026):** рабочая ветка [`work/rev26-terminal-imports-20261030`](https://github.com/Ncorror/NekoFlash-2.0/tree/work/rev26-terminal-imports-20261030), включающая [REV26 (PR #13)](https://github.com/Ncorror/NekoFlash-2.0/pull/13) и [REV27 (PR #14)](https://github.com/Ncorror/NekoFlash-2.0/pull/14). Последний проверенный merge: `8806222d8590`. Это **NekoFlash 2.0**, не NekoFlash Pro. Разработка пока **не объединена в `main` и не является production release**.
+
+**Назначение:** восстановление, обслуживание и прошивка другого Android-устройства непосредственно с Android-телефона по USB OTG, без ПК и без root на телефоне-хосте. В DEV реализованы ADB, Fastboot, Sideload, Quick/Mass Flash, терминал, интегрированная USB-панель, Центр операций и импорт локальных/SAF-источников. Реальное аппаратное покрытие DEV и возможность безопасного выпуска пока **не подтверждены**.
+
+**REV26:** терминальные ADB-команды не сворачивают Console и не открывают посторонний прогресс-диалог; закрытие терминала отделено от отмены операции; история и PTY сохранены. Импорт SAF получил отмену блокирующего чтения через проверку готовности дескриптора, а инструментальные тесты защищают управление при смене ориентации и клавиатуры. [Исправления и CI](https://github.com/Ncorror/NekoFlash-2.0/pull/13).
+
+**REV27:** скрытый терминал не обновляет `RecyclerView` на каждый пакет вывода, а при открытии немедленно синхронизирует строки из актуального буфера. Добавлен инструментальный тест на большие пакеты, закрытие, повторное открытие и вывод до публикации LiveData. [Код REV27](https://github.com/Ncorror/NekoFlash-2.0/pull/14).
+
+**Последний подтверждённый CI для REV27:** [GitHub Actions #41012595076](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41012595076), код `acde18d06865`: **SUCCESS** — основная сборка, JVM, lint, нативные проверки; **19/19 инструментальных тестов на Android API 26 и 19/19 на API 34**, по 28 захваченных состояний интерфейса. Проверка артефактов выполнялась без физической USB-прошивки; количество JVM-тестов и предупреждений lint следует брать из конкретного CI-отчёта, а не из исторических ревизий.
+
+**APK и версия:** в `app/build.gradle` пока `versionName=6.0.0-alpha11`, `versionCode=234`; DEV-вариант имеет суффикс `-dev` и `applicationId=ru.forum.adbfastboottool.dev`. Номер REV27 — **этап разработки**, а не новая опубликованная версия APK. Для тестирования используй проверенные артефакты соответствующего GitHub Actions, сверяя SHA/BUILD_ID с нужным коммитом. Не путай их с выпуском исходного NekoFlash, ссылки на который сохранены ниже для истории.
+
+**Важная граница безопасности:** кнопки erase/format/flash, экспорт команд и работа с Mi-сессией требуют отдельного усиления защиты перед релизом. Локальные диагностические журналы могут включать идентификаторы устройства, а санитайзер не гарантирует удаление всех их форм. **Не публикуй сырые логи и не выполняй запись разделов на рабочем устройстве без собственного проверенного плана восстановления.** Подробности: [аудит и открытые вопросы](docs/SECURITY_REVIEW_BACKLOG.md), [приватность](PRIVACY.md).
+
+**Что дальше:** аппаратные тесты терминала/PT​Y/IME и Android-to-Android USB; аудит импорта и сохранения файлов; защитные подтверждения опасных операций и проверка путей утечки данных; стабилизация ADB/Fastboot; согласование GUI, версий и релизного процесса. Рабочая сводка: [состояние DEV и план](docs/DEVELOPMENT_STATUS.md). Эмуляторные тесты **не подтверждают** восстановление конкретного телефона.
+
+**Профессиональный режим диагностики:** [политика сохранения сырых журналов и прямого терминала](docs/PROFESSIONAL_RECOVERY_POLICY.md). Журналы не чистятся, не усекaются и не подвергаются автоматическому обезличиванию в рамках защитных изменений. В DEV REV28 (отдельный PR, до подтверждения CI) готовятся разовая проверка критичных GUI-команд и атомарное хранение ADB-идентичности; эти изменения не объявляются опубликованным выпуском.\n\n**История ревизий:** [REV18](docs/source-audit/REV18-AUDIT-2026-10-25-RU.md), [REV21](docs/source-audit/REV21-FASTBOOT-HOST-2026-10-26-RU.md), [REV22](docs/source-audit/REV22-BUNDLED-MKFS-2026-10-26-RU.md), [REV23](docs/source-audit/REV23-RESPARSE-2026-10-27-RU.md), [REV24](docs/source-audit/REV24-SOURCES-2026-10-28-RU.md), [REV25](docs/source-audit/REV25-UI-2026-10-29-RU.md), [историческая сверка с оригиналом](docs/source-audit/REV25-LEGACY-COMPARISON.json). Ранние отчёты относятся к своим коммитам, а не к текущей REV27.
+
+**Команда:** автор и текущий разработчик — [Ncorror](https://github.com/Ncorror). [IQ-HARRY7](https://github.com/IQ-HARRY7) добавлен в список участников по просьбе автора проекта; реализация кода и аппаратные тесты за ним пока не подтверждены.
+
+---
+
+## Исходная документация NekoFlash (историческая версия)
+
+# NekoFlash
 
 **NekoFlash** is an Android USB OTG flashing tool for controlling, servicing, and flashing another Android device directly from a phone or tablet — **without a PC** and without root on the host device.
 
@@ -302,6 +335,11 @@ Do not force-push protected `main` and do not commit build outputs, local signin
 ADB, Fastboot, flashing, sideload and diagnostics operate locally between the host Android device and the USB-connected target. The source tree contains no analytics, advertising or third-party crash-reporting SDK.
 
 Internet/network access is used by the optional Xiaomi / Mi Unlock flow. See [PRIVACY.md](PRIVACY.md) for the data-handling details.
+
+## Team / Команда
+
+- [Ncorror](https://github.com/Ncorror) — maintainer and current developer / автор и разработчик.
+- [IQ-HARRY7](https://github.com/IQ-HARRY7) — listed as a project team member at the maintainer's request. No implemented code or completed hardware tests are attributed to him yet / указан как участник команды по просьбе автора, без приписывания выполненной разработки или тестов.
 
 ## Documentation
 

@@ -5,7 +5,7 @@ import java.util.UUID
 
 /** Creates a bounded-lifetime privacy-filtered copy for Android ACTION_SEND. */
 object SanitizedLogShare {
-    const val DEFAULT_MAX_SOURCE_BYTES: Long = 64L * 1024L * 1024L
+    const val DEFAULT_MAX_SOURCE_BYTES: Long = Long.MAX_VALUE
     const val DEFAULT_RETENTION_MS: Long = 24L * 60L * 60L * 1000L
 
     fun create(
@@ -16,7 +16,8 @@ object SanitizedLogShare {
         nowMs: Long = System.currentTimeMillis()
     ): File {
         require(source.isFile) { "Log source does not exist or is not a regular file" }
-        require(source.length() in 0..maxSourceBytes) { "Log source exceeds sanitized share limit" }
+        require(maxSourceBytes > 0L) { "Invalid diagnostic export size policy" }
+        require(source.length() <= maxSourceBytes) { "Log source is larger than the requested explicit export limit" }
         require(outputDir.exists() || outputDir.mkdirs()) { "Cannot create sanitized share directory" }
         require(outputDir.isDirectory) { "Sanitized share output is not a directory" }
 

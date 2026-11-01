@@ -10,6 +10,7 @@ English
 
 </div>
 
+
 This document is a maintainer checklist, not legal advice.
 
 ## Project license
@@ -41,10 +42,14 @@ Before a stable release, review Gradle files and any bundled components.
 
 If a dependency is bundled into the APK, record it in `THIRD_PARTY_NOTICES.md` when required by its license.
 
-## Current release
+## Historical release evidence vs. NekoFlash 2.0 DEV
 
-Current public release:
+The following is **historical evidence recorded for the original release line**, not a live claim that these assets are the newest release:
 
 - tag: `v6.0.0-alpha10.1`
-- base commit: `de1225b9cd5be110c72c6f130320b2d62d927cc0`
-- release asset: `NekoFlash-v6.0.0-alpha10.1-release.apk`
+- recorded base commit: `de1225b9cd5be110c72c6f130320b2d62d927cc0`
+- recorded release asset: `NekoFlash-v6.0.0-alpha10.1-release.apk`
+
+The separate `Ncorror/NekoFlash-2.0` development repository had **no GitHub Releases when reviewed on 2026-10-30**. The current DEV source uses `versionName=6.0.0-alpha11`, `versionCode=234`; a version string in source is **not** proof of a signed/published release. See [development status](DEVELOPMENT_STATUS.md) and [open release-security checks](SECURITY_REVIEW_BACKLOG.md).
+
+Bundled ext4/F2FS filesystem executables carry upstream GPL-2.0/component licenses and require matching notices and corresponding source as described in [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md) and [vendor/filesystems](../vendor/filesystems/README.md). The tag-driven release workflow currently needs an explicit approved-commit policy before public distribution.

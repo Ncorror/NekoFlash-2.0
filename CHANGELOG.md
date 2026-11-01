@@ -10,9 +10,30 @@ English
 
 </div>
 
-Release-level changes only. Commit-by-commit development notes, temporary plans and maintainer workflow history belong in Git history.
+The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes are not published APK releases.** The technical REV number is independent of `versionName` / `versionCode`; see [development status](docs/DEVELOPMENT_STATUS.md). Historical build/release statements refer to the source snapshot in which they were recorded.
 
-## v6.0.0-alpha11 — UI/UX audit
+## Unreleased NekoFlash 2.0 DEV — REV38–43 (1 November 2026)
+
+**NOT a public APK release.** DEV branch `work/rev26-terminal-imports-20261030`; latest functional merge REV43 `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`. Release `main` remains unchanged.
+
+- REV38: Gboard composing deletion, Unicode and emoji Backspace; [PR #31](https://github.com/Ncorror/NekoFlash-2.0/pull/31).
+- REV39–40: native terminal output text selection/copy and avoid unexpected autoscroll while selecting; [PR #32](https://github.com/Ncorror/NekoFlash-2.0/pull/32) / [PR #33](https://github.com/Ncorror/NekoFlash-2.0/pull/33).
+- REV41: cancellable Fastboot post-DATA final-response polling (30 s overall, 2 s slices); [PR #34](https://github.com/Ncorror/NekoFlash-2.0/pull/34).
+- REV42: generic ADB `A_WRTE` respects negotiated peer maxdata, including SYNC data frames; [PR #35](https://github.com/Ncorror/NekoFlash-2.0/pull/35).
+- REV43: lazy recursive `adb push -r` with all-directory-before-file order and cancellation retained across nested file writes; [PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37).
+- REV44 documentation/test tooling: [offline RU/EN testbook](docs/insiders/testbook.html) with eight additional field checks, original AutoLogs BIN ZIP/export, [RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) field manuals and CI HTML validation/artifact publication.
+
+**Evidence limits:** [REV43 PR CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391) passed build, API26 and API34. The [merged DEV CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) passed build and API34 but **failed API26 on two UI wait timeouts**. Physical DEV REV43 HOST→TARGET validation has not yet been recorded as PASS; older alpha10 tests do not count. See [current status](docs/DEVELOPMENT_STATUS.md).
+
+## Historical Unreleased DEV (REV26–REV27, based on `6.0.0-alpha11`)
+
+
+
+- REV26: separated terminal close from cancellation and operation progress; preserved command history and PTY; fixed cancellable SAF provider import on Android API 26.
+- REV27: deferred RecyclerView updates while Console is collapsed, rendered up-to-date output on reopen, and added regression tests for long output.
+- [Verified REV27 CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41012595076) passed 19 installed-app tests on API 26 and API 34. These changes **are not** a production release and do not validate physical-device flashing.
+
+## Unreleased `6.0.0-alpha11` source line — UI/UX audit
 
 - Restored and refined the Home **Operation Center** as a persistent, non-blocking task surface with a prominent current action, percentage/indeterminate progress, `step X of Y`, a bounded nearby-step queue, contextual failure/verification details, reports access and explicit cancellation.
 - Added a compact **live operation strip** above every workflow page so Flash/Sideload/Unlock/diagnostic work remains visible without leaving the current tab. It now shows the current step together with the safety/status message, and tapping it opens Home and scrolls directly to the full Operation Center. Completed/cancelled results auto-clear after a short confirmation window, while failed/verify-pending states remain until reviewed or dismissed.
@@ -25,7 +46,7 @@ Release-level changes only. Commit-by-commit development notes, temporary plans 
 
 ## v6.0.0-alpha10.2 — published release
 
-- Current packaged source identity is `versionName=6.0.0-alpha10.2`, `versionCode=233`, matching the release links and version metadata documented in this source snapshot.
+- Historical release snapshot identity was `versionName=6.0.0-alpha10.2`, `versionCode=233`; the current NekoFlash 2.0 DEV source has since advanced to `versionName=6.0.0-alpha11`, `versionCode=234`.
 - The UI/UX audit above is **unreleased** and is not claimed as part of the already published alpha10.2 APK.
 
 ## v6.0.0-alpha10.1 — published hotfix release
