@@ -1,6 +1,6 @@
 # Insiders — NekoFlash 2.0 REV43 field testbook
 
-**Telegram tester community: NekoFlash Insiders**. The testbook and debug APK are being made available to testers there; ZIP evidence is shared privately. No verified public invite URL was provided yet. Direct GitHub downloads below remain available.
+**Telegram tester community: [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** The testbook and debug APK are available for distribution to testers there; ZIP evidence should be shared only in the trusted testing group, not in public Issues. Direct GitHub downloads below remain available.
 
 - **[Open the offline RU/EN HTML testbook](testbook.html)**.
 - **[Download the standalone HTML file from main](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)**. On an Android browser choose Save link / Download file. Then open the saved `.html` locally — no server is required.
