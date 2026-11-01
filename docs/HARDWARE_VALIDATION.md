@@ -11,9 +11,11 @@ English
 </div>
 
 
-## NekoFlash 2.0 REV43 — new Insiders campaign (1 November 2026)
+## NekoFlash 2.0 REV43 — public main beta / Insiders campaign (1 November 2026)
 
 **Status: TESTING STARTING / NO NEW REV43 HARDWARE PASS VERIFIED.** The qualifications below were performed on the **earlier alpha10** device/release line. They are historical evidence only and do not validate the revised DEV ADB/PTY/Fastboot code.
+
+**Telegram tester group:** NekoFlash Insiders. APK and offline testbook are being prepared for sharing there; no unverified invitation URL is published. Direct GitHub test downloads remain available.
 
 Field-test materials:
 - [Offline downloadable RU/EN REV43 testbook](insiders/testbook.html) · [RU manual](testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN manual](testing/INSIDERS-FIELD-TEST-REV43-EN.md).

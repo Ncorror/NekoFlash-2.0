@@ -1,12 +1,13 @@
-# NekoFlash 2.0 — актуальный статус DEV и полевые тесты, 1 ноября 2026
+# NekoFlash 2.0 — тестирование REV44 в main, 1 ноября 2026
 
 **Это текущая точка входа.** Предыдущие ревизии и их CI сохранены в исторических разделах ниже. Не переносить старые PASS на REV43.
 
 | Объект | Подтверждённое состояние |
 |---|---|
 | Репозиторий | `Ncorror/NekoFlash-2.0`, не NekoFlash Pro |
-| Основная DEV-ветка | `work/rev26-terminal-imports-20261030` |
-| DEV HEAD перед документальным PR | `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5` |
+| Публичная тестовая база | `main` — интеграция REV26–44 через [PR #39](https://github.com/Ncorror/NekoFlash-2.0/pull/39), **не production release** |
+| Предыдущая рабочая DEV-ветка | `work/rev26-terminal-imports-20261030` (сохранена для истории) |
+| Последний функциональный коммит DEV до интеграции | `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5` (историческая точка) |
 | Последняя объединённая функциональная ревизия | REV43, [PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37), streaming `adb push -r` + Stop/USB cancellation |
 | Точный исходный PR коммит | `27ab796d100387b3530bd88a6faf28e48d1c717c` |
 | PR CI REV43 | [Run #41247325391](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391): **BUILD/JVM/lint/API26/API34 PASS** |
@@ -14,11 +15,11 @@
 | Тестовая Debug APK | [GitHub Actions artifact REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171), пакет `ru.forum.adbfastboottool.dev`, versionCode 234, `6.0.0-alpha11-dev` |
 | Тестбук | [Offline RU/EN HTML](insiders/testbook.html), [инструкция RU](testing/INSIDERS-FIELD-TEST-REV43-RU.md), [EN](testing/INSIDERS-FIELD-TEST-REV43-EN.md) |
 | Физический HOST → TARGET для REV43 | **Тестовая кампания начинается, новые PASS пока не подтверждены** |
-| Публикация | `main` не содержит эти DEV-изменения; Release Candidate не объявлен |
+| Публикация | `main` используется как **публичная тестовая база**, релизный тег/подписанный release не создавался |
 
 ## Где скачать тестбук
 
-[**Скачать автономный REV43 HTML прямо из DEV**](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/work/rev26-terminal-imports-20261030/docs/insiders/testbook.html). Он поддерживает RU/EN, этапы, чекбоксы, статусы и свободные замечания, JSON-прогресс, ZIP-отчёт с исходными `log-*`, `trace-*.bin`, `session-summary-*` и фотографиями. Он не отправляет файлы на сервер и требует ручного разрешения на папку логов. Каждый успешный build CI также экспортирует тестбук как отдельный скачиваемый GitHub Actions artifact.
+[**Скачать автономный REV43 HTML прямо из main**](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html). Он поддерживает RU/EN, этапы, чекбоксы, статусы и свободные замечания, JSON-прогресс, ZIP-отчёт с исходными `log-*`, `trace-*.bin`, `session-summary-*` и фотографиями. Он не отправляет файлы на сервер и требует ручного разрешения на папку логов. Каждый успешный build CI также экспортирует тестбук как отдельный скачиваемый GitHub Actions artifact. Для тестовой группы указан точный идентификатор **NekoFlash Insiders**, но ссылка-приглашение не опубликована и не должна подставляться наугад.
 
 **Внимание:** GitHub Actions artifact APK — отдельный ZIP; не путать с архивом отчёта. SHA-256 старой REV29 APK не относится к REV43: проверь новый APK самостоятельно. Не удаляй установленную стабильную версию NekoFlash.
 
@@ -43,7 +44,7 @@
 
 ## Граница этой ревизии документации
 
-REV44 добавляет офлайн-тестбук и обновляет актуальные индексные документы. **Исторические отчёты alpha10 и REV5/REV9/REV27 не переписываем:** даты, CI SHA и условия в них относятся только к указанным старым проверкам. `CHANGELOG.md` описывает опубликованные версии; DEV REV43 нельзя выдавать за новый официальный релиз.
+REV44 добавляет офлайн-тестбук и обновляет актуальные индексные документы; PR #39 переносит рабочие изменения в `main` с сохранением обеих линий истории. **Исторические отчёты alpha10 и REV5/REV9/REV27 не переписываем:** даты, CI SHA и условия в них относятся только к указанным старым проверкам. `CHANGELOG.md` описывает опубликованные версии; DEV REV43 нельзя выдавать за новый официальный релиз.
 
 ---
 

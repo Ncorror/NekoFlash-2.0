@@ -1,11 +1,13 @@
 # NekoFlash 2.0 — полевой тестбук Insiders REV43
 
+**Telegram-группа тестирования: NekoFlash Insiders.** В ней планируется раздача APK и тестбука, сбор отчётов и приватных ZIP с логами; официальная ссылка-приглашение пока не подтверждена. Используй прямые ссылки GitHub ниже.
+
 **Статус 1 ноября 2026:** старт тестовой кампании на реальных Android HOST → TARGET; **новых подтверждённых результатов REV43 на физических устройствах пока нет**. Это инструкция, не протокол пройденных испытаний. Тестируем только **NekoFlash 2.0**, не NekoFlash Pro.
 
-## Скачать
+## Скачать тестбук и приложение для NekoFlash Insiders
 
 - [Тестбук REV43 — один автономный HTML](../insiders/testbook.html). Его можно открыть в браузере Android без интернета после скачивания; RU/EN, чекбоксы, PASS/FAIL/BLOCKED/NOT TESTED, сохранение прогресса, JSON, ZIP.
-- [Скачать тот же HTML непосредственно из DEV-ветки](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/work/rev26-terminal-imports-20261030/docs/insiders/testbook.html). GitHub Actions этой DEV-ветки дополнительно публикует **NekoFlash-Insiders-Testbook-REV43-…** как отдельный скачиваемый artifact.
+- [Скачать тот же HTML непосредственно из ветки main](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html). GitHub Actions тестовой ветки дополнительно публикует **NekoFlash-Insiders-Testbook-REV43-…** как отдельный скачиваемый artifact.
 - [Debug APK из зелёного точного PR REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171) — скачивание GitHub Actions требует доступ к artifact; извлечь APK из ZIP. Сборка NekoFlash `6.0.0-alpha11-dev`, `versionCode 234`, applicationId `ru.forum.adbfastboottool.dev`. **Не удаляй оригинальный NekoFlash**.
 - Исходник REV43 PR: `27ab796d100387b3530bd88a6faf28e48d1c717c`. Объединённая DEV: `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`. Не подставляй SHA-256 старого APK — свой скачанный APK проверяй заново: `sha256sum /sdcard/Download/имя.apk`.
 
