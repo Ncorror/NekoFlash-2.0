@@ -115,33 +115,18 @@ Not requested:
     <!-- Onboarding -->
     <string name="onboarding_subtitle">Android flashing over USB Host</string>
     <string name="onboarding_bg_desc">Welcome background image</string>
-    <string name="onboarding_grant_button">Set up access</string>
-    <string name="perm_storage">File access</string>
-    <string name="perm_notifications">Notifications</string>
-    <string name="perm_battery_opt">Ignore battery optimization</string>
-    <string name="onboarding_ready_short">Ready to enter</string>
-    <string name="onboarding_need_storage_short">File access required</string>
-    <string name="onboarding_agree_text_short">I accept the flashing risks</string>
     <string name="onboarding_enter_button">Continue</string>
-    <string name="onboarding_confirm_risk_short">Confirm flashing risks</string>
-    <string name="onboarding_confirm_risk_first">Accept the flashing risks first.</string>
-    <string name="onboarding_miui_battery_fallback_toast">If MIUI did not open Battery settings: Settings → Apps → NekoFlash → Battery → No restrictions.</string>
-    <string name="onboarding_gate_save_failed">Could not save the onboarding confirmation. Try entering again.</string>
-    <string name="onboarding_notifications_open_settings">Notifications were denied several times. Open NekoFlash settings and allow them manually; app entry is not blocked.</string>
     <!-- Layout text extracted from activity_main.xml -->
     <string name="layout_status_no_device">● No device</string>
-    <string name="layout_icon_scan">🔌</string>
     <string name="layout_icon_cancel">✕</string>
     <string name="layout_icon_home">Home</string>
     <string name="layout_icon_fastboot">Flash</string>
     <string name="layout_icon_adb">Sideload</string>
-    <string name="layout_device_title">DEVICE INFORMATION</string>
     <string name="layout_mode_empty">Mode: —</string>
     <string name="layout_model_empty">Model: —</string>
     <string name="layout_slot_empty">Slot: —</string>
     <string name="layout_bl_empty">BL: —</string>
     <string name="layout_max_dl_empty">Max DL: —</string>
-    <string name="layout_refresh">↻ Refresh</string>
     <string name="layout_reboot_system">System</string>
     <string name="layout_reboot_bootloader">Bootloader</string>
     <string name="layout_reboot_recovery">Recovery</string>
@@ -230,9 +215,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="flash_progress_writing">Writing…</string>
     <string name="status_fastbootd">● FASTBOOT • FASTBOOTD</string>
     <string name="otg_status_checking">🔌 OTG: checking…</string>
-    <string name="otg_status_unsupported">🔌 OTG: not supported by this phone</string>
-    <string name="otg_status_active">🔌 OTG: active · device detected</string>
-    <string name="otg_status_no_device">🔌 OTG: no devices · check cable or enable OTG in settings</string>
     <string name="perm_open_settings_manually">Could not open settings automatically. Grant "All files access" to NekoFlash manually in Settings → Apps.</string>
     <string name="layout_icon_unlock_tab">Unlock</string>
     <string name="mi_login_continue">Continue</string>
@@ -278,7 +260,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_unlock_sign_in_button">🔑 Sign in to Mi Account</string>
     <string name="mi_unlock_change_zone_button">🌍 Change dataCenterZone</string>
     <string name="device_mode_value">Mode: %1$s</string>
-    <string name="device_product_value">Model/product: %1$s%2$s%3$s</string>
     <string name="device_slot_value">Slot: %1$s</string>
     <string name="device_bootloader_value">Bootloader unlocked: %1$s</string>
     <string name="device_max_download_value">Max download: %1$s%2$s%3$s%4$s</string>
@@ -412,9 +393,6 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="home_advanced_information">Extended information</string>
     <string name="home_model_specs">Model specifications</string>
     <string name="home_specs_unavailable">No verified offline specifications for this model. Device information above is sourced from USB diagnostics.</string>
-    <string name="home_data_current">Current connection</string>
-    <string name="home_data_cached">Previously obtained — USB connection changed</string>
-    <string name="home_data_empty">No device data available</string>
     <string name="operation_center_collapse">Minimize</string>
     <string name="flash_rev7_quick">Quick Flash</string>
     <string name="flash_rev7_mass">Mass Flash</string>
