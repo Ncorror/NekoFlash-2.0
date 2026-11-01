@@ -9,8 +9,8 @@
     <string name="pro_review_queue">flash queue</string>
     <string name="pro_review_execute">EXECUTE</string>
     <string name="pro_review_slot_default">default / active</string>
-    <string name="pro_review_queue_count">Queue: %1$d targets</string>
-    <string name="pro_review_additional_targets">…and %1$d more targets (see queue for full list)</string>
+    <plurals name="pro_review_queue_count"><item quantity="one">Queue: %1$d target</item><item quantity="other">Queue: %1$d targets</item></plurals>
+    <plurals name="pro_review_additional_targets"><item quantity="one">…and %1$d more target (see queue for full list)</item><item quantity="other">…and %1$d more targets (see queue for full list)</item></plurals>
     <string name="pro_review_source_changed">Source or queue changed. Review the current selection again.</string>
     <string name="app_name">NekoFlash</string>
     <string name="app_name_neko">Neko</string>
@@ -474,7 +474,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev11_slot_switch_unverified">Active slot not confirmed: requested %1$s, device reports %2$s.</string>
     <string name="rev11_slot_switch_verified">Active slot confirmed: %1$s.</string>
     <string name="rev11_import_started">Importing %1$s into %2$s.</string>
-    <string name="rev11_import_expected_size">Source size: %1$d bytes.</string>
+    <plurals name="rev11_import_expected_size"><item quantity="one">Source size: %1$d byte.</item><item quantity="other">Source size: %1$d bytes.</item></plurals>
     <string name="rev11_import_finished">File imported: %1$s (%2$s).</string>
     <string name="rev11_import_failed">File import failed: %1$s.</string>
     <string name="rev11_picker_open_failed">Cannot open the Android file picker: %1$s.</string>
