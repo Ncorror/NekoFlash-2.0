@@ -1,3 +1,78 @@
+<div align="center">
+
+<img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash 2.0 — Mass Flash Specification & Fastboot Audit
+
+### Approved mass flashing queue rules and additional fastboot tools audit
+
+English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](#русская-версия--russian-version)
+
+</div>
+
+## Mass Flash Specification & Fastboot Audit
+
+**Date:** October 9, 2026  
+**Baseline:** `NekoFlash-2.0-MASTER-DECISIONS-2026-10-09-RU.md`  
+**Reference Source:** `NekoFlash-main-legacy.zip`, `6.0.0-alpha11`, SHA-256 `74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3`.  
+**Status Structure:** Section 1 — APPROVED, Section 2 — VERIFIED AUDIT, Section 3 — PROPOSAL (historically pending).
+
+---
+
+## 1. Approved Decisions for Mass Flashing
+
+Overrides earlier drafts and legacy section 7.1 notes:
+
+- **Queue Representation:** Mass flashing is structured as a clear list of concrete `partition → image file` mappings.
+- **Queue Modification:** Operations can be added, deleted, or manually reordered. Execution is **strictly top-to-bottom** in visible order, with no background re-sorting.
+- **Single Target Invariant:** **One specific partition — one entry. Duplicates are disallowed.** Re-adding a partition replaces the target image rather than creating a secondary entry. (`boot_a` and `boot_b` are treated as distinct addressable targets).
+- **Partition Scope:** Supports slotted and unslotted partitions with explicit manual entry, matching Quick Flash rules.
+- **Execution Flow:** Executes **sequentially** and halts **immediately upon the first failure**. Completed, skipped, and unreached steps are faithfully reflected in the Operation Center.
+- **No Hidden Actions:** No automatic reboots, mandatory preflight popups, extra confirmation steps, or artificial queue limits.
+- **No GUI Presets:** **Do NOT add dedicated "Save List" or "Load List" GUI buttons, templates, or profile managers.** Legacy state restoration remains internal.
+- **Inherited Engines:** Inherit `runFlashQueue()`, `flashPartitionDetailed()`, USB serialization, and diagnostics, while purging obsolete sorting and capacity limits (`FlashOperationDraft.kt`, `DeviceViewModel.kt`).
+
+---
+
+## 2. Additional Fastboot Tools Audit Findings
+
+### 2.1 Implemented Capabilities in Baseline
+
+| Capability | Legacy Source Location | Operational Detail |
+|---|---|---|
+| `getvar:<key>`, `getvar:all` | `FastbootProtocol.getVar`, `.getVarAll`, `.collectPartitionInventory` | Structural inventory exists; `getvar:all` is parsed structurally. |
+| `erase:<partition>` | Terminal parser → `FastbootPartitionCommand` → `DeviceViewModel` | Slot selection via `--slot`; support depends on bootloader implementation. |
+| `format <partition>` | Terminal parser forwards to `format:<partition>` wire | **Does not match desktop AOSP `fastboot format` filesystem creation.** Must be fixed before advertising in GUI. |
+| `set_active:<slot>` | Raw Fastboot with verified `getvar:current-slot` check | Active slot verification implemented. |
+| `fetch` | `fetchPartition` + `fetchChunk` with `.part` staging | IN-stream bulk transfer (16 KiB blocks); depends on bootloader/fastbootd support. |
+| Dynamic partition query | `inspectLogicalPartition` | Queries `is-logical`, `partition-size`, `partition-type`. |
+| Dynamic partition mutation | `runLogicalPartitionCommand` | `create-logical-partition`, `delete-logical-partition`, `resize-logical-partition`. |
+| `update-super` | Terminal parser → `downloadAndRun(..., update-super:...)` | Requires valid metadata image; single-download limits apply. |
+| `boot <file>` | `downloadAndRun(file, "boot")` | Boots RAM image directly without partition flash. |
+| Advanced commands | Passthrough in terminal | `snapshot-update`, `gsi`, `flashing`, `oem`, raw commands. |
+
+### 2.2 Critical Implementation Differences
+
+1. **Host-Side `format`:** Desktop `fastboot format` creates filesystems locally matching partition geometry; simple wire command transmission is not universally supported.
+2. **Reboot Command Unification:** Reconcile `reboot:fastboot` vs `reboot-fastboot` wire formats between menu handlers and terminal parsers.
+3. **Partial Stream Safety:** `fetch` must verify available storage, manage `.part` files, and validate transfer completeness before concluding.
+4. **State Verification:** `snapshot-update merge` must verify status is `NONE` before marking success.
+
+---
+
+## 3. Fastboot Tools UI Structure (Reference)
+
+Subdivided into four functional blocks within the **Flash** tab:
+- **Information:** `getvar` inspection and partition inventory.
+- **Partitions:** `erase`, proper `format` (post-remediation), and `fetch` with destination file picker.
+- **Slots:** `set_active` slot switching with confirmed `current-slot`.
+- **Fastbootd:** Logical partition inspection, management, and `update-super`.
+- **Expert Commands:** Reserved for full-screen terminal (raw/OEM/flashing).
+
+---
+
+## Русская версия / Russian Version
+
 # NekoFlash 2.0 — дополнение к контрольной спецификации
 
 **Дата:** 2026-10-09  
@@ -19,8 +94,6 @@
 - Наследовать механизмы `runFlashQueue()`, `flashPartitionDetailed()`, USB-сериализацию/верификацию и диагностику, но устранить устаревшую сортировку и лимиты (`FlashOperationDraft.kt`, `DeviceViewModel.kt`).
 - Утверждённая «Быстрая прошивка» и отдельная ручная перезагрузка остаются НЕИЗМЕННЫМИ.
 
-**Хронология исправлений:** промежуточное предложение о разрешении дубликатов было прямо отвергнуто пользователем; последнее решение о запрете дублей имеет приоритет. Предложение о GUI сохранения/загрузки списков было прямо отвергнуто.
-
 ## 2. Факты из аудита дополнительных Fastboot-инструментов (НЕ утверждение нового GUI)
 
 ### 2.1. Что реализовано
@@ -39,34 +112,11 @@
 | `boot <file>` | `downloadAndRun(file, "boot")` | Файл загружается в RAM загрузчика, а затем команда boot; это не прошивка раздела |
 | `fastboot flashall` / `fastboot update` | Терминальный парсер сообщает, что desktop batch orchestration **не реализована** | Не путать с GUI массовой очередью `runFlashQueue()` |
 
-### 2.2. Подтверждённые расхождения и задачи, которые нельзя замаскировать GUI
-
-1. `format` в терминале развернут в wire `format:<partition>`, тогда как официальный AOSP desktop `fastboot format` обычно **сам генерирует образ ФС** с учётом `partition-type`, `partition-size`, geometry и отправляет его обычной передачей/прошивкой. Не рекламировать простой wire как эквивалент; для корректного GUI требуются хостовая подготовка ФС или явно распознаваемая OEM-специфика. Источник AOSP: https://chromium.googlesource.com/aosp/platform/system/core/+/refs/heads/upstream/fastboot/fastboot.cpp
-2. `MainActivity.showRebootMenu()` направляет Fastbootd как `reboot:fastboot`, но `parseFastbootCommand("reboot fastboot")` — как `reboot-fastboot`. Проверить и унифицировать фактическую wire-команду со спецификацией/AOSP, не менять согласованное место кнопки. Это **расхождение в legacy**, не повод для автоперезагрузки.
-3. Часть опций терминального host CLI (`-S`, `--disable-verity`, `--disable-verification`, `flashall`, `update`, `wipe-super`) в текущем парсере не реализует соответствующей desktop-host семантики. Некоторые отвергаются или просто отправляются на USB. Не заявлять полную совместимость с desktop fastboot до реализации.
-4. Для `fetch` нужно учитывать отказ DATA посреди чтения, достаточное место в файловом хранилище, `.part` файл и реальную полноту результата; `max-fetch-size`/поблочное чтение поддерживаются по условию и могут отсутствовать у устройства.
-5. Для `snapshot-update merge` в legacy есть verify-политика, ожидающая `snapshot-update-status=NONE`; проверить поведение на реальных состояниях snapshot, не трактуя неполный merge как подтверждённый успех.
-6. `getvar:all` и инвентаризация могут быть неполными и требуют строго прочитанной топологии; `UNKNOWN` не является `A_ONLY`. Уже утверждённые правила работы со слотами сохраняются.
-7. Лог диагностики при `unlocked=no` сообщает, будто прошивка блокируется приложением, но `flashPartitionDetailed` не содержит соответствующего явного запрета — привести диагностику к фактическому поведению, а не вводить новый искусственный запрет.
-8. Raw/OEM passthrough доступен через полноэкранный терминал и должен остаться. USB owner, serial transactions, разрыв повреждённой сессии, реальные OKAY/FAIL — общие для всех способов запуска.
-
-### 2.3. Где проверено
-
-- `app/src/main/java/ru/forum/adbfastboottool/MainActivity.kt`: `showRebootMenu` ~1856–1912; `handleFastbootTerminalCommand` ~921–953; `parseFastbootCommand` ~1088–1250; `page_fastboot.xml` — прежние элементы быстрого Flash.
-- `app/src/main/java/ru/forum/adbfastboottool/DeviceViewModel.kt`: `runFastbootCommand`, `runFastbootDownloadAndRun`, `runFastbootLogicalPartitionCommand`, `inspectFastbootLogicalPartition`, `runFastbootFetch`, `runFastbootPartitionCommand` ~1009–1075.
-- `app/src/main/java/ru/forum/adbfastboottool/FastbootProtocol.kt`: `sendCommand`, `runTerminalCommand`, `getVar`, `getVarAll`, `collectPartitionInventory` ~344–664; slot targeting ~813–878; flash ~880–996; dynamic/fetch ~997–1109; download+run ~1115–1185; fetch read ~2310–2380.
-- AOSP fastboot docs: https://android.googlesource.com/platform/system/core/+/master/fastboot/README.md ; AOSP client: https://chromium.googlesource.com/aosp/platform/system/core/+/refs/heads/upstream/fastboot/fastboot.cpp ; Fastbootd reference: https://source.android.com/docs/core/architecture/bootloader/fastbootd
-
 ## 3. Предложение по интерфейсу (ЕЩЁ НЕ УТВЕРЖДЕНО)
 
-Предлагается **не менять** утверждённую «Быструю прошивку» и «Массовую прошивку». В существующей нижней вкладке **«Прошивка»** разместить отдельный внутренний раздел **«Инструменты Fastboot»**:
-
+В существующей нижней вкладке **«Прошивка»** разместить отдельный внутренний раздел **«Инструменты Fastboot»**:
 - **Сведения:** `getvar` по ключу и общий обзор/инвентаризация.
 - **Разделы:** `erase`, полноценный `format` *после исправления host-side семантики*, `fetch` с выбором файла для сохранения; существующее правило слота.
 - **Слоты:** `set_active` с фактическим подтверждением `current-slot`.
 - **Fastbootd:** инспекция `is-logical` / размера / типа, управление create/delete/resize и `update-super` по поддержке устройства.
-- **Расширенные команды:** оставлять полноэкранному терминалу (raw/OEM/flashing/snapshot/gsi) во избежание дублирования и ненужной кнопочной россыпи. Терминал не вызывает Центр операций.
-
-Для коротких запросов — обычный вывод результата. Для длительных GUI-запросов (например `fetch`, `update-super`) — ранее утверждённый Центр операций; никаких навязанных preflight-окон и искусственных стопоров. Никаких автоперезагрузок.
-
-**Ожидаемое решение пользователя:** согласовать или скорректировать саму организацию инструментов. Пока **НЕ считать этот раздел утверждённым**, не создавать новые кодовые изменения или APK.
+- **Расширенные команды:** оставлять полноэкранному терминалу (raw/OEM/flashing/snapshot/gsi).

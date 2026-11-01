@@ -1,4 +1,15 @@
-# Legal review
+<div align="center">
+
+<img src="artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# Legal Review
+
+### Maintainer checklist, project licensing, trademarks, and compliance
+
+English
+
+</div>
+
 
 This document is a maintainer checklist, not legal advice.
 

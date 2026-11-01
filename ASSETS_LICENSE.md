@@ -1,4 +1,14 @@
-# NekoFlash artwork licensing
+<div align="center">
+
+<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash Artwork Licensing
+
+### Licensing terms and copyright conditions for visual assets
+
+English
+
+</div>
 
 The Apache License 2.0 in the repository root applies to NekoFlash source code,
 documentation, build scripts, and ordinary UI resources unless another notice

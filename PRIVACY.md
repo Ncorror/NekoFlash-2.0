@@ -1,4 +1,15 @@
-# NekoFlash privacy note
+<div align="center">
+
+<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash Privacy Note
+
+### Data privacy, telemetry, local operations, and offline integrity
+
+English
+
+</div>
+
 
 This document describes the behavior of the current NekoFlash source tree. It is not a substitute for a jurisdiction-specific privacy policy if the application is later distributed through a store or service that requires one.
 

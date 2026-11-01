@@ -1,8 +1,87 @@
+<div align="center">
+
+<img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash 2.0 — Full Design Legacy Audit
+
+### Comprehensive audit of approved design decisions compared against original legacy source
+
+English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](#русская-версия--russian-version)
+
+</div>
+
+## Full Design Legacy Audit
+
+**Date:** October 9, 2026  
+**State:** Static audit of design specifications, WITHOUT modifying source code, USB sessions, APKs, or GitHub repositories.  
+**Baseline:** `NekoFlash-main-legacy.zip`, **SHA-256 `74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3`**, `versionName=6.0.0-alpha11`, `versionCode=234`, `applicationId=ru.forum.adbfastboottool` (`app/build.gradle:29-33`). This is **not NekoFlash-Pro** and not an experimental fork.
+
+---
+
+## 0. Status Classification Definitions
+
+- **APPROVED:** The user explicitly affirmed this design choice. Does NOT mean "implemented in APK".
+- **IN LEGACY:** Capability or mechanism is present in original code. Does NOT mean it matches new UX without adaptation.
+- **FINDING:** Discrepancy, technical hazard, missing evidence, or unaddressed requirement requiring alignment.
+- **NOT AGREED:** Requires explicit user determination; must not be implemented unilaterally.
+- **VERIFY:** Demands automated or hardware regression tests; static review alone is insufficient.
+
+---
+
+## 1. Executive Summary & Top Findings
+
+**Summary:** The design consensus establishes shell behavior, device overview cards, USB status reporting, and the Operation Center. Essential tested transport mechanics from legacy are preserved. **No new UI screens or background coordinators were merged into the legacy baseline during this phase.**
+
+**Top Audit Findings:**
+1. **[P0 / UX]** Navigation contains five tabs (`Home`, `Flash`, `ADB`, `Unlock`, `Settings`), but opening the full-screen terminal needed clear definition.
+2. **[P0 / Architecture]** Legacy operations run inside `viewModelScope` (`DeviceViewModel.kt:1604`), while `FlashOperationService` mostly supports foreground notifications. ViewModel destruction risks interrupting long operations.
+3. **[P0 / Transport]** Native USBFS enforces a **hard 90-second timeout** (`FastbootProtocol.kt:1442-1472`, `native_usbfs.cpp`), which risks aborting slow but functional large image writes.
+4. **[P0 / Logs]** Legacy storage rotates segments (`DiagnosticLogStore.kt`: caps at 30 files / 64 MiB), and sanitized export caps at 64 MiB, conflicting with complete lossless logging requirements.
+5. **[P1 / Outcome]** Successful Recovery Sideloads on POCO X3 Pro record `verificationPending=3` without updating the operation state to confirmed success (`DeviceViewModel.kt:1409-1450`).
+6. **[P1 / Multi-device]** `UsbDeviceInspector.selectModeSwitchCandidate()` requires a single device candidate. Multiple attached devices require explicit selection.
+7. **[P1 / Resources]** Legacy uses `FLAG_KEEP_SCREEN_ON` and automatic brightness reduction (`MainActivity.kt:300-347`).
+8. **[P1 / Framing Limits]** Fastboot `download` uses a 32-bit length header, bounding single payload transfers to 4 GiB (`FastbootProtocol.kt:913-925`).
+
+---
+
+## 2. Inventory of Approved Design Decisions
+
+| Functional Area | Approved UX Specification | Legacy Baseline Anchor | Audit Finding |
+|---|---|---|---|
+| Welcome | Retain original artwork, full-screen on cold launch, single orange "Enter NekoFlash" button. No mandatory storage gates. | `drawable-nodpi/bg_welcome.jpg`, `WelcomeActivity.kt` | **APPROVED.** Remove gates, preserve artwork, ensure window insets. |
+| USB Status Bar | Persistent color strip with auto-detected mode: ADB System/Recovery/Sideload, Fastboot/Fastbootd, unknown, error. Tapping opens sheet with VID/PID, interface, diagnostics. | `ConnectionModeUiPolicy.kt`, `UsbDeviceInspector.kt`, `UsbSessionSnapshot.kt` | **APPROVED.** No manual mode overriding; unknown modes rendered accurately. |
+| Navigation | Exactly five tabs: Home, Flash, ADB/Sideload, Unlock, Settings; handles window insets. | `activity_main.xml`, `TabController.kt` | **APPROVED.** Full-screen terminal accessible via header icon. |
+| Home Tab | Pure device overview; no action buttons, persistent task centers, or history on Home. | `page_home.xml` | **APPROVED.** Legacy Operation Center card removed from Home. |
+| Device Card | Left device photo; model + key specs on right; codename, Android version, bootloader, slot below. Two expandable cards: "Advanced Info" and "Model Specs". | `DeviceViewModel` diagnostics & inventory, getprop/getvar | **APPROVED.** Catalog data source required. |
+| Terminal | Full workspace view, command input/paste, PTY for `adb shell`, clean IME handling. Terminal commands bypass Operation Center. | `AdbProtocol.kt`, `MainActivity.kt`, `ConsoleDockController.kt` | **APPROVED.** Clean entry next to USB status bar. |
+| Operation Center | Contextual popup for long GUI tasks; detailed scrolling logs (100–120dp); real progress steps. | `DeviceViewModel.OperationProgress`, `NativeTransferProgress` | **APPROVED.** Presentation layer only; does not own USB transport. |
+| Floating Indicator | Compact pill above bottom navigation showing percentage or indeterminate progress. | Legacy live operation strip + Home Center | **APPROVED.** Unified visual state across all tabs. |
+| Operation Queue | Prompts "Queue" or "Cancel" when USB is busy; single USB owner; sequential execution. | `DeviceViewModel.startOperation` busy checks | **APPROVED.** Requires durable background coordinator. |
+| Mass Flash | Sequential execution in visible order; halts on first error; no auto-retry or continue-on-error. | `runFlashQueue()` | **APPROVED.** UI overhauled to clean list. |
+| USB Recovery | Differentiate normal mode transitions, ADB disconnection, Fastboot broken sessions, Native USBFS drain. Retain `USBDEVFS_RESET`. | `UsbTransportShutdownPolicy`, `NativeUsbfsBackend` | **APPROVED.** Reconnecting is not assumed to mean success. |
+| Outcome States | SUCCESS, FAILED, CANCELLED, VERIFY_PENDING; logs and reports preserved after closing window. | `DeviceViewModel.OperationOutcomeKind` | **APPROVED.** Sideload and unlock outcomes strictly verified. |
+
+---
+
+## 3. Invariants — Forbidden to Break
+
+- **Single USB Transport Owner:** GUI and terminal cannot execute concurrent USB mutations.
+- **Native USBFS URB Lifecycle:** Strict pending URB cancellation/drain/poison rules; `USBDEVFS_RESET` restricted to narrow recovery paths.
+- **No Auto-Retry on Ambiguous Writes:** Never automatically retry incomplete Fastboot DATA transfers.
+- **Protocol Fidelity:** Preserve ADB `shell_v2`, RSA authentication, and exact bootloader response interpretations.
+- **Hardware Topologies:** Respect actual partition configurations (`has-slot`, A-only, A/B). Never guess slots.
+- **Lossless Logging:** Logs and reports must not be truncated silently; authentication credentials must not leak.
+- **Visual Heritage:** Maintain original Welcome artwork, dark theme with signature orange accent, and clean professional styling.
+
+---
+
+## Русская версия / Russian Version
+
 # NekoFlash 2.0 — полный аудит утверждённого проектирования и сверка с оригинальным legacy
 
 **Дата:** 9 октября 2026 г.  
 **Состояние:** аудит проектных решений, БЕЗ изменений исходного кода, USB-сессий, APK и GitHub.  
-**Основа:** исходный `NekoFlash-main-legacy.zip`, **SHA-256 `74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3`**, `versionName=6.0.0-alpha11`, `versionCode=234`, `applicationId=ru.forum.adbfastboottool` (`app/build.gradle:29-33`). Копия `NekoFlash-main-legacy(2).zip` совпадает побайтово. Это **не NekoFlash-Pro** и не экспериментальные переписывания NekoFlash-2.0.
+**Основа:** исходный `NekoFlash-main-legacy.zip`, **SHA-256 `74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3`**, `versionName=6.0.0-alpha11`, `versionCode=234`, `applicationId=ru.forum.adbfastboottool` (`app/build.gradle:29-33`).
 
 ## 0. Что означает статус в этом отчёте
 
@@ -16,134 +95,25 @@
 
 **Основной результат:** Зафиксирована согласованная концепция оболочки, страницы устройства, USB-статуса и Центра операций. Важная проверенная транспортная логика legacy сохранена как обязательная основа. **Ни один новый экран, попап или фоновой координатор не был внедрён в оригинальный ZIP на этом этапе проектирования.**
 
-**Наиболее важные находки:**
-
-1. **[P0/UX]** В нижней навигации пять вкладок (`Главная`, `Прошивка`, `ADB`, `Unlock`, `Настройки`), но **не определено, откуда открывать полноценный терминал**, обязательный для профессионального инструмента. Старый терминал — выдвижной Console dock.
-2. **[P0/архитектура]** Старые USB-операции запускаются в `viewModelScope` (`DeviceViewModel.kt:1604`), а `FlashOperationService` в основном поддерживает уведомление. Простое наличие Foreground Service не гарантирует выполнения при гибели ViewModel/процесса.
-3. **[P0/транспорт]** Native USBFS содержит **абсолютный 90-секундный hard timeout**, который может прервать корректную, но медленную передачу большого образа; кроме него есть stall-timeout. Не удалять вслепую, а проверить на модели с подтверждённым прогрессом (`FastbootProtocol.kt:1442-1472`, `native_usbfs.cpp`).
-4. **[P0/журналы]** Старое хранилище **удаляет сегменты** (`DiagnosticLogStore.kt`: 5 сегментов на поток, по умолчанию 30 файлов/64 МиБ на каталог), а экспорт sanitized ограничен 64 МиБ (`SanitizedLogShare.kt:7-27`). Это прямо противоречит принятому «полные логи без усечения и тайного удаления».
-5. **[P1/результат]** Реальные успешные Recovery Sideload на POCO X3 Pro после `VERIFY_PENDING` подтверждены, но исходный код не переводит итоговый статус операции при получении вердикта, хотя записывает его в лог (`DeviceViewModel.kt:1409-1450`).
-6. **[P1/USB]** `UsbDeviceInspector.selectModeSwitchCandidate()` требует единственного кандидата `singleOrNull()` и фильтрует по прежнему vendor ID. При нескольких устройствах или неожиданной смене дескрипторов автоматический путь может не выбрать цель; нужен ранее утверждённый выбор устройства, без подмены цели.
-7. **[P1/фон]** Исходный Manifest использует `foregroundServiceType="dataSync"`, а ранее предложенный тип `connectedDevice` ещё не реализован и должен проверяться отдельно по API/разрешениям и на устройстве (`AndroidManifest.xml:51-54`).
-8. **[P1/ресурсы]** В legacy уже есть `FLAG_KEEP_SCREEN_ON` и **автоматическое снижение яркости** при операции (`MainActivity.kt:300-347`). Первое утверждено; поведение яркости отдельно не обсуждалось.
-9. **[P1/размеры]** Fastboot `download` ограничен форматом длины до 4 GiB в текущей реализации (`FastbootProtocol.kt:913-925`), это **протокольное ограничение реализации**, не произвольная UI-политика. Нельзя удалить проверку без нового, проверенного способа передачи.
-10. **[P1/проверка]** Аппаратные документы подтверждают alpha10/release-base на `vayu` и `rodin`, **не новую сборку 2.0 и не все изменения alpha11**. В архиве нет `src/test` / `src/androidTest`.
-
 ## 2. Инвентаризация утверждённого дизайна
 
 | Раздел | Утверждённое поведение | Legacy-опора | Итог проверки |
 |---|---|---|---|
-| Welcome | Неизменное исходное artwork, полноэкранный экран на холодном старте, название и одна оранжевая «Войти в NekoFlash». Без обязательного storage gate; разрешения по необходимости. | `drawable-nodpi/bg_welcome.jpg`, `WelcomeActivity.kt`, `OnboardingGate.kt` | **УТВЕРЖДЕНО.** Убрать gate, не менять изображение, сохранить корректный USB attach/insets и исключить повтор Welcome при обычном resume. |
-| Верхний USB-статус | Постоянная цветная панель с автоматически определяемым режимом: ADB System/Recovery/Sideload; Fastboot/Fastbootd; unknown/connecting/error/no-device. Нажатие → шторка с VID/PID, interface, endpoints, USB auth, выбором устройства и диагностикой. | `ConnectionModeUiPolicy.kt`, `UsbDeviceInspector.kt`, `UsbSessionSnapshot.kt`, `AdbProtocol.PeerMode`, `FastbootProtocol` | **УТВЕРЖДЕНО.** Не создавать ручной выбор режима; неизвестное не выдавать за System/Fastbootd. |
-| Нижняя навигация | Ровно пять пунктов: Главная / Прошивка / ADB / Unlock / Настройки; учёт Android navigation insets. | `activity_main.xml`, `TabController.kt` | **УТВЕРЖДЕНО.** **НАХОДКА:** место полноэкранного терминала ещё не определено. |
-| Главная | Только информация об устройстве; никаких рабочих кнопок, постоянного Operation Center, «центра задач» или истории на Home. | `page_home.xml` содержит техполя, но также старую большую карточку Operation Center | **УТВЕРЖДЕНО.** Legacy-центр не переносить на Home. |
-| Карточка устройства | Фото слева; название + 2–3 короткие спецификации справа; ниже codename, Android, bootloader, slot. Два независимых раскрываемых блока: «Расширенная информация» (факты с устройства) и «Характеристики модели» (каталог). | `DeviceViewModel` diagnostics и inventory, ADB getprop/Fastboot getvar | **УТВЕРЖДЕНО.** Каталог фото/спецификаций — **новая** подсистема, в legacy её нет. |
-| Источник и актуальность данных | `vayu`/`bhima` каталогизировать как POCO X3 Pro с сохранением реального codename; current / last-known / unavailable по смене режимов; offline fallback. A-only не представлять как A/B. | `FastbootProtocol.kt:545-546,780-795`; доказательство X3 Pro `vayu` A-only | **УТВЕРЖДЕНО.** **ПРОВЕРИТЬ** поведение без ADB Shell в Sideload и на неподдерживаемом Recovery. |
-| Терминал | Профессиональный полный рабочий экран, ввод/вставка, большой вывод, интерактивный ADB shell, аккуратный resize/IME, не мелкая «форточка». Ни одна терминальная команда не поднимает Центр операций. | `AdbProtocol.kt:1427-1458`, `MainActivity.kt` парсер terminal, `ConsoleDockController.kt` | **ЧАСТИЧНО УТВЕРЖДЕНО**: базовый UX и отсутствие popup утверждены; **НАХОДКА** — маршрут открытия/конкретная компоновка терминала требуют решения. |
-| Центр операций | Только контекстные всплывающие окна для GUI-длительных задач, без постоянной Home-карточки; компактное поле «Подробности», высота 100–120dp/внутренняя прокрутка; реальные стадии и прогресс. | `DeviceViewModel.OperationProgress`, `OperationStep`, `NativeTransferProgress` | **УТВЕРЖДЕНО.** Окно только читает реальный статус ядра и не владеет транспортом. |
-| Сворачивание | Один плавающий индикатор **над нижней навигацией**; реальный процент или неопределённое состояние; при нескольких задачах число; касание открывает список/операцию. | Legacy live operation strip + Home Center | **УТВЕРЖДЕНО.** Это новое представление старого статуса, не два параллельных центра. |
-| Очередь операций | При занятом USB спросить: «В очередь» / «Не запускать». Один USB owner, остальные USB-задачи ждут; параллельно возможны только независимые локальные задачи. Проверка устройства перед запуском; при аварии очередь пауза. | `DeviceViewModel.startOperation` отклоняет новую при busy; `FlashOperationDraft` содержит cap 32 | **УТВЕРЖДЕНО как UX.** **НАХОДКА:** надёжный runtime-coordinator и durable queue придётся добавить без изменения USB семантики. |
-| Массовая прошивка | Последовательно, порядок заранее виден, первая ошибка останавливает всю пачку; учёт `OKAY` / `FAIL` / «не запускался» / «не подтверждено» по каждому разделу; без auto-retry и режима continue-on-error. | `runFlashQueue()` уже существует, `FlashResult` содержит стадию ошибки | **УТВЕРЖДЕНО.** Исходный GUI массовой очереди удалён из alpha11, executor жив. Возвращать профессионально, не старый скрытый UI. |
-| Фон | Экран остаётся включённым на переднем плане при длительной операции; при ручной блокировке или уходе из приложения — фоновое исполнение по возможностям Android; уведомление с результатом без звука и вибрации. | `MainActivity` KEEP_SCREEN_ON, `FlashOperationService`, PARTIAL_WAKE_LOCK | **УТВЕРЖДЕНО как поведение.** **НАХОДКА:** ViewModelScope vs FGS, Android policy и battery optimization нужно испытать. |
-| Восстановление USB | Различать штатную смену режима, ADB обрыв, Fastboot broken session, Native USBFS poison/drain, Sideload `VERIFY_PENDING`; сохранить из legacy узкий `USBDEVFS_RESET`; никакого опасного авто-повтора. | `UsbTransportShutdownPolicy`, `NativeUsbfsBackend`, `FastbootProtocol`, `RecoveryInstallVerifier` | **УТВЕРЖДЕНО.** Не принимать новый USB connect за успех ранее запущенной операции. |
-| Итоговые статусы | SUCCESS, FAILED, CANCELLED, VERIFY_PENDING; в массе «частично выполнено» как представление результата; не подменять 100% bytes итогом flash; не терять запись/лог после закрытия окна. | `DeviceViewModel.OperationOutcomeKind` | **УТВЕРЖДЕНО.** Исправить синхронизацию `VERIFY_PENDING` с итоговой историей (Sideload). |
-| История | `Настройки → История и отчёты` + быстрый переход из результата; не на Главной. Компактный индекс записей; полный журнал доступен по выбору. | `DiagnosticSessionTracker`, `DiagnosticLogStore`, `MainActivity` report actions | **УТВЕРЖДЕНО.** Добавить персистентную историю отдельных операций поверх сессий. |
-| Журналы и экспорт | **Без искусственного усечения**, без молчаливой ротации/удаления оригиналов; COMPACT + TRACE, отчёты TXT/JSON/ZIP, потоковый экспорт, явная безопасная копия для шаринга, полные данные остаются у оператора. | `DiagnosticLogStore`, `DiagnosticLogPolicy`, `ReportSanitizer`, `SanitizedLogShare` | **УТВЕРЖДЕНО.** Наиболее заметное отличие от старого storage; нуждается в новой реализации и тестах дискового пространства. |
-| Mi Unlock | Разбирать **после** аудита; использовать исходный рабочий путь и device-side verification, не переписывать из-за UI. | `MiUnlockClient`, `MiAccountClient`, `DeviceViewModel.verifyPendingUnlockIfReady` | **ОТЛОЖЕНО ПОЛЬЗОВАТЕЛЕМ**. Не считать всю вкладку Unlock окончательно спроектированной. |
+| Welcome | Неизменное исходное artwork, полноэкранный экран на холодном старте, название и одна оранжевая «Войти в NekoFlash». Без обязательного storage gate. | `drawable-nodpi/bg_welcome.jpg`, `WelcomeActivity.kt` | **УТВЕРЖДЕНО.** |
+| Верхний USB-статус | Постоянная цветная панель с автоматически определяемым режимом. | `ConnectionModeUiPolicy.kt`, `UsbDeviceInspector.kt` | **УТВЕРЖДЕНО.** |
+| Нижняя навигация | Ровно пять пунктов: Главная / Прошивка / ADB / Unlock / Настройки. | `activity_main.xml`, `TabController.kt` | **УТВЕРЖДЕНО.** |
+| Главная | Только информация об устройстве; никаких рабочих кнопок. | `page_home.xml` | **УТВЕРЖДЕНО.** |
+| Карточка устройства | Фото слева; название + 2–3 короткие спецификации справа; ниже codename, Android, bootloader, slot. | `DeviceViewModel` diagnostics и inventory | **УТВЕРЖДЕНО.** |
+| Терминал | Профессиональный полный рабочий экран. | `AdbProtocol.kt`, `MainActivity.kt` | **УТВЕРЖДЕНО.** |
+| Центр операций | Контекстные всплывающие окна для GUI-длительных задач. | `DeviceViewModel.OperationProgress` | **УТВЕРЖДЕНО.** |
+| Массовая прошивка | Последовательно, порядок заранее виден, первая ошибка останавливает всю пачку. | `runFlashQueue()` | **УТВЕРЖДЕНО.** |
 
-## 3. Находки, которые мы могли упустить
-
-### 3.1 [P0] Куда поместить профессиональный терминал
-
-Нижняя навигация утверждена с пятью названиями, **без отдельной вкладки «Терминал»**. В legacy Console — раскрываемый BottomSheet (`ConsoleDockController.kt`, `activity_main.xml:442-599`), поддерживает shell-v2 PTY, локальные команды и history. Новый большой терминал должен быть доступен **без шестой вкладки и без возвращения мелкого дока**, но точный переход пока не согласован. Не назначать его автоматически внутрь ADB (он нужен и для Fastboot), не добавлять тестовые/служебные кнопки самовольно.
-
-Отдельный контракт: терминальные `adb push`, `fastboot flash` не открывают окно Центра операций, **но обязаны использовать те же transport ownership, cancellation, logs и аппаратные safeguards**. Legacy `MainActivity` маршрутизирует терминальные команды в те же `DeviceViewModel.run...`, где `startOperation` обновляет глобальное состояние. Следовательно, в 2.0 потребуется различать `origin=TERMINAL` и `origin=GUI` только для презентации, а не дублировать USB-путь (`MainActivity.kt:182-196, 927-988`; `DeviceViewModel.kt:1565-1604`).
-
-### 3.2 [P0] Новые экраны «Прошивка», «ADB» и «Настройки» согласованы не целиком
-
-Утверждены назначения вкладок, глобальная оболочка и процессные окна. **Но детальный основной контент этих рабочих вкладок ещё не прошёл утверждение как единое целое:** выбор файла/папки, рабочие действия Fastboot/ADB, preflight разметка, сценарии больших файлов, A/B и logical partitions, Recovery/Sideload entry и профессиональный терминал. В legacy `page_fastboot.xml` — recovery-first Quick Flash, `page_adb.xml` — ADB/Sideload; `MainActivity` содержит expert/логические операции. Не терять команды и не обещать, что страницы готовы только потому, что Центр операций готов.
-
-### 3.3 [P0] Абсолютный Fastboot Native USBFS timeout 90 секунд
-
-В `FastbootProtocol.kt:1442-1472` задаётся `hardTimeoutMs=NATIVE_USBFS_HARD_TIMEOUT_MS` вне зависимости от подтверждённого прогресса. Прежний углублённый аудит указывает на 90 000 ms и на отдельный stall deadline. Медленное устройство, кабель или очень большой образ могут прервать исправную запись. Нужна характеризационная проверка progress/stall/hard-timeout, а не удаление защит от зависания. `download:%08x` кроме того имеет 4-GiB границу текущего framing (`FastbootProtocol.kt:913-925`).
-
-### 3.4 [P0] Две разные роли службы и ViewModel
-
-`FlashOperationService.kt` управляет Foreground notification, но реальная корутина создаётся в `viewModelScope` (`DeviceViewModel.kt:1604`). При простой смене Activity обычно ViewModel выживает, но если ViewModel уничтожена, сервис уведомления не гарантирует продолжение операции. Перенос владения исполнением в отдельный надёжный coordinator должен быть отдельной аккуратной работой с аппаратными регрессиями. Manifest в legacy использует `foregroundServiceType="dataSync"`; идея `connectedDevice` для 2.0 — технический кандидат, **не проверенный факт**. Учитывать ограничения современных Android, выключение экрана, power saver и отказ foreground start.
-
-Дополнительный нюанс: `MainActivity.kt:328-346` уже выставляет и убирает `FLAG_KEEP_SCREEN_ON`, но **также снижает яркость** (`applyReducedBrightness()`), чего мы отдельно не обсуждали. Не смешивать это с «экран включён» без спроса.
-
-### 3.5 [P0] Полнота логов требует изменения реального storage, не только визуализации
-
-`DiagnosticLogStore.kt` удаляет старые сегменты при ротации и старые файлы при входе в следующую сессию. `SanitizedLogShare.kt` отклоняет >64MiB. `DiagnosticLogPolicy.kt` сохраняет прогрессные сообщения с интервалом 5/10% либо 5/10 секунд, UI получает более частые обновления, а повторяющиеся компактные сообщения объединяются в течение 1,5 сек. В 2.0 надо разделить: **(а) каждое реально записанное событие сохраняется без удаления**, **(б) интенсивность *создания* телеметрии — отдельная спецификация**, **(в) видимый preview ограничен высотой**, **(г) никакого чтения целого гигабайтного лога в память**. Не обещать «каждый USB пакет записывается», если код его никогда не журналировал; при расширении трассировки — сохранять секреты и производительность.
-
-Отказ записи при полном диске, нехватке разрешений или отказе FS нельзя игнорировать: статус логирования должен быть виден без остановки USB в опасный момент. Рекомендуется *фактическая* доступная ёмкость и понятное предупреждение, а не молчаливая чистка.
-
-### 3.6 [P1] Статус Sideload после Recovery подтверждения
-
-На POCO X3 Pro три sideload-пакета реально завершились успешно по Recovery evidence, но summary остался `verificationPending=3` (`docs/evidence/POCO_X3_PRO_ALPHA10_1.md:60-112`). `DeviceViewModel.kt:1409-1450` при вердикте Recovery пишет в журнал и удаляет pending-marker, но не обновляет `OperationProgress`/result как отдельный verified outcome. В NekoFlash 2.0 требуется атомарное применение вердикта к актуальной операции, индикатору, истории и отчёту; UNKNOWN оставить pending/unknown, не выдавать за FAILED. Для Mi Unlock схожая финальная проверка работает иначе; её обсудим позднее.
-
-### 3.7 [P1] Актуальность device info и multi-device
-
-`ConnectionModeUiPolicy.kt:9-55` знает **UNKNOWN** состояния для ADB/Fastboot; ADB banner (`AdbProtocol.kt:155-160`) не всегда позволяет уверенно отличить кастомное Recovery от Android System. Титульная панель не должна принудительно классифицировать неизвестный режим. `UsbDeviceInspector.kt:148-166` возвращает candidate только при ровно одном подходящем устройстве в re-enumeration, и сравнивает VID. Два телефона, USB hub, disconnect/reconnect и недоступный serial — отдельные UX и state-machine тесты.
-
-У X3 Pro `vayu` legacy A-only, поэтому «Текущий слот» — **«Не применяется»**, а не случайно «A». A/B `rodin` — другая топология (`FastbootProtocol.kt:545-546, 780-795`; `docs/HARDWARE_VALIDATION.md`). Между режимами сохранять прошлые факты с пометкой `last-known` и проверкой привязки к той же физической цели.
-
-### 3.8 [P1] Фото и характеристики: новой базе нужен источник данных
-
-Наш карточный каталог (фото, CPU/GPU, экран, батарея) **не присутствует как готовая функция в исходном legacy**. Не извлекать несуществующие данные из Fastboot, не подменять фактический объём RAM/версии Android заводским каталогом; поддержать offline/unknown, aliases, версии моделей, качество/лицензию фото. UI должен оставаться пригодным без интернета и без отправки уникального ID на сайты каталога. `ASSETS_LICENSE.md` исключает welcome artwork из общего Apache-лицензирования: оригинальное artwork сохраняется без изменений и с сохранением правообладателя.
-
-### 3.9 [P1] Отмена и USB shutdown
-
-Legacy уже содержит graceful cancellation, wake lock до завершения cleanup и запрет закрытия unsafe Native USBFS (`DeviceViewModel.kt:1709-1725`, `UsbTransportShutdownPolicy.kt`). Наш диалог «Остановить» должен обращаться к *разрешённой фазе*, а не изображать мгновенное завершение во время device-side flash. Если result unknown — оставить `VERIFY_PENDING`, даже если UI закрыт.
-
-### 3.10 [P1] Профессиональный Fastboot: не терять мощность исходника
-
-`MainActivity.kt:1088-1245` поддерживает парсер Fastboot raw/OEM/getvar/erase/format/set_active/partition/fetch/download etc.; `FastbootProtocol` поддерживает logical partitions, topology, slots, и частично generic USB matching. Новая страница «Прошивка» не должна свести всё к двум recovery-кнопкам. Legacy **не содержит прежний полный Mi Flash workflow**, который был намеренно удалён ещё при начале V6 (`CHANGELOG.md:78-90`): его нельзя объявлять «уже проверенным в этом ZIP».
-
-### 3.11 [P1] Original release/ABI/identity
-
-Legacy `targetSdk=34`, `compileSdk=36` оставлены специально из-за window/USB поведения (`app/build.gradle:20-33,84-85`). `applicationId=ru.forum.adbfastboottool`, JNI exports, Android backup и signing связаны с совместимостью. При разделении `MainActivity` и переносе package не менять одновременно application identity, JNI и транспорт. Продакшн release требует постоянной подписи, CI debug можно делать независимо. Документация противоречит сама себе: `README` называет alpha11 выпущенным, `CHANGELOG` помечает alpha11 как ещё не выпущенный. Нужен точный source/tag/certificate baseline перед релизом.
-
-### 3.12 [P1] Тесты и аппаратное доказательство
-
-Исходный snapshot содержит 44 Kotlin-файла, архитектуру transport / diagnostics, но нет unit/instrumentation test suite. Физическая матрица 10.08.2026: POCO F7 как USB-host Android 16; цели POCO X3 Pro `vayu` и POCO X7 Pro `rodin`; подтверждены ADB shell, reconnect, настоящий flash, Recovery/Sideload/Fastbootd, slot selection и конечная загрузка (`docs/HARDWARE_VALIDATION.md`; `docs/evidence/...`). Это тесты линии alpha10/release-base, а **не NekoFlash 2.0**. Из двух пользовательских Poco X3 Pro будущие опасные проверки проводить **только на разблокированном**; блокированный не использовать для прошивки.
-
-## 4. Сводка статусов проектирования
-
-**Полностью согласованы как дизайн:** Welcome, 5-пунктовая навигация, верхняя USB-панель и шторка, device-card + 2 раскрываемых блока, контекстные окна Центра операций, 5 режимов, минимизация/плавающий индикатор, USB concurrency/подтверждение очереди, режим ожидания/проверки, stop-on-first-error для multi-flash, уведомления/keep screen on, схема восстановления, история/экспорт/полные логи. Не считать это уже собранными Android экранами.
-
-**Нужна доработка/проверка без изменения дизайна:** устойчивое operation state + durable queue + отдельный фоновой coordinator, full-fidelity log persistence/export, sideload result promotion, Native USBFS timeout, MODE UNKNOWN/2 devices, ошибки USB/ADB ownership, re-entrancy, Android 14/15/16 foreground policy.
-
-**Пока не завершено в UX:** конкретный способ открыть полный терминал при пяти вкладках, полностью функциональное наполнение «Прошивка», «ADB», «Настройки», preflight UX/выбор образов/слотов и сквозной offline photo-catalog; точное поведение автоматического снижения яркости. **Mi Unlock — отдельный отложенный большой раздел** по прямому решению пользователя.
-
-## 5. Рекомендуемый порядок следующих обсуждений (не реализация)
-
-1. Совместно посмотреть **находки этого аудита** и подтвердить, какие открытые вопросы первоочередные. Не менять утверждённые экраны.
-2. **Профессиональный терминал:** как открыть его из утверждённой навигации, как отображать HOST/explicit ADB shell, сохранить работу без центра операций.
-3. **Страница «Прошивка»:** полный функциональный аудит legacy Quick Flash / expert partitions / A-B / Fastbootd / multi-flash, структура GUI без тестовых кнопок, preflight.
-4. **Страница «ADB»:** Push/Pull, APK/multiple, Sideload, reboot, авторизация, режимы, Recovery и большая передача, не дублируя терминал.
-5. **Страница «Настройки»:** source/workspace, logs/reports, battery/screen/notifications, язык/доступность, техдиагностика; согласовать brightness.
-6. **Mi Unlock** — отдельный аудит авторизации Xiaomi, server response, wipe confirmation, stage-by-stage verification после завершения остальных обсуждений.
-7. После утверждения всех экранов — отдельный план миграции поверх зафиксированного legacy baseline, characterization tests, CI и аппаратный regression на разблокированном X3 Pro.
-
-## 6. Инварианты, запрещено ломать при миграции
+## 3. Инварианты, запрещено ломать при миграции
 
 - Единственный владелец физического USB transport; GUI и терминал не могут независимо запускать конкурентные операции.
 - Native USBFS pending URB cancel/drain/poison semantics; `USBDEVFS_RESET` только в прежнем ограниченном recovery-path.
 - Никакой auto-retry после ambiguous Fastboot DATA/flash; нельзя подменять «передано 100%» на «раздел записан».
 - ADB `shell_v2` и логика `CLSE`/RSA key/auth; Recovery/Sideload verification; сохранение точной семантики ответа загрузчика.
 - Фактическая топология разделов, `has-slot`, A-only и A/B; не угадывать слот.
-- Без искусственных запретов host-side, но с настоящими протокольными проверками и честным preflight.
-- Ни одно новое окно не обязано захватывать USB; закрытие окна не отменяет команду.
-- Логи/отчёты не усекаются ради удобства UI, исходники логов не удаляются тайно; секреты авторизации не распространяются.
-- Оригинальное Welcome artwork/брендинг не изменять; тёмная тема/оранжевый акцент; без фейковых test-кнопок.
-- При работе в терминале Центр операций не возникает, но полные логи и безопасность транспорта сохраняются.
-
-## 7. Границы выполненной проверки
-
-**Фактически сделано:** SHA-256 сравнение двух архивов; `unzip -t` оригинального ZIP; прочитаны исходники `MainActivity`, `DeviceViewModel`, `AdbProtocol`, `FastbootProtocol`, `NativeUsbfsBackend`/связанные механизмы, `ConnectionModeUiPolicy`, `UsbDeviceInspector`, `FlashOperationService`, `DiagnosticLogStore`, `DiagnosticLogPolicy`, `SanitizedLogShare`, `ReportSanitizer`, `FlashOperationDraft`, Android Manifest, `app/build.gradle`, лицензии artwork, README/CHANGELOG, аппаратные доказательства и прежние аудиты. Итоги проектирования взяты из текущих согласований.
-
-**Не сделано:** запуск Gradle unit/lint/build на этом конкретном source в данной проверке; USB-тесты, физическая прошивка, performance profiler, live verification GitHub release; оценка юридической применимости всех сторонних изображений. Исходный ZIP, текущие кодовые базы и репозитории **не менялись**.
-
-**Правило:** все замечания о будущем коде — рекомендации или проверки, не объявлять их реализованными до реальной сборки и тестов.
+- Логи/отчёты не усекаются ради удобства UI; секреты авторизации не распространяются.
+- Оригинальное Welcome artwork/брендинг не изменять; тёмная тема/оранжевый акцент.

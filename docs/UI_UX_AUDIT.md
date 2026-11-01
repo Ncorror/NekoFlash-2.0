@@ -1,4 +1,14 @@
+<div align="center">
+
+<img src="artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
 # NekoFlash UI/UX and Localization Audit
+
+### Android interface, UI controllers, RU/EN interface copy, and accessibility audit
+
+English
+
+</div>
 
 **Audit scope:** Android interface, UI controllers, RU/EN interface copy, accessibility-facing labels, and public documentation.
 

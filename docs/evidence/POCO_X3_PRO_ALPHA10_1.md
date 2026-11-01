@@ -1,4 +1,14 @@
-# POCO X3 Pro (`vayu`) release-base hardware validation
+<div align="center">
+
+<img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# POCO X3 Pro (vayu) Release-Base Hardware Validation
+
+### Physical regression test report and hardware validation evidence
+
+English
+
+</div>
 
 ## Scope
 

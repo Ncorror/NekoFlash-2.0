@@ -1,4 +1,15 @@
-# Third-party notices and acknowledgements
+<div align="center">
+
+<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# Third-Party Notices and Acknowledgements
+
+### Open-source licenses, bundled dependencies, and third-party notices
+
+English
+
+</div>
+
 
 This file documents third-party material bundled into, linked into, or used to build NekoFlash, plus non-bundled projects that informed implementation choices.
 

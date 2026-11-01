@@ -1,4 +1,14 @@
-# POCO X7 Pro (`rodin`) hardware validation
+<div align="center">
+
+<img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# POCO X7 Pro (rodin) Hardware Validation
+
+### Physical-device test run and hardware validation evidence
+
+English
+
+</div>
 
 ## Scope
 

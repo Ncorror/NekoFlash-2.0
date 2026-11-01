@@ -1,3 +1,87 @@
+<div align="center">
+
+<img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash 2.0 — REV5: Five-Tab Audit & Implementation Roadmap
+
+### Verification of all five tabs against original legacy baseline and implementation roadmap
+
+English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](#русская-версия--russian-version)
+
+</div>
+
+## Overview
+
+**Date:** October 10, 2026.  
+**Status:** Source code inspection + initial port of one approved screen into working copy. Neither APK builds, GitHub release pushes, USB operations, nor live Mi account authentication were performed at this stage.
+
+## 1. Provenance Control
+
+- **Single Canonical Original:** `NekoFlash-main-legacy.zip`, SHA-256 `74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3`.
+- From `app/build.gradle`: `applicationId=ru.forum.adbfastboottool`, `versionName=6.0.0-alpha11`, `versionCode=234`, `compileSdk=36`, `targetSdk=34`; version string is intentionally **unchanged** to avoid presenting a work-in-progress checkpoint as finished 2.0 release.
+- Projects such as `NekoFlash-Pro`, remote experimental branches, and side forks were NOT used.
+- Decision precedence: Master REV2 → Sideload REV3 approved → Unlock REV4 approved. **Third tab is Sideload**, despite historical internal identifier `adb` in code.
+
+## 2. Five-Tab Verification Matrix
+
+| Tab | Approved UX Specification | Original Android Code Baseline | Gap & Plan |
+| --- | --- | --- | --- |
+| **Home** | Device card only with photo & specs; actual codename, Android version, bootloader status, active slot; two independent expandable sections; no active operations | `page_home.xml`: `cardHomeDeviceInfo`, mode/product/slot/unlocked/maxDownload fields, Refresh button; plus **persistent** `cardOperationCenter` | Remove persistent GUI Operation Center from Home **after** migrating state presentation into contextual Center. Add device catalog & freshness indicator; never invent hardware IDs. |
+| **Flash** | Approved **Quick Flash**, **Mass Flash**, and **Fastboot Tools** with segmented sub-section switching; no auto-reboot or separate forced preflight dialog | `page_fastboot.xml`: recovery-first card, individual partition flash buttons; `DeviceViewModel` contains `flashOperationDraft`, `runFlashQueue`; Fastboot operations and diagnostics exist | Replace UI completely **only with approved layout composition**. Bind to existing methods without rewriting transport. Resolve target/slot/format/fetch/fastbootd wire differences separately from design. |
+| **Sideload** | REV3: Recovery instruction prompt, selected ZIP filename, "Choose ZIP for Sideload", "Import file" — and nothing else | `page_adb.xml` already contains both buttons; `MainActivity.kt` calls `showFileSelector → viewModel.runSideload(file)` and `startImportFilePicker` | **First UI slice implemented in REV5:** minimal screen with chosen ZIP filename and preserved button IDs/handlers. Full Recovery verdict integration and Operation Center decoupling follow next. No Push/Pull/APK/Shell in this tab. |
+| **Unlock** | REV4: Mi Account, bootloader status, server zone hidden in expandable advanced settings, wipe warning, action button enabled only under verified conditions, verdict confirmed upon reconnect (`unlocked=yes`) | `MainActivity.buildUnlockPage()` dynamically creates views; `MiLoginActivity`, `MiAccountClient`, `MiUnlockClient`, `DeviceViewModel.runMiUnlock`, and pending verification logic exist | Migrate **without replacing backend** into approved REV4 layout. Move zone selection into expandable section; link pending-result to same history entry. Never leak secrets into shared logs. Never execute unlock on hardware without owner consent. |
+| **Settings** | Approved placement for "History & Reports", language, and system parameters. Independent new log viewer screen is not approved | `MainActivity.buildSettingsPage()` manages language, permissions, battery optimization, workspace cache clearing, About; logs accessible via legacy Console/Home | Add agreed entry point "History & Reports", migrated from Home. Clarify storage/streaming implementation before removing legacy structures; do not introduce unauthorized extra sections. |
+
+## 3. Global Shell & Cross-Cutting Invariants
+
+- `activity_main.xml` already contains **five tabs**. The third tab label is presented as "Sideload" in `values/strings.xml` and `values-ru/strings.xml`, though internal layout IDs (`tabAdb`) and routing keys retain `adb`. Do not rename internal identifiers without complete call site auditing.
+- **USB Status:** Legacy uses separate `tvStatus`, OTG strip, and scan/cancel buttons. Convert into a unified **clickable status strip** with live detected mode and technical details bottom sheet; avoid guessing Fastbootd/Recovery modes upon reconnect.
+- **Terminal:** Legacy console is a BottomSheet in `activity_main.xml` (`ConsoleDockController`). In approved design, terminal opens via **icon to the right of USB strip**, occupies the full workspace, defaults to HOST CLI, reserves PTY strictly for `adb shell`, preserving copy/paste/IME. Terminal commands must never launch the GUI Operation Center.
+- **Operation Center:** Legacy contains persistent Home card and status strip. Approved design specifies a contextual modal dialog and a compact floating pill above the bottom navigation; true progress stems only from backend core, single USB ownership, and user-confirmed queuing on busy transport.
+- **Welcome:** Retain original `bg_welcome.jpg` artwork; no mandatory onboarding storage gates; window insets and cold-start permissions handled cleanly.
+
+## 4. Critical Boundaries to Close Before Physical Qualification
+
+| Priority | Legacy State | Remediation / Verification Requirement |
+| --- | --- | --- |
+| P0 | USBFS enforces hard 90-second timeout (`FastbootProtocol.kt`, `native_usbfs.cpp`) | Characterize stall deadline vs overall timeout; avoid breaking slow large RAW/sparse transfers. Require progress verification and safe cancellation test. |
+| P0 | `DiagnosticLogStore.kt` purges segments (caps at 30 files / 64 MiB); `SanitizedLogShare.kt` caps at 64 MiB | Design streaming write/export, user-managed log retention, visible out-of-space warnings; protect auth secrets outside public reports. |
+| P0 | `DeviceViewModel.startOperation` executes under ViewModel scope; `FlashOperationService` is mostly a notification | Strengthen durable execution ownership and USB serialization; never allow concurrent secondary USB sessions. |
+| P1 | `verifyPendingSideloadIfReady()` logs SUCCESS/FAILED, but does not promote the operation outcome | Atomically update GUI operation and history **only on authoritative verdict**; keep UNKNOWN as pending, not failure. |
+| P1 | Mi Unlock pending check may diverge on timeout vs report | Conclude operation state reliably upon reconnect/timeout, match device identity, produce single consolidated report. |
+| P1 | `FlashOperationDraftPolicy` caps at 32 operations | Remove artificial UI limit; document technical limits; execute queue strictly sequentially, stopping upon first failure. |
+| P1 | Quick Flash UI is recovery-first | Bind approved partition selector, exact manual partition input, actual slot resolution, single "Flash" button, manual Reboot menu. |
+| P1 | No qualified hardware tests of 2.0 APK yet | First execute fake transport + clean builds, then non-destructive hardware checks on unlocked test device, followed by full test suite. |
+
+## 5. Current Changes in Android Source Tree
+
+In the Android source tree, **only five files were changed/added**:
+
+1. `res/layout/page_adb.xml`: Minimal Sideload REV3 layout (title, Recovery hint, chosen ZIP name, two buttons, verdict note).
+2. `res/drawable/bg_sideload_file.xml`: Clean outline background for file display.
+3. `res/values/strings.xml`, `res/values-ru/strings.xml`: RU/EN localized strings without breaking existing keys.
+4. `MainActivity.kt`: Passes chosen ZIP name to `tvSideloadSelectedZip` and calls original `viewModel.runSideload(file)`.
+
+*Note:* Legacy UX starts sideload **immediately after file selection in `showFileSelector`**. REV5 preserves this exact working behavior. "Import file" only imports and does not start sideload.
+
+Core engine, AndroidManifest, Welcome, Home, Flash, Unlock, Settings, Gradle configuration, and TabController remain byte-for-byte identical.
+
+## 6. Sequential Implementation Roadmap
+
+1. **R5 (Current):** Immutable legacy baseline, five-tab verification matrix, port REV3 Sideload, offline XML/contract tests.
+2. **R6:** Global shell/UI + unified USB status bar, mode detection, window insets, and full-screen terminal entry. Preserve USB engine.
+3. **R7:** Home (device specifications catalog and freshness indicators, without Home Operation Center), followed by three approved Flash sub-screens with authentic Fastboot operations.
+4. **R8:** REV4 Unlock with canonical Xiaomi backend, Settings → History & Reports, contextual Operation Center modal/queue and robust background execution.
+5. **R9:** Regression/CI qualification, large-file transfers, reconnect recovery, dual localization verification, physical device testing on unlocked hardware, followed by release evaluation.
+
+## 7. Verification Checks
+
+- Run `python3 tests/check_rev5.py` for automated structural verification of XML resources, RU/EN string parity, IDs/handlers, and transport file SHA256 integrity against baseline.
+
+---
+
+## Русская версия / Russian Version
+
 # NekoFlash 2.0 — REV5: сверка пяти вкладок с ORIGINAL и карта внедрения
 
 Дата: 10 октября 2026 г. Статус: **проверка по исходникам + начат перенос одного утверждённого экрана в копию проекта**. Ни APK, ни GitHub, ни USB, ни настоящая Mi-авторизация здесь не использовались.
@@ -66,5 +150,3 @@
 ## 7. Проверка этого пакета
 
 - `python3 tests/check_rev5.py` — автоматическая структурная проверка XML, RU/EN строк, ID и обработчиков, неизменности всех критичных транспортных файлов относительно SHA256 baseline.
-- Для полноценной сборки нужен Android SDK + CMake/NDK, JDK 17, wrapper Gradle из исходников; в данном окружении Android SDK отсутствует, поэтому `assembleDebug` **не запускался**.
-- **GitHub, APK, USB-устройство не изменялись.**

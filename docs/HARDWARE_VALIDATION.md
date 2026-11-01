@@ -1,4 +1,15 @@
-# Physical-device validation
+<div align="center">
+
+<img src="artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# Physical-Device Validation
+
+### Hardware testing results, qualification matrix, and device evidence
+
+English
+
+</div>
+
 
 ## NekoFlash 2.0 REV43 — new Insiders campaign (1 November 2026)
 

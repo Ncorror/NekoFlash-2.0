@@ -1,3 +1,51 @@
+<div align="center">
+
+<img src="../artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash 2.0 — Mi Unlock Static Legacy Audit
+
+### Static audit of Mi Unlock source implementation, pending states, and risk mitigation
+
+English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](#русская-версия--russian-version)
+
+</div>
+
+## Mi Unlock Static Audit
+
+**Date:** October 10, 2026  
+**Scope:** Design audit; NOT Android implementation or physical hardware testing.  
+**Baseline:** `NekoFlash-main-legacy.zip` (SHA-256 `74fe6f49fe466b15a2cd5b36e141c208823b4ef9e7a42ea96e0d5647b9c9d5b3`).
+
+### Actual Implementation in Legacy Source
+
+1. `MainActivity.kt:2331–2493`: The `Unlock` tab is constructed from two cards: **Mi Account** and **Bootloader**. Sign-in is handled via `MiLoginActivity`; upon success, ID, region, and `dataCenterZone` are displayed. Manual zone selection and sign-out controls exist. Bootloader state and action availability depend on Fastboot diagnostics.
+2. `MainActivity.kt:1571–1622`: Following web login, an `unlockApi` session token is acquired via `MiAccountClient.exchangeToken`.
+3. `DeviceViewModel.kt:885–990`: Execution flow: `getVar(product) → readXiaomiUnlockToken → nonce → checkClear → requestUnlock → stageAndOemUnlock`. This transitions to **VERIFY_PENDING**, not immediate SUCCESS. Device reconnection with `getvar:unlocked=yes` is required for confirmation.
+4. `DeviceViewModel.kt:1336–1367,1451–1518`: Pending verification stores product and serial (when available), validates matching identity after reconnect, rejects mismatched devices, marks success on `unlocked=yes`, failed on proven `no`, and waits if inconclusive.
+5. `MiUnlockClient.kt`: Server interactions require live Xiaomi infrastructure and valid accounts.
+
+### Proposed REV4 Design Adjustments
+
+- Preserve persistent top USB status bar, full-screen terminal icon on the right, and five bottom tabs (third is **Sideload**).
+- Compactly display **Mi Account** (unauthenticated → login; authenticated → status, expandable zone settings, logout) and **Bootloader** (actual status, Fastboot requirement, data wipe warning, primary action).
+- If diagnostics confirm `unlocked=yes`, suppress redundant unlock actions.
+- Keep server zone management in expandable account settings. Do not put raw commands into Unlock.
+- Display success only after verified reconnect.
+- Mockups are visual prototypes (`?preview=ready` simulates UI without live USB/network commands).
+
+### Technical Safeguards for Future Implementation
+
+- **[P0] Device Identity Integrity:** Avoid device mismatch upon reconnection; correlate pending unlock with re-enumerated target using authoritative descriptors. Disallow concurrent operations on busy USB. Never infer unlock success from `oem unlock` ACK alone without `getvar:unlocked=yes`.
+- **[P1] Operation Lifecycle & Reports:** Propagate verified outcome to Operation Center, history log, and exported reports. Prevent pending markers from timing out without explicit outcome resolution.
+- **[P1] Server Warning Propagation:** Preserve prominent data-wipe warnings before initiating the unlock sequence.
+- **[P1] Credential Security:** Authentication cookies, `passToken`, `ssecurity`, device tokens, and encrypted payloads are confidential. Never write them into exported logs, share dialogs, or UI mockups.
+- **[P2] Compatibility & Diagnostics:** Preserve detailed server error messages (including Xiaomi business error 20045 and zone mismatches).
+- **[P2] Testing Strategy:** Validate using mock transports before physical hardware checks. Never trigger unlock on user hardware without explicit consent.
+
+---
+
+## Русская версия / Russian Version
+
 # NekoFlash 2.0 — Unlock / Mi Unlock: статический аудит исходника
 
 **Дата:** 10.10.2026. **Этап:** проектирование, НЕ реализация Android и НЕ аппаратное тестирование.
