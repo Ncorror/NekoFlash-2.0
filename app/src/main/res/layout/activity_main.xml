@@ -576,6 +576,7 @@
                 android:layout_alignParentTop="true"
                 android:minHeight="48dp"
                 android:paddingStart="12dp"
+                android:paddingEnd="12dp"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
                 android:background="@color/bg_elevated"
