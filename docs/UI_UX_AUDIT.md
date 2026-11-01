@@ -10,13 +10,13 @@ English
 
 </div>
 
-**Audit scope:** Android interface, UI controllers, RU/EN interface copy, accessibility-facing labels, and public documentation.
+**Status:** Historical UI assessment. For active REV44 main beta, Android API26/34 CI and the 49 outstanding lint warnings see [REV45 audit](AUDIT-REV45-2026-11-01-RU.md). No new physical REV43 validation is implied here.\n\n**Audit scope:** Android interface, UI controllers, RU/EN interface copy, accessibility-facing labels, and public documentation.
 
 **Explicitly out of scope:** USB transport, ADB/Fastboot protocol implementation, network requests, Xiaomi API behavior, mutation algorithms, operation ownership, signing/build logic, and other backend/core behavior.
 
 ## Release-readiness assessment
 
-**Current project readiness: 90% for the next reviewed alpha/release-candidate build.**
+**Historical estimate only (earlier UI audit): 90% at that snapshot. Not a current REV44/REV45 release-readiness metric.**
 
 The UI refactor is internally consistent under static verification, but release sign-off still requires a real Gradle/Android build and physical-device visual smoke because the audit environment could not download the Gradle 8.13 distribution. The remaining work is validation rather than another planned UI redesign.
 
