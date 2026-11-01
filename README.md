@@ -1,24 +1,26 @@
-# NekoFlash 2.0 — Android-to-Android ADB / Fastboot (DEV REV43)
+<div align="center">
 
-> **Актуальная DEV (1 ноября 2026):** ветка [`work/rev26-terminal-imports-20261030`](https://github.com/Ncorror/NekoFlash-2.0/tree/work/rev26-terminal-imports-20261030), коммит после [REV43 PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37) — `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`. Разработка NekoFlash 2.0, **не** NekoFlash Pro и **не** production release. `main` не трогаем.
+<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
 
-## Тестирование на реальных Android HOST → TARGET / Insiders field tests
+# NekoFlash 2.0
 
-**[Открыть офлайн-тестбук REV43 (RU/EN)](docs/insiders/testbook.html)** · **[Скачать отдельный HTML из DEV](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/work/rev26-terminal-imports-20261030/docs/insiders/testbook.html)** · [Инструкция RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN manual](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Статус DEV и CI](docs/DEVELOPMENT_STATUS.md)
+### Android USB OTG ADB & Fastboot Flashing Tool
 
-Тестбук — автономный HTML: чек-листы, статусы, комментарии, локальный JSON-прогресс, ZIP с `report.txt`, `progress.json`, `evidence-manifest.json`, скриншотами и исходными `log-*`, `trace-*.bin`, `session-summary-*`. Сохранены RU/EN, чёрно-оранжевый дизайн и ручное разрешение Android на папку. **Без отправки данных в сеть и без очистки логов**. GitHub Actions DEV дополнительно публикует отдельный архив `NekoFlash-Insiders-Testbook-REV43-...`.
+English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](README_ru.md)
 
-**[Тестовая Debug APK REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)** (artifact ZIP; `ru.forum.adbfastboottool.dev`, 6.0.0-alpha11-dev, versionCode 234). Не удаляй стабильную APK. Вычисляй SHA-256 скачанной APK, а не используй контрольную сумму старого REV29 файла.
+</div>
 
-| Проверка | Фактический результат |
-|---|---|
-| [PR REV43 run 41247325391](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391) | Build/JVM/lint и Android API26/API34 — **PASS** |
-| [Merged DEV run 41248168147](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) | Build PASS, API34 PASS, **API26 FAIL** (два UI wait-timeout) |
-| REV43 physical HOST → TARGET | Кампания начинается; **подтверждённых аппаратных PASS пока нет** |
+## Current testing stage — REV44 in main (1 November 2026)
 
-Действия первого раунда: проверка OTG/USB без записи разделов, `adb devices`, `adb shell getprop`, терминал/Gboard/поворот, копирование, логи. Следующий раунд: тестовые `adb push/pull`, `push -r` на 512 файлах, Stop, detach/reconnect только при **одноразовой ADB передаче**, проверка SHA и RAM. Fastboot DATA/flash/erase/format/unlock — исключительно отдельная согласованная лаборатория на запасном устройстве.
+This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta testing**, NOT a signed production release. The standalone `.dev` test APK does not replace the original signed NekoFlash release.
 
-**Открыто:** [TERM-01 #20](https://github.com/Ncorror/NekoFlash-2.0/issues/20), [CI API26 #16](https://github.com/Ncorror/NekoFlash-2.0/issues/16), [ADB push RAM/USB #36](https://github.com/Ncorror/NekoFlash-2.0/issues/36). Публикуй в GitHub только обезличенные выводы; полные бинарные логи передавай в доверенный закрытый канал.
+**Telegram testing group — NekoFlash Insiders.** Testers use this group for APK/testbook distribution, discussion and private ZIP reports. The official invitation URL has not been supplied, so no guessed `t.me` link is published. The materials are independently downloadable from GitHub:
+
+- [Download standalone offline testbook HTML (RU/EN)](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)
+- [Download tested REV43 debug APK — GitHub Actions ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
+- [RU tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Current status](docs/DEVELOPMENT_STATUS.md)
+
+**Verification:** [REV44 exact-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. An earlier merged DEV [API26 run failed two UI waits](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147). New physical REV43 HOST→TARGET passes remain unverified. The historical alpha11 release link in the archive does not refer to this beta.
 
 ---
 

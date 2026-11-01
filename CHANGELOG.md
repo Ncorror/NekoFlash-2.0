@@ -1,4 +1,14 @@
-# Changelog
+<div align="center">
+
+<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+
+# NekoFlash Changelog
+
+### Release-level changes and version history
+
+English
+
+</div>
 
 The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes are not published APK releases.** The technical REV number is independent of `versionName` / `versionCode`; see [development status](docs/DEVELOPMENT_STATUS.md). Historical build/release statements refer to the source snapshot in which they were recorded.
 
