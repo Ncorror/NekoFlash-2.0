@@ -139,6 +139,9 @@ jobs:
               line = loc.get('line', '?') if loc is not None else '?'
               print(f"LINT DETAIL: {issue.get('severity')} {issue.get('id')} "
                     f"{path}:{line} — {issue.get('message')}")
+          findings = [issue for issue in lint.findall('issue')
+                      if issue.get('severity') in ('Warning', 'Error', 'Fatal')]
+          assert not findings, f"Android Lint must be warning-free: {len(findings)} findings"
           PY
 
       - name: Upload inspectable lint and JVM reports
