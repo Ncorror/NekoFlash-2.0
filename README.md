@@ -20,7 +20,7 @@ This `main` contains NekoFlash 2.0 DEV changes REV26–44 **for hardware beta te
 - [Download tested REV43 debug APK — GitHub Actions ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)
 - [RU tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN tester guide](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) · [Current status](docs/DEVELOPMENT_STATUS.md)
 
-**Verification:** [REV44 PR-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. Integration [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) also passed, but later [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) failed two API26 UI tests with the persistent keyboard visible in captured screenshots. No physical REV43 HOST→TARGET PASS is verified. [REV45 audit, lint warnings and open tasks](docs/AUDIT-REV45-2026-11-01-RU.md). The historical alpha11 release link below is **not** this beta.
+**Verification:** [REV44 PR-head CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41250348806) passed build/API26/API34. Integration [CI 41342607390](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342607390) also passed, but later [CI 41342739222](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41342739222) failed two API26 UI tests with the persistent keyboard visible in captured screenshots. No physical REV43 HOST→TARGET PASS is verified. [REV45 audit, resolved lint findings and remaining emulator tests](docs/AUDIT-REV45-2026-11-01-RU.md). The historical alpha11 release link below is **not** this beta.
 
 ---
 
