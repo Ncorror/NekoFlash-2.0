@@ -1,26 +1,18 @@
-# Insiders — NekoFlash 2.0 REV43 field testbook
+# NekoFlash Insiders · REV45
 
-**Telegram tester community: [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).** The testbook and debug APK are available for distribution to testers there; ZIP evidence should be shared only in the trusted testing group, not in public Issues. Direct GitHub downloads below remain available.
+**[Скачать комплект / Download tester ZIP](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram](https://t.me/+NR_FiUmvXlViOTUy)
 
-- **[Open the offline RU/EN HTML testbook](testbook.html)**.
-- **[Download the standalone HTML file from main](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html)**. On an Android browser choose Save link / Download file. Then open the saved `.html` locally — no server is required.
-- **[RU test manual](../testing/INSIDERS-FIELD-TEST-REV43-RU.md)** / **[EN test manual](../testing/INSIDERS-FIELD-TEST-REV43-EN.md)**.
-- **[REV43 tested Debug APK from GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171)**. The Actions artifact is a ZIP; extract the APK. Original NekoFlash remains installed.
-- GitHub Actions also uploads `NekoFlash-Insiders-Testbook-REV43-<SHA>` independently of the APK. The archive can be downloaded from the matching workflow run.
+**RU.** Распакуй ZIP и начни с `START-HERE.txt`. В комплекте лежат проверенная DEV APK, автономный тестбук, две инструкции, сведения о сборке и контрольные суммы. Название артефакта в GitHub Actions — `NekoFlash-Insiders-Tester-Kit`. Его публикация зависит от успешного завершения сборки и обеих эмуляторных проверок. Ссылка выше ведёт на один закреплённый ZIP у тега insiders-rev45.
 
-## Functionality preserved from AutoLogs BIN REV32
+**EN.** Extract the ZIP and open `START-HERE.txt`. The kit contains the debug APK, offline RU/EN checklist, two field guides, build metadata, checksums, notices and corresponding filesystem-tool sources. The link above downloads the pinned field-test ZIP. For a newer CI snapshot, sign in, open a successful main run and select `NekoFlash-Insiders-Tester-Kit` under Artifacts.
 
-The existing Black & Orange interface, Russian/English language switch, search and category/stage filters, checkboxes, PASS/FAIL/BLOCKED/NOT TESTED statuses, free notes, local state, JSON import/export, ZIP report, and byte-exact `trace-*.bin` / `log-*` / `session-summary-*` log attachment collection are retained. The user must grant Android folder access; some pickers provide a snapshot only, so choose the folder again before export. Reports are **not** uploaded automatically.
+| File | Use |
+| --- | --- |
+| [START-HERE.txt](START-HERE.txt) | First session / первый запуск |
+| [FIELD-GUIDE-RU.md](FIELD-GUIDE-RU.md) · [FIELD-GUIDE-EN.md](FIELD-GUIDE-EN.md) | Commands, expected evidence and lab boundaries |
+| [testbook.html](testbook.html) | Offline checklist, JSON backup and raw evidence ZIP |
+| BUILD.txt · SHA256SUMS.txt | Exact kit build and integrity checks, included in the ZIP |
 
-Eight new REV38–43 field cases cover keyboard composition and Unicode, selecting text during output, ADB peer maxdata, 512-file recursive push, cancellation, OTG detach/reconnect, read-only Fastboot and CI-versus-hardware evidence.
+The standalone testbook in the repository identifies the [reference build](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165). The copy in a CI kit identifies that kit’s own APK. Open the HTML from the same ZIP as the installed APK. Earlier REV25, REV29 and REV43 progress JSON may be imported explicitly. Imported reports retain their original build details.
 
-The report ZIP is not encrypted; store and share raw logs **only in a trusted private testing channel**, not public Issues. No automatic log removal, truncation or redaction. ZIP32 cannot exceed its format size limit; split oversized log sessions while keeping originals.
-
-## Testing truth
-
-- [REV43 PR CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391) — build/API26/API34 PASS.
-- [Merged DEV CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) — build/API34 PASS, **API26 FAIL (2 UI timeouts)**.
-- No new REV43 physical HOST→TARGET PASS is recorded yet. Older alpha10 hardware results are historical.
-- Testbook source is checked for JavaScript syntax and required AutoLogs/report contracts by `tests/check_insiders_testbook.py` in CI.
-
-This testbook is included in the public testing `main` branch after PR #39. It is **not** a signed NekoFlash 2.0 production release. See [current REV45 audit and CI caveats](../AUDIT-REV45-2026-11-01-RU.md).
+Передавай исходные журналы только в доверенный личный канал. Архив отчёта не зашифрован. Share raw report ZIPs privately. [Аудит / audit](AUDIT-2026-11-02.md).

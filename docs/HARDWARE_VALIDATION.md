@@ -11,21 +11,11 @@ English
 </div>
 
 
-## NekoFlash 2.0 REV43 — public main beta / Insiders campaign (1 November 2026)
+## REV45 hardware beta · 2 November 2026
 
-**Status: TESTING STARTING / NO NEW REV43 HARDWARE PASS VERIFIED.** The qualifications below were performed on the **earlier alpha10** device/release line. They are historical evidence only and do not validate the revised DEV ADB/PTY/Fastboot code.
+The reference APK is from [main CI #409](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165), commit `7b54ba1e7080`. Both emulator jobs passed. A verified physical HOST → TARGET report for REV45 is still pending.
 
-**Telegram tester group:** [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy). Debug APK and offline testbook are shared there; raw ZIP reports should go to trusted testers rather than public GitHub issues. GitHub downloads remain available.
-
-Field-test materials:
-- [Offline downloadable RU/EN REV43 testbook](insiders/testbook.html) · [RU manual](testing/INSIDERS-FIELD-TEST-REV43-RU.md) · [EN manual](testing/INSIDERS-FIELD-TEST-REV43-EN.md).
-- [PR-head CI REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391): build, Android API26/34 PASS.
-- [Merged DEV CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147): build PASS, API34 PASS, API26 FAIL — two interface wait timeouts and missing captures.
-- [Debug APK artifact](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171): `ru.forum.adbfastboottool.dev`, do not uninstall the production app.
-
-Required field evidence: Android HOST/TARGET models, OS, USB cable/role, installed build ID, test stage/status, reproduction, timing, screenshot, and original raw log/trace binaries, sent only through a trusted private channel. Avoid public unique device IDs and credentials. Pending physical cases: TERM-01 IME/rotation, 4-KiB ADB maxdata, large recursive push, Stop/USB detach/reconnect, read-only Fastboot diagnostics, and RAM over long sessions. A plain `fastboot getvar` does not test post-DATA flashing.
-
-No live REV43 USB test data has been added to this public document. The archived section below remains unchanged.
+Use the [Insiders kit and RU/EN guides](insiders/README.md). Record both devices, Android versions, cable, build ID, test ID, result and reproduction steps. Priorities are OTG/RSA, terminal keyboard and rotation, 512-file ADB push, Stop and reconnect. Keep raw evidence within the trusted team. The older alpha10 results below apply only to their original builds.
 
 ---
 
