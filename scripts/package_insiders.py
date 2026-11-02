@@ -34,16 +34,4 @@ page = page[:match.start(1)] + json.dumps(build) + page[match.end(1):]
 out = args.output
 out.mkdir(parents=True, exist_ok=False)
 (out / "testbook.html").write_text(page)
-for src in (apk, args.debug / "filesystem-tools-build-info.json",
-            args.debug / "filesystem-tools-source.tar.gz", ROOT / "LICENSE",
-            ROOT / "NOTICE", ROOT / "THIRD_PARTY_NOTICES.md", DOCS / "START-HERE.txt",
-            DOCS / "FIELD-GUIDE-RU.md", DOCS / "FIELD-GUIDE-EN.md"):
-    shutil.copyfile(src, out / src.name)
-(out / "BUILD.txt").write_text(
-    f"NekoFlash 2.0 Insiders {build['revision']}\nCommit: {args.commit}\n"
-    f"CI: https://github.com/Ncorror/NekoFlash-2.0/actions/runs/{args.run}\n"
-    f"APK: {apk.name}\nAPK SHA-256: {digest}\n"
-)
-(out / "SHA256SUMS.txt").write_text("".join(
-    f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n" for path in sorted(out.iterdir())
-))
+shutil.copyfile(apk, out / apk.name)

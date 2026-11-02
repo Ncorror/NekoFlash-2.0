@@ -1,6 +1,6 @@
 # NekoFlash 2.0 field guide · Insiders REV45
 
-Extract the whole kit. Read START-HERE.txt first. BUILD.txt identifies the exact commit, GitHub Actions run, APK filename and SHA-256. Open testbook.html in the host browser. Export JSON to back up your progress and import it to resume.
+Extract the ZIP, install the APK on the host and open testbook.html in a browser. The build panel lists the commit, CI run and APK digest. Use JSON export to save progress.
 
 [Telegram · NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy)
 

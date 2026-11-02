@@ -29,6 +29,10 @@ for marker in (
 for old in ("485f0e0f314d32dc94ee31524ad53c2a856ab484f2d4f39593a6c6a1480f729a",
             "41021696162", "12961957458"):
     assert old not in source, f"Old REV29 release metadata leaked: {old}"
+header = source.split('<header class="top">', 1)[1].split('</header>', 1)[0]
+assert 'href="https://t.me/+NR_FiUmvXlViOTUy"' in header
+for absent in ("START-HERE.txt", "SHA256SUMS.txt", "BUILD.txt"):
+    assert absent not in source, f"Instructions depend on absent file: {absent}"
 build = json.loads(re.search(r"^const KIT = (.+);$", source, re.M)[1])
 assert re.fullmatch(r"[0-9a-f]{40}", build["sourceCommit"])
 assert build["sourceCommit"] == build["testArtifactCommit"]
