@@ -13,7 +13,7 @@ English
 
 ## REV45 hardware beta · 2 November 2026
 
-The reference APK is from [main CI #409](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165), commit `7b54ba1e7080`. Both emulator jobs passed. A verified physical HOST → TARGET report for REV45 is still pending.
+The reference APK is from [main CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886), commit `a31dedadd4ad`. Both emulator jobs passed. A verified physical HOST → TARGET report for REV45 is still pending.
 
 Use the [Insiders kit and RU/EN guides](insiders/README.md). Record both devices, Android versions, cable, build ID, test ID, result and reproduction steps. Priorities are OTG/RSA, terminal keyboard and rotation, 512-file ADB push, Stop and reconnect. Keep raw evidence within the trusted team. The older alpha10 results below apply only to their original builds.
 

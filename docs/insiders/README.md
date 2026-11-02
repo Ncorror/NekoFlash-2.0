@@ -13,6 +13,6 @@
 | [testbook.html](testbook.html) | Offline checklist, JSON backup and raw evidence ZIP |
 | BUILD.txt · SHA256SUMS.txt | Exact kit build and integrity checks, included in the ZIP |
 
-The standalone testbook in the repository identifies the [reference build](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165). The copy in a CI kit identifies that kit’s own APK. Open the HTML from the same ZIP as the installed APK. Earlier REV25, REV29 and REV43 progress JSON may be imported explicitly. Imported reports retain their original build details.
+The standalone testbook in the repository identifies the [pinned field release build](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886). The copy in a CI kit identifies that kit’s own APK. Open the HTML from the same ZIP as the installed APK. Earlier REV25, REV29 and REV43 progress JSON may be imported explicitly. Imported reports retain their original build details.
 
 Передавай исходные журналы только в доверенный личный канал. Архив отчёта не зашифрован. Share raw report ZIPs privately. [Аудит / audit](AUDIT-2026-11-02.md).

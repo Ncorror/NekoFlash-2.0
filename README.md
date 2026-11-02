@@ -28,7 +28,7 @@ Start with the interface and keyboard. Then connect a second phone, authorize AD
 
 The console supports ADB shell, push/pull and APK installation. The Flash tab contains Quick Flash, a Mass Flash queue and Fastboot tools. The app also has recovery Sideload, Xiaomi Unlock, operation reports and raw USB diagnostics.
 
-Android 14 emulator (API 34), REV45. Home shows a disconnected host. The Mass Flash queue contains a test image.
+English interface of the published REV45 APK on an Android 14 emulator (API 34). Home shows a disconnected host. The Mass Flash queue contains a test image.
 
 | Home | Terminal | Quick Flash |
 | --- | --- | --- |
@@ -36,11 +36,11 @@ Android 14 emulator (API 34), REV45. Home shows a disconnected host. The Mass Fl
 
 | Mass Flash queue | Fastboot tools | ADB Sideload |
 | --- | --- | --- |
-| <img src="docs/screenshots/rev45/mass-saf-queue.png" width="210" alt="Mass Flash queue"> | <img src="docs/screenshots/rev45/portrait-tools.png" width="210" alt="Fastboot tools"> | <img src="docs/screenshots/rev45/portrait-sideload.png" width="210" alt="ADB Sideload"> |
+| <img src="docs/screenshots/rev45/mass-queue.png" width="210" alt="Mass Flash queue"> | <img src="docs/screenshots/rev45/portrait-tools.png" width="210" alt="Fastboot tools"> | <img src="docs/screenshots/rev45/portrait-sideload.png" width="210" alt="ADB Sideload"> |
 
 ## Build and evidence
 
-Reference APK and gallery — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`7b54ba1e7080`](https://github.com/Ncorror/NekoFlash-2.0/commit/7b54ba1e70807bdc7cee65a64cff87fd002ce26b). [CI #409](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165/artifacts/13102347829).
+Reference APK and gallery — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`a31dedadd4ad`](https://github.com/Ncorror/NekoFlash-2.0/commit/a31dedadd4adcf08691ece82c7574f05286078f3). [CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886/artifacts/13139380119).
 
 308 JVM tests passed. Android API 26 and 34 passed 20 instrumentation tests each. Lint reported zero findings. Each new tester kit records its own commit and APK hash in `BUILD.txt`.
 

@@ -1,6 +1,6 @@
 # NekoFlash 2.0 · статус на 2 ноября 2026
 
-**REV45 проходит тестирование на физических устройствах.** Контрольная сборка `7b54ba1e7080` прошла build и обе проверки Android в [main CI #409](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41354284165). В отчётах 308/308 JVM, 20/20 API 26, 20/20 API 34, lint без замечаний. Для этой сборки ещё нужны результаты с реальных HOST → TARGET.
+**REV45 проходит тестирование на физических устройствах.** Контрольная сборка `a31dedadd4ad` прошла build и обе проверки Android в [main CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886). В отчётах 308/308 JVM, 20/20 API 26, 20/20 API 34, lint без замечаний. Для этой сборки ещё нужны результаты с реальных HOST → TARGET.
 
 [Комплект Insiders](insiders/README.md) · [Аудит и открытые проверки](insiders/AUDIT-2026-11-02.md) · [Матрица устройств](HARDWARE_VALIDATION.md).
 
