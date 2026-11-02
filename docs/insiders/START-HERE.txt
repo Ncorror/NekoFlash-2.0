@@ -3,8 +3,8 @@ Telegram: https://t.me/+NR_FiUmvXlViOTUy
 
 РУССКИЙ
 1. Распакуй весь ZIP в отдельную папку на телефоне-хосте (Android 8+).
-2. Имя APK, коммит и контрольная сумма указаны в BUILD.txt. При наличии
-   Termux открой каталог распакованного ZIP и выполни sha256sum -c SHA256SUMS.txt.
+2. Коммит и контрольная сумма APK указаны в тестбуке. При наличии
+   Termux открой каталог распакованного ZIP и выполни sha256sum *.apk.
 3. Установи APK на хост. Оригинальный NekoFlash можно оставить. Если Android
    сообщает о конфликте подписи с более ранней DEV, сохрани её данные и
    журналы перед любыми действиями, которые могут их удалить.
@@ -18,8 +18,8 @@ Telegram: https://t.me/+NR_FiUmvXlViOTUy
 
 ENGLISH
 1. Extract the entire ZIP into its own folder on the Android 8+ host phone.
-2. Read BUILD.txt for the APK name, commit and digest. With Termux available,
-   run sha256sum -c SHA256SUMS.txt from the extracted folder.
+2. Open the build panel in testbook.html for the commit and APK digest. With Termux available,
+   run sha256sum *.apk from the extracted folder.
 3. Install the APK on the host. The original NekoFlash can stay installed.
    If Android reports a signature conflict with an older DEV installation,
    preserve its data and logs before taking any step that could erase them.

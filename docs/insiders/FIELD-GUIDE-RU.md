@@ -1,6 +1,6 @@
 # Полевые тесты NekoFlash 2.0 · Insiders REV45
 
-Распакуй весь комплект. Начни с START-HERE.txt. В BUILD.txt записаны коммит, запуск GitHub Actions, имя APK и SHA-256 именно этого файла. Открой testbook.html в браузере на HOST. Свой прогресс можно выгрузить в JSON и восстановить позже.
+Распакуй ZIP, установи APK на HOST и открой testbook.html в браузере. В разделе сборки указаны коммит, запуск CI и SHA-256 APK. Для сохранения прогресса используй экспорт JSON.
 
 [Telegram · NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy)
 

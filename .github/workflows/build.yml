@@ -565,8 +565,7 @@ jobs:
       - name: Stage and verify offline kit
         run: |
           python3 scripts/package_insiders.py kit-input tester-kit --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
-          cd tester-kit
-          sha256sum --check SHA256SUMS.txt
+          python3 scripts/verify_insiders_kit.py tester-kit --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v6
         id: upload
         with:
@@ -598,12 +597,14 @@ jobs:
         run: |
           set -euo pipefail
           marker=docs/insiders/campaign-tag.txt
-          if git diff --quiet "$PREVIOUS" "$GITHUB_SHA" -- "$marker"; then
-            echo "Campaign tag unchanged"
-            exit 0
-          fi
           tag=$(cat "$marker")
           [[ "$tag" =~ ^insiders-rev([1-9][0-9]*)$ ]]
+          if git diff --quiet "$PREVIOUS" "$GITHUB_SHA" -- "$marker"; then
+            if ! git diff --quiet "$PREVIOUS" "$GITHUB_SHA" -- scripts/package_insiders.py; then
+              bash scripts/repack_insiders_release.sh "$tag"
+            fi
+            exit 0
+          fi
           revision=REV${BASH_REMATCH[1]}
           archive="NekoFlash-Insiders-${revision}.zip"
           gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$ARTIFACT_ID/zip" > "$archive"
@@ -614,6 +615,7 @@ jobs:
             cmp "$archive" "published/$archive"
             exit 0
           fi
-          gh release create "$tag" "$archive" --target "$GITHUB_SHA" --prerelease --latest=false \
+          gh run download "$GITHUB_RUN_ID" --name "NekoFlash-$GITHUB_SHA-debug" --dir debug-source
+          gh release create "$tag" "$archive" debug-source/filesystem-tools-source.tar.gz --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "NekoFlash Insiders $revision · hardware beta" \
-            --notes "Android field-testing kit. Extract the ZIP and open START-HERE.txt. CI: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. ZIP SHA-256: ${ARTIFACT_DIGEST#sha256:}."
+            --notes "Android field-testing kit. Extract the ZIP, install the APK and open testbook.html. [Telegram tester group](https://t.me/+NR_FiUmvXlViOTUy). CI: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. ZIP SHA-256: ${ARTIFACT_DIGEST#sha256:}."
