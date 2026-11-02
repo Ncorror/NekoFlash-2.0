@@ -13,6 +13,9 @@ from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 CURRENT = {
+    "README_ru.md", "docs/index.html", "docs/ru/index.html",
+    "docs/insiders/README.md", "docs/insiders/AUDIT-2026-11-02.md",
+    "docs/insiders/FIELD-GUIDE-RU.md", "docs/insiders/FIELD-GUIDE-EN.md",
     "README.md", "PRIVACY.md", "THIRD_PARTY_NOTICES.md",
     "ASSETS_LICENSE.md", "CHANGELOG.md",
     "docs/DEVELOPMENT_STATUS.md", "docs/SECURITY_REVIEW_BACKLOG.md",

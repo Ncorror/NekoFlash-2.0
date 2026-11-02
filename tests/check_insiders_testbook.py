@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """REV44: offline Insiders HTML source contract (no remote uploads)."""
 from pathlib import Path
+import json
 import re
 import shutil
 import subprocess
@@ -16,23 +17,25 @@ assert source.count("<script>") == 1 and source.count("</script>") == 1
 # offline ZIP builder, full original binary logs and explicit file permissions.
 for marker in (
     "NekoFlash 2.0", "const T = {", "ru: {", "en: {",
-    "const TESTS = [", "const KEY = 'nekoflash_insiders_rev43_testkit_v3'",
-    "LEGACY_KEY", "LEGACY_OLD_KEY", "function makeStoreZip(",
+    "const TESTS = [", "nekoflash-rev45-testkit-v4",
+    "nekoflash-rev43-testkit-v3", "nekoflash-rev29-testkit-v2", "nekoflash-rev25-testkit-v1", "function makeStoreZip(",
     "async function blobCRC(", "async function generateZip(",
     "async function chosenLogs(", "webkitdirectory",
     "trace-", "evidence-manifest.json", "progress.json",
     "downloadBlob(", "localStorage", "zipCreating",
-    "bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5",
-    "27ab796d100387b3530bd88a6faf28e48d1c717c",
-    "41247325391", "41248168147",
 ):
     assert marker in source, f"Missing tester feature/provenance: {marker}"
 
 for old in ("485f0e0f314d32dc94ee31524ad53c2a856ab484f2d4f39593a6c6a1480f729a",
             "41021696162", "12961957458"):
     assert old not in source, f"Old REV29 release metadata leaked: {old}"
-assert "const APK_SHA256 = ''" in source, "Do not pin an unverified old APK hash"
-assert "API26 FAIL" in source and "API34 PASS" in source
+build = json.loads(re.search(r"^const KIT = (.+);$", source, re.M)[1])
+assert re.fullmatch(r"[0-9a-f]{40}", build["sourceCommit"])
+assert build["sourceCommit"] == build["testArtifactCommit"]
+assert re.fullmatch(r"[0-9a-f]{64}", build["apkSha256"]) and build["runId"].isdigit()
+assert "schema: SCHEMA," in source and "IMPORT_SCHEMAS = [SCHEMA," in source
+assert "!IMPORT_SCHEMAS.includes(v.schema)" in source
+assert "API26 FAIL" not in source
 
 # Ensure scenario IDs unique. This test parses only id properties in TESTS,
 # not DOM IDs or unrelated metadata.
@@ -50,4 +53,8 @@ with tempfile.TemporaryDirectory() as temp:
     js_file = Path(temp) / "testbook.js"
     js_file.write_text(script, encoding="utf-8")
     subprocess.run([node, "--check", str(js_file)], check=True, cwd=root)
-print(f"PASS REV44: offline RU/EN testbook, {len(ids)} scenarios, JS parse, AutoLogs BIN and exact CI metadata")
+print(f"PASS Insiders: offline RU/EN testbook, {len(ids)} scenarios, JS parse, AutoLogs BIN and exact CI metadata")
+
+tag = (root / "docs/insiders/campaign-tag.txt").read_text().strip()
+assert re.fullmatch(r"insiders-rev[1-9][0-9]*", tag)
+assert tag == "insiders-" + build["revision"].lower()
