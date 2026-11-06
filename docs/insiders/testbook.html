@@ -1689,7 +1689,7 @@ async function generateZip() {
     // Read fresh log handles at the moment of report creation; never silently
     // mark a report complete if permission has expired or log files vanished.
     const logs = await chosenLogs();
-    if (logs.mode === 'none' && !attachedFiles.some(f => /\\.zip$/i.test(f.name)) &&
+    if (logs.mode === 'none' && !attachedFiles.some(f => /\.zip$/i.test(f.name)) &&
         !window.confirm(t().logMissingConfirm)) return;
     const items = [];
     for (const {file, path} of logs.files) {
