@@ -622,7 +622,11 @@ h3 { font-size: 15px; margin: 0 0 8px; }
         <button class="btn danger sm" id="resetAllBtn" type="button">Сбросить</button>
       </div>
     </div>
-    <div class="field" style="margin:10px 0">
+    <div class="actions" style="margin:10px 0 6px">
+      <button class="btn primary sm" id="modeToggle" type="button">Показать все 43 проверки</button>
+    </div>
+    <p class="small-help" id="modeHint"></p>
+    <div class="field" id="advancedRound" style="margin:10px 0">
       <label for="roundSelect" id="roundLabel">Этап тестирования</label>
       <select id="roundSelect" style="background:#101015;border:1px solid #42424c;border-radius:10px;color:#fff;min-height:44px;padding:8px 12px;width:100%"><option value="today">Сегодня — диагностический раунд</option><option value="extended">Расширенные испытания</option><option value="lab">Лабораторный этап (отдельно)</option><option value="all">Все проверки</option></select>
     </div>
@@ -661,7 +665,8 @@ h3 { font-size: 15px; margin: 0 0 8px; }
     <div class="file-items" id="fileList"></div>
     <p class="name-warning" id="privacy"></p>
     <div class="actions">
-      <button class="btn primary" id="makeZip" type="button">📦 Создать ZIP-отчёт</button>
+      <button class="btn primary" id="makeZip" type="button">📦 Подготовить ZIP-отчёт</button>
+      <a id="readyZipLink" class="btn primary" href="#" hidden>⬇ Скачать ZIP-отчёт</a>
       <button class="btn" id="copyReportBtn" type="button">📋 Скопировать report.txt</button>
       <button class="btn" id="exportJson" type="button">Сохранить прогресс JSON</button>
       <button class="btn ghost" id="importJson" type="button">Загрузить прогресс</button>
@@ -683,6 +688,12 @@ const T = {
   ru: {
     title: 'Тестбук NekoFlash 2.0',
     roundLabel: 'Этап тестирования',
+    showAdvanced: 'Показать все 43 проверки',
+    showQuick: 'Вернуться к 6 заданиям',
+    quickHint: 'Основной раунд: только 6 заданий. Отмечай то, что реально проверила или проверил.',
+    advancedHint: 'Расширенный раунд: сохранены все 43 проверки, включая лабораторные.',
+    zipReady: 'ZIP готов. Нажми кнопку скачивания.',
+    zipDownload: '⬇ Скачать ZIP-отчёт',
     rounds: {today:'Сегодня — диагностика без записи разделов',extended:'Расширенный тест на запасном TARGET',lab:'Лаборатория — отдельное разрешение',all:'Все проверки'},
     sub: 'Полевые тесты DEV REV45 · HOST → TARGET · исходные логи в ZIP · офлайн.',
     progress: 'Результаты тестов',
@@ -727,13 +738,13 @@ const T = {
     copied: 'Скопировано в буфер обмена',
     copymanual: 'Не удалось скопировать автоматически. Выдели текст вручную.',
     report: 'Собрать ZIP-отчёт',
-    reportIntro: 'Отметки и комментарии попадут в ZIP автоматически. Подключи папку NekoFlash/logs: при создании отчёта доступные журналы будут добавлены без изменения содержимого. Скриншоты можно приложить отдельно.',
+    reportIntro: 'Отметки и комментарии попадут в ZIP. В новой APK открой «Логи / Отчёты → Экспорт всех логов в ZIP» и прикрепи архив ниже. Папку вручную создавать не требуется. Скриншоты тоже можно добавить.',
     suggestions: 'Общие замечания и предложения',
     suggestionsPlaceholder: 'Что доработать, что неудобно, что сломалось...',
     attach: 'Логи, скриншоты и записи экрана (можно добавлять по очереди)',
     noFiles: 'Ручных вложений пока нет. Автосбор логов показывается отдельно выше.',
     autoLogsTitle: 'Автоматически вложить журналы NekoFlash',
-    autoLogsHelp: 'Выбери Download/NekoFlash/logs или папку NekoFlash. В поддерживаемом браузере новые журналы, включая исходные trace-*.bin, подхватываются прямо при создании ZIP. Android-файловый браузер может требовать повторного выбора папки перед каждым отчётом.',
+    autoLogsHelp: 'Это необязательный способ для старых APK: выбери Download/NekoFlash/logs. Если папки нет, в новой APK экспортируй ZIP из меню «Логи» и добавь файл через кнопку вложений ниже.',
     chooseLogFolder: '📁 Подключить / обновить логи',
     androidLogFolder: 'Android: разовый выбор папки',
     disconnectLogFolder: 'Отключить доступ',
@@ -746,7 +757,7 @@ const T = {
     logSelectionCancelled: 'Выбор папки отменён.',
     logSelectionError: 'Не удалось прочитать папку: ',
     logBrowserFallback: 'В этом браузере постоянный доступ к папке недоступен. Открой выбор папки ещё раз или используй обычные вложения.',
-    logMissingConfirm: 'Папка NekoFlash/logs не выбрана. Создать ZIP БЕЗ диагностических логов?',
+    logMissingConfirm: 'Диагностические файлы не выбраны. Создать отчёт без логов?',
     logPermissionError: 'Нет доступа к папке логов — подключи её повторно. ZIP без журналов не создан.',
     logCollected: n => `Автоматически добавлено ${n} исходных лог-файлов; их содержимое не менялось.`,
     logTooMany: 'ZIP32 не может вместить весь объём логов. Файлы не удалены; раздели сбор по сессиям или используй экспорт NekoFlash.',
@@ -771,6 +782,12 @@ const T = {
   en: {
     title: 'NekoFlash 2.0 Test Kit',
     roundLabel:'Test stage',
+    showAdvanced: 'Show all 43 checks',
+    showQuick: 'Back to 6 tasks',
+    quickHint: 'Quick round: only 6 tasks. Mark only what you have actually tested.',
+    advancedHint: 'Expert round: all 43 scenarios remain available, including lab checks.',
+    zipReady: 'ZIP is ready. Tap the download button.',
+    zipDownload: '⬇ Download report ZIP',
     rounds: {today:'Today — read-only / disposable data',extended:'Extended tests on spare TARGET',lab:'Lab — separate authorization required',all:'All checks'},
     sub: 'REV45 DEV hardware checks, original binary logs and offline ZIP reporting.',
     progress: 'Test results',
@@ -815,13 +832,13 @@ const T = {
     copied: 'Copied to clipboard',
     copymanual: 'Automatic copy failed. Select the text manually.',
     report: 'Create ZIP report',
-    reportIntro: 'Checkmarks and notes are included automatically. Connect the NekoFlash/logs folder to collect original diagnostic files during report generation; add screenshots separately.',
+    reportIntro: 'Checkmarks and notes are saved to ZIP. In the updated APK open Logs / Reports → Export raw diagnostics ZIP, then attach it below. No need to create a folder manually; screenshots can also be attached.',
     suggestions: 'General feedback and improvements',
     suggestionsPlaceholder: 'What should change? What was confusing or broken?',
     attach: 'Logs, screenshots and screen recordings (can be added incrementally)',
     noFiles: 'No manually attached files. Automatic log collection is shown above.',
     autoLogsTitle: 'Automatically include NekoFlash diagnostic logs',
-    autoLogsHelp: 'Choose Download/NekoFlash/logs or the NekoFlash folder. On supported browsers new logs, including raw trace-*.bin evidence, are scanned at ZIP creation. Some Android file pickers return only a snapshot; reselect the folder before the next report.',
+    autoLogsHelp: 'Optional fallback for older APKs: pick Download/NekoFlash/logs. If the folder is missing, export a ZIP directly from the updated APK Logs menu and attach that archive below.',
     chooseLogFolder: '📁 Connect / refresh logs',
     androidLogFolder: 'Android: choose folder once',
     disconnectLogFolder: 'Disconnect folder',
@@ -834,7 +851,7 @@ const T = {
     logSelectionCancelled: 'Folder selection cancelled.',
     logSelectionError: 'Unable to read folder: ',
     logBrowserFallback: 'Persistent folder access is unavailable in this browser. Select the folder again or attach the logs manually.',
-    logMissingConfirm: 'NekoFlash/logs is not connected. Generate ZIP WITHOUT diagnostic logs?',
+    logMissingConfirm: 'No diagnostic files selected. Create a report without logs?',
     logPermissionError: 'Log folder access expired — reconnect it. The report was not generated without logs.',
     logCollected: n => `Automatically included ${n} original log files without modifying their contents.`,
     logTooMany: 'ZIP32 cannot fit all log data. No source files were deleted; split collection by sessions or use NekoFlash export.',
@@ -1006,6 +1023,11 @@ const SCHEMA = 'nekoflash-rev45-testkit-v4';
 const IMPORT_SCHEMAS = [SCHEMA, 'nekoflash-rev43-testkit-v3', 'nekoflash-rev29-testkit-v2', 'nekoflash-rev25-testkit-v1'];
 const KEY = SCHEMA + ':' + KIT.apkSha256;
 const STATUSES = ['', 'pass', 'fail', 'blocked', 'skip'];
+const QUICK_IDS = ['SETUP-01','UI-01','TERM-01','USB-01','ADB-01','REPORT-01'];
+const visibleTests = () => state.quickMode
+  ? TESTS.filter(o => QUICK_IDS.includes(o.id))
+  : TESTS.filter(o => state.round === 'all' || (o.stage || 'today') === state.round);
+let readyZipUrl = null;
 const CATS = ['all', 'basic', 'adb', 'fastboot', 'ui'];
 let storageWorks = true;
 const openTests = new Set();
@@ -1022,6 +1044,7 @@ let state = {
   lang: 'ru',
   filter: 'all',
   round: 'today',
+  quickMode: true,
   meta: { hostModel: '', hostAndroid: '', targetModel: '', targetAndroid: '', usbInfo: '', build: BUILD_LABEL, suggestions: '' },
   provenance: KIT,
   tests: {}
@@ -1326,6 +1349,11 @@ function renderStatic() {
   $('howSteps').innerHTML = x.howSteps.map(([n, s]) => `<div class="mini"><strong>${n}</strong><div>${e(s)}</div></div>`).join('');
   $('search').placeholder = x.search;
   $('roundSelect').value = state.round;
+  $('modeToggle').textContent = state.quickMode ? x.showAdvanced : x.showQuick;
+  $('modeHint').textContent = state.quickMode ? x.quickHint : x.advancedHint;
+  $('advancedRound').style.display = state.quickMode ? 'none' : '';
+  $('filters').style.display = state.quickMode ? 'none' : '';
+  $('search').parentElement.style.display = state.quickMode ? 'none' : '';
   updateRoundCount();
   $('roundLabel').textContent = x.roundLabel;
   [...$('roundSelect').options].forEach(opt => {opt.textContent = x.rounds[opt.value];});
@@ -1351,9 +1379,8 @@ function renderStatic() {
 
 function renderTests() {
   const query = $('search').value.trim().toLowerCase();
-  const filtered = TESTS.filter(o =>
-    (state.filter === 'all' || o.group === state.filter) &&
-    (state.round === 'all' || (o.stage || 'today') === state.round) &&
+  const filtered = visibleTests().filter(o =>
+    (state.quickMode || state.filter === 'all' || o.group === state.filter) &&
     (!query || [o.id, o.ru, o.en, o.intro.ru, o.intro.en, ...o.steps.flatMap(s => [s.ru, s.en, s.cmd || ''])].join(' ').toLowerCase().includes(query))
   );
 
@@ -1407,26 +1434,30 @@ function renderTests() {
 }
 
 function updateRoundCount() {
-  const selected = TESTS.filter(o => state.round === 'all' || (o.stage || 'today') === state.round);
+  const selected = visibleTests();
   const done = selected.filter(o => STATUSES.slice(1).includes(dstate(o.id).status)).length;
   const ruCount = n => n % 10 === 1 && n % 100 !== 11 ? `${n} проверка`
     : [2,3,4].includes(n % 10) && ![12,13,14].includes(n % 100)
       ? `${n} проверки` : `${n} проверок`;
-  $('roundCount').textContent = state.lang === 'ru'
-    ? `Выбранный этап: ${ruCount(selected.length)} · результатов ${done}/${selected.length}. Общий прогресс выше: ${ruCount(TESTS.length)}.`
-    : `Selected stage: ${selected.length} checks · results ${done}/${selected.length}. Total progress above covers all ${TESTS.length} checks.`;
+  $('roundCount').textContent = state.quickMode
+    ? (state.lang === 'ru' ? `Основные задания: ${done}/${selected.length}.`
+        : `Quick tasks complete: ${done}/${selected.length}.`)
+    : (state.lang === 'ru'
+        ? `Выбранный этап: ${ruCount(selected.length)} · результатов ${done}/${selected.length}.`
+        : `Selected stage: ${selected.length} checks · results ${done}/${selected.length}.`);
 }
 
 function updateProgress() {
-  const vals = TESTS.map(o => dstate(o.id).status);
+  const shown = visibleTests();
+  const vals = shown.map(o => dstate(o.id).status);
   const done = vals.filter(s => STATUSES.slice(1).includes(s)).length;
-  const steps = TESTS.reduce((sum, o) => sum + Object.keys(dstate(o.id).checks || {}).filter(k => dstate(o.id).checks[k] && Number(k) < o.steps.length).length, 0);
-  const maxSteps = TESTS.reduce((sum, o) => sum + o.steps.length, 0);
+  const steps = shown.reduce((sum, o) => sum + Object.keys(dstate(o.id).checks || {}).filter(k => dstate(o.id).checks[k] && Number(k) < o.steps.length).length, 0);
+  const maxSteps = shown.reduce((sum, o) => sum + o.steps.length, 0);
 
-  $('progressCount').textContent = `${done} / ${TESTS.length}`;
+  $('progressCount').textContent = `${done} / ${shown.length}`;
   $('stepCount').textContent = `${steps} / ${maxSteps}`;
 
-  const percent = Math.round(100 * done / TESTS.length);
+  const percent = shown.length ? Math.round(100 * done / shown.length) : 0;
   const stepPercent = maxSteps ? Math.round(100 * steps / maxSteps) : 0;
 
   $('barInner').style.width = percent + '%';
@@ -1658,7 +1689,8 @@ async function generateZip() {
     // Read fresh log handles at the moment of report creation; never silently
     // mark a report complete if permission has expired or log files vanished.
     const logs = await chosenLogs();
-    if (logs.mode === 'none' && !window.confirm(t().logMissingConfirm)) return;
+    if (logs.mode === 'none' && !attachedFiles.some(f => /\\.zip$/i.test(f.name)) &&
+        !window.confirm(t().logMissingConfirm)) return;
     const items = [];
     for (const {file, path} of logs.files) {
       items.push({
@@ -1700,8 +1732,16 @@ async function generateZip() {
     ];
     const zip = await makeStoreZip(entries);
     const device = safeFileName(state.meta.hostModel || 'HOST').replace(/\s+/g, '_');
-    downloadBlob(zip, `NekoFlash_Insiders_AutoLogs_BIN_${device}_${new Date().toISOString().slice(0, 10)}.zip`);
-    toast(logs.files.length ? t().logCollected(logs.files.length) : t().zipDone);
+    // Deliberate user tap: Android Chrome can block delayed programmatic downloads
+    // after asynchronous ZIP generation has consumed transient user activation.
+    if (readyZipUrl) URL.revokeObjectURL(readyZipUrl);
+    readyZipUrl = URL.createObjectURL(zip);
+    const link = $('readyZipLink');
+    link.href = readyZipUrl;
+    link.download = `NekoFlash_Insiders_Report_${device}_${new Date().toISOString().slice(0, 10)}.zip`;
+    link.textContent = t().zipDownload;
+    link.hidden = false;
+    toast(t().zipReady);
   } catch (err) {
     toast(t().zipErr + (err?.message || String(err)));
   } finally {
@@ -1710,7 +1750,13 @@ async function generateZip() {
   }
 }
 
-$('roundSelect').addEventListener('change', ev => {state.round=ev.target.value; save(); renderTests(); updateRoundCount();});
+$('roundSelect').addEventListener('change', ev => {state.round=ev.target.value; save(); renderTests(); updateProgress();});
+$('modeToggle').addEventListener('click', () => {
+  state.quickMode = !state.quickMode;
+  save();
+  renderStatic();
+  renderTests();
+});
 $('ru').addEventListener('click', () => setLanguage('ru'));
 $('en').addEventListener('click', () => setLanguage('en'));
 
@@ -1851,7 +1897,11 @@ $('fileList').addEventListener('click', ev => {
   }
 });
 
-$('makeZip').addEventListener('click', generateZip);
+$('makeZip').addEventListener('click', () => {
+  if (readyZipUrl) { URL.revokeObjectURL(readyZipUrl); readyZipUrl = null; }
+  $('readyZipLink').hidden = true;
+  generateZip();
+});
 
 $('copyReportBtn').addEventListener('click', () => {
   const reportText = renderReportText(snapshot());
