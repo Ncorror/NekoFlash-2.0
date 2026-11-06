@@ -118,6 +118,9 @@ class MainActivity : AppCompatActivity() {
     private var operationStoredProgressHidden: Boolean = false
     private var operationHiddenProgressFingerprint: String? = null
     private var operationCancelRequested: Boolean = false
+    // Keep completed checkpoint evidence, but do not resurrect its strip after
+    // an Activity cold launch (including force-stop and process recreation).
+    private var hideRestoredTerminalResultOnColdLaunch: Boolean = false
 
     private val actionUsbPermission: String by lazy { "$packageName.USB_PERMISSION" }
     private val folderName = "NekoFlash"
@@ -296,6 +299,7 @@ class MainActivity : AppCompatActivity() {
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
         viewModel = DeviceSessionStore.attachUi(application)
         viewModelReady = true
+        hideRestoredTerminalResultOnColdLaunch = savedInstanceState == null
         operationStoredProgressHidden = savedInstanceState?.getBoolean(
             STATE_HIDE_STORED_OPERATION_PROGRESS,
             false
@@ -345,6 +349,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.operationActive.observe(this) { active ->
             val rawProgress = viewModel.operationProgress.value
             if (active) {
+                hideRestoredTerminalResultOnColdLaunch = false
                 // Do not leak a completed queue's step list or result into a
                 // later unrelated operation. Heavy operations publish a fresh
                 // unfinished OperationProgress before operationActive=true;
@@ -3976,6 +3981,24 @@ class MainActivity : AppCompatActivity() {
         viewModel.cancelActiveOperation()
     }
 
+    private fun restoreFinishedOperationUiIfNeeded() {
+        if (!hideRestoredTerminalResultOnColdLaunch) return
+        val progress = viewModel.operationProgress.value
+        if (!OperationResultRestorePolicy.hideOldFinishedResult(
+                coldLaunch = hideRestoredTerminalResultOnColdLaunch,
+                activeOperation = viewModel.operationActive.value == true,
+                finishedResult = progress?.finished == true
+            )
+        ) return
+
+        // Hide the old on-screen result only. DeviceViewModel retains the exact
+        // persisted VERIFY_PENDING/SUCCESS/FAILURE and unmodified diagnostic logs.
+        operationStoredProgressHidden = true
+        operationHiddenProgressFingerprint = operationProgressFingerprint(progress)
+        operationStripDismissedSignature = operationProgressSignature(progress)
+        hideRestoredTerminalResultOnColdLaunch = false
+    }
+
     private fun operationProgressForUi(
         rawProgress: DeviceViewModel.OperationProgress?
     ): DeviceViewModel.OperationProgress? =
@@ -4129,6 +4152,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun renderOperationProgressUi(rawProgress: DeviceViewModel.OperationProgress?) {
+        restoreFinishedOperationUiIfNeeded()
         // Operation progress is rendered in-place. It never opens Console or
         // overlays the active workflow page.
         if (::operationCenterProgressBar.isInitialized && ::tvOperationCenterProgress.isInitialized) {
@@ -4261,6 +4285,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateOperationCenter(lines: List<String>) {
         if (!::tvOperationCenterStatus.isInitialized || !::tvOperationCenterLastEvent.isInitialized) return
+        restoreFinishedOperationUiIfNeeded()
 
         val active = viewModel.operationActive.value == true
         val progress = operationProgressForUi(viewModel.operationProgress.value)
