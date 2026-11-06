@@ -666,7 +666,7 @@ h3 { font-size: 15px; margin: 0 0 8px; }
     <p class="name-warning" id="privacy"></p>
     <div class="actions">
       <button class="btn primary" id="makeZip" type="button">📦 Подготовить ZIP-отчёт</button>
-      <a id="readyZipLink" class="btn primary" href="#" hidden>⬇ Скачать ZIP-отчёт</a>
+      <a id="readyZipLink" class="btn primary" href="#" style="display:none">⬇ Скачать ZIP-отчёт</a>
       <button class="btn" id="copyReportBtn" type="button">📋 Скопировать report.txt</button>
       <button class="btn" id="exportJson" type="button">Сохранить прогресс JSON</button>
       <button class="btn ghost" id="importJson" type="button">Загрузить прогресс</button>
@@ -1740,7 +1740,7 @@ async function generateZip() {
     link.href = readyZipUrl;
     link.download = `NekoFlash_Insiders_Report_${device}_${new Date().toISOString().slice(0, 10)}.zip`;
     link.textContent = t().zipDownload;
-    link.hidden = false;
+    link.style.display = 'inline-flex';
     toast(t().zipReady);
   } catch (err) {
     toast(t().zipErr + (err?.message || String(err)));
@@ -1899,7 +1899,7 @@ $('fileList').addEventListener('click', ev => {
 
 $('makeZip').addEventListener('click', () => {
   if (readyZipUrl) { URL.revokeObjectURL(readyZipUrl); readyZipUrl = null; }
-  $('readyZipLink').hidden = true;
+  $('readyZipLink').style.display = 'none';
   generateZip();
 });
 
