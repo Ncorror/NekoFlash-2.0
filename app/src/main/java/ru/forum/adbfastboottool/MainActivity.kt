@@ -128,6 +128,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var massImageLauncher: ActivityResultLauncher<Intent>
     private var pendingMassPartition: String? = null
     private lateinit var miLoginLauncher: ActivityResultLauncher<Intent>
+    private lateinit var diagnosticZipLauncher: ActivityResultLauncher<Intent>
     private var miAuth: MiAccountClient.AuthResult? = null
     private var miAuthExchangeJob: Job? = null
     private var miAuthExchangeState: MiAuthExchangeState = MiAuthExchangeState.IDLE
@@ -420,6 +421,11 @@ class MainActivity : AppCompatActivity() {
         registerQuickImageLauncher()
         registerMassImageLauncher()
         registerMiLoginLauncher()
+        diagnosticZipLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                result.data?.data?.let(::exportDiagnosticArchive)
+            }
+        }
         setupButtons()
         setupFastbootWorkflowUi()
         initializeOperationCenterDialog()
@@ -2026,7 +2032,10 @@ class MainActivity : AppCompatActivity() {
         if (PermissionGate.hasStorage(this)) {
             if (!::workspacePath.isInitialized) initWorkspace()
         } else if (::viewModel.isInitialized) {
-            viewModel.log("ℹ️ Workspace permission is optional until importing or selecting files.")
+            // Diagnostics must not depend on MANAGE_EXTERNAL_STORAGE. This private
+            // directory survives ordinary app restarts and can be exported through SAF.
+            viewModel.configureLogDirectory(File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"))
+            viewModel.log("ℹ️ Public workspace is optional; diagnostics use app-private storage.")
         }
     }
 
@@ -2071,6 +2080,7 @@ class MainActivity : AppCompatActivity() {
         val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
         workspacePath = File(downloadsDir, folderName)
         if (!workspacePath.exists() && !workspacePath.mkdirs()) {
+            viewModel.configureLogDirectory(File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"))
             viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev11_workspace_create_failed, workspaceDisplayPath()))
             return
         }
@@ -2183,6 +2193,52 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
+    private fun activeDiagnosticLogsDirectory(): File =
+        viewModel.currentLogFile()?.parentFile
+            ?: File(getExternalFilesDir(null) ?: filesDir, "NekoFlash/logs")
+
+    private fun diagnosticEvidenceDirectories(): List<File> = listOfNotNull(
+        activeDiagnosticLogsDirectory(),
+        File(getExternalFilesDir(null) ?: filesDir, "NekoFlash/logs"),
+        File(filesDir, "NekoFlash/logs"),
+        if (::workspacePath.isInitialized) File(workspacePath, "logs") else null
+    ).distinctBy { it.absolutePath }
+
+    private fun requestDiagnosticArchive() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.logs_export_zip)
+            .setMessage(R.string.logs_export_raw_warning)
+            .setPositiveButton(R.string.logs_export_continue) { _, _ ->
+                val filename = "NekoFlash-diagnostics-${System.currentTimeMillis()}.zip"
+                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                    addCategory(Intent.CATEGORY_OPENABLE)
+                    type = "application/zip"
+                    putExtra(Intent.EXTRA_TITLE, filename)
+                }
+                diagnosticZipLauncher.launch(intent)
+            }
+            .setNegativeButton(R.string.cancel_upper, null)
+            .show()
+    }
+
+    private fun exportDiagnosticArchive(uri: Uri) {
+        lifecycleScope.launch {
+            try {
+                val exported = withContext(Dispatchers.IO) {
+                    val directories = diagnosticEvidenceDirectories()
+                    val output = contentResolver.openOutputStream(uri, "w")
+                        ?: error("Android did not open the selected ZIP destination")
+                    DiagnosticEvidenceArchive.write(output, directories)
+                }
+                viewModel.log("Diagnostic ZIP exported: $exported files")
+                Toast.makeText(this@MainActivity, getString(R.string.logs_export_done, exported), Toast.LENGTH_LONG).show()
+            } catch (error: Exception) {
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: diagnostic ZIP export failed: ${error.message}")
+                Toast.makeText(this@MainActivity, getString(R.string.logs_export_failed, error.message ?: error.javaClass.simpleName), Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
     /**
      * Единое меню отчётов и логов (BottomSheet). Собирает 5 разбросанных
      * функций логов и отчётов в одну панель без скрытой дублирующей страницы.
@@ -2191,6 +2247,7 @@ class MainActivity : AppCompatActivity() {
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
         val items = listOf(
             getString(R.string.reports_copy_short_summary) to { copyDiagnosticSummary() },
+            getString(R.string.logs_export_zip) to { requestDiagnosticArchive() },
             getString(R.string.reports_open_folder) to { openReportsFolder() },
             getString(R.string.reports_log_actions) to { showLogsMenu() }
         )
@@ -2225,15 +2282,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLogsMenu() {
-        if (!ensureWorkspaceReady()) return
         val compact = viewModel.currentLogFile()
         val trace = viewModel.currentTraceLogFiles().lastOrNull()
         val summaryFile = viewModel.currentSessionSummaryFile()
         val snapshot = viewModel.currentDiagnosticSessionSummary()
-        val logsDir = File(workspacePath, "logs")
+        val logsDir = activeDiagnosticLogsDirectory()
         val entries = LogMenuPolicy.entries(logsDir.listFiles())
         val activeNames = activeLogFileNames(summaryFile)
-        val oldCount = entries.count { LogMenuPolicy.canDelete(it, activeNames) }
+        val oldCount = if (::workspacePath.isInitialized) {
+            entries.count { LogMenuPolicy.canDelete(it, activeNames) }
+        } else 0
 
         val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(this)
         val root = LinearLayout(this).apply {
@@ -2271,6 +2329,7 @@ class MainActivity : AppCompatActivity() {
 
         val actions = mutableListOf<Pair<String, () -> Unit>>()
         actions += getString(R.string.logs_current_summary) to { showCurrentSessionSummaryDialog() }
+        actions += getString(R.string.logs_export_zip) to { requestDiagnosticArchive() }
         if (compact?.isFile == true) {
             actions += getString(R.string.logs_current_compact) to {
                 showLogFileActions(LogMenuPolicy.Entry(compact, LogMenuPolicy.Kind.COMPACT))
@@ -2375,8 +2434,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showLogHistoryDialog() {
-        if (!ensureWorkspaceReady()) return
-        val logsDir = File(workspacePath, "logs")
+        val logsDir = activeDiagnosticLogsDirectory()
         val entries = LogMenuPolicy.entries(logsDir.listFiles())
         if (entries.isEmpty()) {
             Toast.makeText(this, getString(R.string.logs_no_files), Toast.LENGTH_SHORT).show()
@@ -3543,7 +3601,8 @@ class MainActivity : AppCompatActivity() {
                         source = file,
                         outputDir = File(cacheDir, "shared-logs"),
                         scope = ReportSanitizer.Scope(
-                            workspace = workspacePath,
+                            workspace = if (::workspacePath.isInitialized) workspacePath
+                                else File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"),
                             logFile = file,
                             packageName = packageName
                         )
