@@ -27,4 +27,13 @@ class OperationResultRestorePolicyTest {
     @Test fun inProgressRecoveryIsNotHidden() {
         assertFalse(OperationResultRestorePolicy.hideOldFinishedResult(true, false, false))
     }
+
+    @Test fun unverifiedResultAutoCollapsesWithoutBeingMarkedSuccessful() {
+        assertTrue(OperationResultRestorePolicy.shouldAutoDismissStrip("VERIFY_PENDING"))
+        assertTrue(OperationResultRestorePolicy.shouldAutoDismissStrip("SUCCESS"))
+        assertTrue(OperationResultRestorePolicy.shouldAutoDismissStrip("CANCELLED"))
+        assertFalse(OperationResultRestorePolicy.shouldAutoDismissStrip("FAILED"))
+        assertFalse(OperationResultRestorePolicy.shouldAutoDismissStrip("INTERRUPTED"))
+        assertFalse(OperationResultRestorePolicy.shouldAutoDismissStrip(null))
+    }
 }
