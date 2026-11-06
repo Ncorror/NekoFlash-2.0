@@ -1554,7 +1554,14 @@ function renderReportText(data) {
     '',
     isRu ? 'РЕЗУЛЬТАТЫ' : 'RESULTS'
   ];
-  for (const o of TESTS) {
+  // Quick reports include the six tasks and any older expert checks actually
+  // completed: prior test results are not silently hidden or declared untested.
+  const reported = state.quickMode
+    ? TESTS.filter(o => QUICK_IDS.includes(o.id) ||
+        (data.tests[o.id] && (data.tests[o.id].status !== 'not_started' ||
+          data.tests[o.id].notes || data.tests[o.id].checkedSteps.some(Boolean))))
+    : TESTS;
+  for (const o of reported) {
     const z = data.tests[o.id];
     lines.push(
       '',
@@ -1568,6 +1575,7 @@ function renderReportText(data) {
   if (data.evidence) {
     lines.push('', 'EVIDENCE:',
       `Auto logs: ${data.evidence.logsIncluded ?? 0}`,
+      `Attached log archives: ${data.evidence.attachedArchives ?? 0}`,
       `Collection: ${data.evidence.collectionMode || 'none'}`,
       `Log folder: ${data.evidence.folder || ''}`,
       `Manifest: evidence-manifest.json`);
@@ -1723,7 +1731,9 @@ async function generateZip() {
         originalName:x.originalName, source:x.source, sizeBytes:x.blob.size,
         lastModifiedMs:x.lastModified}))
     };
-    snap.evidence = {logsIncluded:logs.files.length, collectionMode:logs.mode, folder:logFolderName};
+    snap.evidence = {logsIncluded:logs.files.length,
+      attachedArchives:attachedFiles.filter(f => /\.zip$/i.test(f.name)).length,
+      collectionMode:logs.mode, folder:logFolderName};
     const entries = [
       { name: 'report.txt', blob: new Blob([renderReportText(snap)], { type: 'text/plain;charset=utf-8' }) },
       { name: 'progress.json', blob: new Blob([JSON.stringify(snap, null, 2)], { type: 'application/json' }) },
