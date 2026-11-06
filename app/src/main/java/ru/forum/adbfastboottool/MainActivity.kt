@@ -19,6 +19,7 @@ import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.provider.Settings
@@ -49,6 +50,7 @@ import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
+import androidx.core.widget.NestedScrollView
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -57,6 +59,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.bottomsheet.BottomSheetBehavior
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -88,6 +91,7 @@ class MainActivity : AppCompatActivity() {
     private var tvOtgStatus: TextView? = null
     private lateinit var cardOperationCenter: MaterialCardView
     private var operationCenterDialog: BottomSheetDialog? = null
+    private var operationCenterRestoredScrollY = 0
     private var autoShowGuiOperation: Boolean = false
     private lateinit var operationCenterDetails: View
     private lateinit var tvOperationCenterStatus: TextView
@@ -111,6 +115,8 @@ class MainActivity : AppCompatActivity() {
     private val operationStripHandler = Handler(Looper.getMainLooper())
     private var operationStripDismissedSignature: String? = null
     private var operationStripScheduledSignature: String? = null
+    private var operationStripDeadlineSignature: String? = null
+    private var operationStripDeadlineMs = 0L
     private var operationStripHideRunnable: Runnable? = null
     private var operationStepsVisibleForCurrentRun: Boolean = false
     private var operationRunObservedActive: Boolean = false
@@ -320,6 +326,12 @@ class MainActivity : AppCompatActivity() {
         operationStripDismissedSignature = savedInstanceState?.getString(
             STATE_OPERATION_STRIP_DISMISSED_SIGNATURE
         )
+        if (!hideRestoredTerminalResultOnColdLaunch) {
+            operationStripDeadlineSignature = savedInstanceState?.getString(STATE_OPERATION_STRIP_DEADLINE_SIGNATURE)
+            operationStripDeadlineMs = savedInstanceState?.getLong(STATE_OPERATION_STRIP_DEADLINE_MS) ?: 0L
+            operationCenterRestoredScrollY = savedInstanceState?.getInt(STATE_OPERATION_CENTER_SCROLL) ?: 0
+            operationStepsVisibleForCurrentRun = savedInstanceState?.getBoolean(STATE_OPERATION_STEPS_VISIBLE) ?: false
+        }
         enableOverlayProtection()
 
         viewModel.logLines.observe(this) { lines ->
@@ -440,6 +452,9 @@ class MainActivity : AppCompatActivity() {
         setupButtons()
         setupFastbootWorkflowUi()
         initializeOperationCenterDialog()
+        if (!hideRestoredTerminalResultOnColdLaunch && savedInstanceState?.getBoolean(STATE_OPERATION_CENTER_OPEN) == true) {
+            cardOperationStrip.post { openOperationCenter() }
+        }
         buildSettingsPage()
         restoreWindowState(savedInstanceState)
         updateDeviceOverview()
@@ -500,6 +515,14 @@ class MainActivity : AppCompatActivity() {
         outState.putString(STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT, operationHiddenProgressFingerprint)
         outState.putBoolean(STATE_OPERATION_CANCEL_REQUESTED, operationCancelRequested)
         outState.putString(STATE_OPERATION_STRIP_DISMISSED_SIGNATURE, operationStripDismissedSignature)
+        outState.putString(STATE_OPERATION_STRIP_DEADLINE_SIGNATURE, operationStripDeadlineSignature)
+        outState.putLong(STATE_OPERATION_STRIP_DEADLINE_MS, operationStripDeadlineMs)
+        outState.putBoolean(STATE_OPERATION_CENTER_OPEN, operationCenterDialog?.isShowing == true)
+        outState.putBoolean(STATE_OPERATION_STEPS_VISIBLE, operationStepsVisibleForCurrentRun)
+        if (::cardOperationCenter.isInitialized) {
+            outState.putInt(STATE_OPERATION_CENTER_SCROLL,
+                cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll).scrollY)
+        }
         if (::consoleDockController.isInitialized) outState.putBoolean("rev26.terminal.open", consoleDockController.isExpanded)
         outState.putStringArrayList("rev26.terminal.history", ArrayList(commandHistory))
         outState.putInt("rev26.terminal.historyIndex", historyIndex)
@@ -525,11 +548,15 @@ class MainActivity : AppCompatActivity() {
             val specs = findViewById<View>(R.id.homeModelSpecs)
             specs.isVisible = !specs.isVisible
         }
-        findViewById<Button>(R.id.btnOperationCenterConsole).apply {
-            text = getString(R.string.operation_center_collapse)
-            setOnClickListener { operationCenterDialog?.dismiss() }
+        findViewById<View>(R.id.btnOperationCenterMinimize).setOnClickListener { operationCenterDialog?.dismiss() }
+        findViewById<Button>(R.id.btnOperationCenterConsole).setOnClickListener {
+            operationCenterDialog?.dismiss()
+            openConsole(requestCommandFocus = false)
         }
-        findViewById<View>(R.id.btnReportsMenu).setOnClickListener { showReportsMenu() }
+        findViewById<View>(R.id.btnReportsMenu).setOnClickListener {
+            operationCenterDialog?.dismiss()
+            showReportsMenu()
+        }
         findViewById<Button>(R.id.btnOperationCenterCancel).setOnClickListener { requestOperationCancelFromUi() }
         cardOperationStrip.setOnClickListener { openOperationCenter() }
         btnOperationStripDismiss.setOnClickListener {
@@ -3007,16 +3034,18 @@ class MainActivity : AppCompatActivity() {
         // is guessed by the GUI.
         val pages = listOf(
             findViewById<View>(R.id.fastbootQuickSection),
-            findViewById<View>(R.id.fastbootMassSection),
-            findViewById<View>(R.id.fastbootToolsSection)
+            findViewById<View>(R.id.fastbootMassSection)
         )
         val controls = listOf(
             findViewById<View>(R.id.btnFastbootSectionQuick),
-            findViewById<View>(R.id.btnFastbootSectionMass),
-            findViewById<View>(R.id.btnFastbootSectionTools)
+            findViewById<View>(R.id.btnFastbootSectionMass)
         )
+        // Temporarily hide Tools, retaining its existing controls and handlers.
+        // Old saved selection 2 must fall back to Quick, never a blank page.
+        findViewById<View>(R.id.btnFastbootSectionTools).visibility = View.GONE
+        findViewById<View>(R.id.fastbootToolsSection).visibility = View.GONE
         fun selectSection(index: Int) {
-            selectedFastbootSection = index.coerceIn(pages.indices)
+            selectedFastbootSection = index.takeIf { it in pages.indices } ?: 0
             pages.forEachIndexed { n, page -> page.visibility = if (n == selectedFastbootSection) View.VISIBLE else View.GONE }
             controls.forEachIndexed { n, view ->
                 val button = view as MaterialButton
@@ -3974,11 +4003,24 @@ class MainActivity : AppCompatActivity() {
         parent.removeView(cardOperationCenter)
         operationCenterDialog = BottomSheetDialog(this).apply {
             setContentView(cardOperationCenter)
+            behavior.skipCollapsed = true
+            behavior.isDraggable = false
+            setOnShowListener {
+                behavior.state = BottomSheetBehavior.STATE_EXPANDED
+                cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll).post {
+                    if (operationCenterRestoredScrollY > 0) {
+                        cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll)
+                            .scrollTo(0, operationCenterRestoredScrollY)
+                        operationCenterRestoredScrollY = 0
+                    }
+                }
+            }
         }
     }
 
     private fun openOperationCenter() {
-        if (viewModel.operationProgress.value == null || operationStoredProgressHidden) return
+        if (isFinishing || isDestroyed) return
+        if (viewModel.operationActive.value != true && operationProgressForUi(viewModel.operationProgress.value) == null) return
         operationCenterDialog?.let { if (!it.isShowing) it.show() }
     }
 
@@ -4170,14 +4212,14 @@ class MainActivity : AppCompatActivity() {
             val operationRunning = active || progress?.finished == false
             val effectiveProgress = progress?.takeUnless { operationRunning && it.finished }
             val showDetails = operationRunning || progress != null
-            val percent = if (operationCancelRequested && operationRunning) {
+            val percent = if (!operationRunning || operationCancelRequested) {
                 null
             } else {
                 effectiveProgress?.percent?.takeIf { it >= 0 }?.coerceIn(0, 100)
             }
 
             operationCenterDetails.visibility = if (showDetails) View.VISIBLE else View.GONE
-            operationCenterProgressBar.visibility = if (showDetails) View.VISIBLE else View.GONE
+            operationCenterProgressBar.visibility = if (operationRunning) View.VISIBLE else View.GONE
             operationCenterProgressBar.isIndeterminate = operationRunning && percent == null
             if (percent != null) {
                 operationCenterProgressBar.progress = percent
@@ -4195,7 +4237,7 @@ class MainActivity : AppCompatActivity() {
             tvOperationCenterPercent.visibility = if (percent != null) View.VISIBLE else View.GONE
 
             val detail = if (operationCancelRequested && operationRunning) {
-                getString(R.string.layout_operation_center_cancelling_detail)
+                ""
             } else {
                 effectiveProgress?.detail?.trim().orEmpty()
             }
@@ -4262,10 +4304,10 @@ class MainActivity : AppCompatActivity() {
                 append('/')
                 append(step.total)
                 append(' ')
-                append(step.title.take(88))
+                append(step.title)
                 step.subtitle?.takeIf { it.isNotBlank() }?.let {
                     append(" — ")
-                    append(it.take(56))
+                    append(it)
                 }
                 append('\n')
             }
@@ -4332,7 +4374,7 @@ class MainActivity : AppCompatActivity() {
         val (statusRes, colorRes) = when {
             operationRunning && operationCancelRequested ->
                 R.string.layout_operation_center_cancelling to R.color.log_warning
-            operationRunning -> R.string.layout_operation_center_running to R.color.log_warning
+            operationRunning -> R.string.layout_operation_center_running to R.color.accent_soft
             progress?.finished == true && progress.outcome == DeviceViewModel.OperationOutcomeKind.SUCCESS ->
                 R.string.layout_operation_center_completed to R.color.log_success
             progress?.finished == true && progress.outcome == DeviceViewModel.OperationOutcomeKind.FAILED ->
@@ -4349,9 +4391,18 @@ class MainActivity : AppCompatActivity() {
         val statusText = getString(statusRes)
         tvOperationCenterStatus.text = statusText
         tvOperationCenterStatus.setTextColor(getColor(colorRes))
-        cardOperationCenter.strokeColor = getColor(
-            if (!operationRunning && progress == null) R.color.stroke else colorRes
-        )
+        cardOperationCenter.strokeColor = getColor(R.color.stroke)
+        val hintRes = when {
+            operationRunning && operationCancelRequested -> R.string.layout_operation_center_cancelling_detail
+            operationRunning -> R.string.operation_hint_running
+            progress?.outcome == DeviceViewModel.OperationOutcomeKind.SUCCESS -> R.string.operation_hint_success
+            progress?.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING -> R.string.operation_hint_pending
+            progress?.outcome == DeviceViewModel.OperationOutcomeKind.CANCELLED -> R.string.operation_hint_cancelled
+            progress?.outcome == DeviceViewModel.OperationOutcomeKind.FAILED -> R.string.operation_hint_failed
+            progress?.outcome == DeviceViewModel.OperationOutcomeKind.INTERRUPTED -> R.string.operation_hint_interrupted
+            else -> R.string.layout_operation_center_subtitle
+        }
+        cardOperationCenter.findViewById<TextView>(R.id.tvOperationCenterHint).text = getString(hintRes)
         val progressTint = ColorStateList.valueOf(getColor(colorRes))
         operationCenterProgressBar.progressTintList = progressTint
         operationCenterProgressBar.indeterminateTintList = progressTint
@@ -4463,7 +4514,24 @@ class MainActivity : AppCompatActivity() {
                 progress.outcome?.name
             )
             if (autoHide && operationStripScheduledSignature != signature) {
-                cancelScheduledOperationStripHide()
+                cancelScheduledOperationStripHide(resetDeadline = false)
+                val holdMs = if (progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING) {
+                    OPERATION_STRIP_VERIFY_PENDING_HOLD_MS
+                } else {
+                    OPERATION_STRIP_SUCCESS_HOLD_MS
+                }
+                val now = SystemClock.elapsedRealtime()
+                if (operationStripDeadlineSignature != signature || operationStripDeadlineMs == 0L) {
+                    operationStripDeadlineSignature = signature
+                    operationStripDeadlineMs = now + holdMs
+                }
+                val remainingMs = (operationStripDeadlineMs - now).coerceAtLeast(0L)
+                if (remainingMs == 0L) {
+                    operationStripDismissedSignature = signature
+                    cancelScheduledOperationStripHide()
+                    cardOperationStrip.visibility = View.GONE
+                    return
+                }
                 operationStripScheduledSignature = signature
                 val hideRunnable = Runnable {
                     if (viewModel.operationActive.value != true &&
@@ -4474,14 +4542,11 @@ class MainActivity : AppCompatActivity() {
                     }
                     operationStripScheduledSignature = null
                     operationStripHideRunnable = null
+                    operationStripDeadlineSignature = null
+                    operationStripDeadlineMs = 0L
                 }
                 operationStripHideRunnable = hideRunnable
-                val holdMs = if (progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING) {
-                    OPERATION_STRIP_VERIFY_PENDING_HOLD_MS
-                } else {
-                    OPERATION_STRIP_SUCCESS_HOLD_MS
-                }
-                operationStripHandler.postDelayed(hideRunnable, holdMs)
+                operationStripHandler.postDelayed(hideRunnable, remainingMs)
             } else if (!autoHide) {
                 cancelScheduledOperationStripHide()
             }
@@ -4497,11 +4562,12 @@ class MainActivity : AppCompatActivity() {
             progress?.title?.trim()?.takeIf { it.isNotBlank() }
         }
             ?: getString(R.string.layout_operation_center_working)
-        val percent = if (operationCancelRequested && running) {
+        // Transfer percentage is not a verdict. Finished results show the
+        // backend outcome alone, especially VERIFY_PENDING and FAILED at 100%.
+        val percent = if (!running || operationCancelRequested) {
             null
         } else {
             effectiveProgress?.percent?.takeIf { it >= 0 }?.coerceIn(0, 100)
-                ?: if (finished && progress.success) 100 else null
         }
         val metaText = if (running && stepSummary != null && !operationCancelRequested) {
             getString(R.string.layout_operation_strip_step_status, stepSummary, statusText)
@@ -4516,6 +4582,7 @@ class MainActivity : AppCompatActivity() {
         }.orEmpty()
         tvOperationStripPercent.visibility = if (percent != null) View.VISIBLE else View.GONE
         btnOperationStripDismiss.visibility = if (finished) View.VISIBLE else View.GONE
+        operationStripProgressBar.visibility = if (running) View.VISIBLE else View.GONE
 
         operationStripProgressBar.isIndeterminate = running && percent == null
         if (percent != null) {
@@ -4527,7 +4594,7 @@ class MainActivity : AppCompatActivity() {
 
         val stateColor = getColor(colorRes)
         val stateTint = ColorStateList.valueOf(stateColor)
-        cardOperationStrip.strokeColor = stateColor
+        cardOperationStrip.strokeColor = getColor(R.color.stroke)
         tvOperationStripMeta.setTextColor(stateColor)
         operationStripProgressBar.progressTintList = stateTint
         operationStripProgressBar.indeterminateTintList = stateTint
@@ -4562,10 +4629,14 @@ class MainActivity : AppCompatActivity() {
         return operationProgressFingerprint(progress)
     }
 
-    private fun cancelScheduledOperationStripHide() {
+    private fun cancelScheduledOperationStripHide(resetDeadline: Boolean = true) {
         operationStripHideRunnable?.let(operationStripHandler::removeCallbacks)
         operationStripHideRunnable = null
         operationStripScheduledSignature = null
+        if (resetDeadline) {
+            operationStripDeadlineSignature = null
+            operationStripDeadlineMs = 0L
+        }
     }
 
     // Console snapshots are coalesced for a short window so bursty USB output
@@ -4719,6 +4790,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        operationCenterDialog?.dismiss()
+        operationCenterDialog = null
         importDialog?.dismiss()
         importDialog = null
         if (!isChangingConfigurations && viewModelReady) viewModel.workspaceImport.cancel()
@@ -4768,6 +4841,11 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_LAST_WINDOW = "last_window"
         private const val STATE_SELECTED_WINDOW = "state_selected_window"
         private const val STATE_OPERATION_SESSION_ID = "state_operation_session_id"
+        private const val STATE_OPERATION_STEPS_VISIBLE = "state_operation_steps_visible"
+        private const val STATE_OPERATION_CENTER_OPEN = "state_operation_center_open"
+        private const val STATE_OPERATION_CENTER_SCROLL = "state_operation_center_scroll"
+        private const val STATE_OPERATION_STRIP_DEADLINE_SIGNATURE = "state_operation_strip_deadline_signature"
+        private const val STATE_OPERATION_STRIP_DEADLINE_MS = "state_operation_strip_deadline_ms"
         private const val STATE_HIDE_STORED_OPERATION_PROGRESS = "state_hide_stored_operation_progress"
         private const val STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT =
             "state_hidden_operation_progress_fingerprint"

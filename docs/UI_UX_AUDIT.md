@@ -10,7 +10,7 @@ English
 
 </div>
 
-**6 November 2026 · author decision:** Operation Center visual redesign is deferred for a later, separate task. REV47 only fixes stale completed-result visibility: cold session restoration hides the old strip, while a new `VERIFY_PENDING` notice auto-hides after 20 seconds without changing its verdict or evidence. See the [REV47 behavior and validation record](source-audit/REV47-OPERATION-RESULT-2026-11-06-RU.md). The historical assessment below is not the current behavior specification.
+**7 November 2026 · REV48:** The author requested the previously deferred Operation Center redesign. The contextual sheet now has scrollable details, separate minimize/console/report actions and concise outcome labels. Rotation preserves the open sheet and result dismissal deadline. Flash → Tools is temporarily hidden. See the [REV48 audit and verification scope](source-audit/REV48-OPERATION-CENTER-2026-11-07-RU.md). Historical assessments below do not specify the current UI.
 
 **Status:** Historical UI assessment. For active REV44 main beta, Android API26/34 CI and the 49 outstanding lint warnings see [REV45 audit](AUDIT-REV45-2026-11-01-RU.md). No new physical REV43 validation is implied here.\n\n**Audit scope:** Android interface, UI controllers, RU/EN interface copy, accessibility-facing labels, and public documentation.
 

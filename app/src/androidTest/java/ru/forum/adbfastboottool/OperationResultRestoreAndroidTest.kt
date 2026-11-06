@@ -120,7 +120,10 @@ class OperationResultRestoreAndroidTest {
             finishPending(scenario)
             journal.writeOperation(pending)
             val originalBytes = checkpoint.readBytes()
-            waitUi(scenario, timeoutMs = 25_000L) {
+            // Rotation must not restart the original 20-second result hold.
+            Thread.sleep(12_000L)
+            scenario.recreate()
+            waitUi(scenario, timeoutMs = 12_000L) {
                 it.findViewById<View>(R.id.cardOperationStrip).visibility == View.GONE
             }
             scenario.onActivity {

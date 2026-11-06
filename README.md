@@ -2,6 +2,8 @@
 
 # NekoFlash 2.0
 
+**Development snapshot REV48:** [PR #45](https://github.com/Ncorror/NekoFlash-2.0/pull/45) updates the Operation Center and temporarily hides Flash → Tools. The published REV45 kit and gallery below remain the previous reference; use the successful PR tester-kit artifact for these changes.
+
 English · [Русский](README_ru.md)
 
 Run ADB and Fastboot from one Android phone to service a second phone over USB OTG. The host needs Android 8.0+ and USB Host support. Use a data-capable cable. Root is optional on the host.
