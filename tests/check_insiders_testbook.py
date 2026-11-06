@@ -23,6 +23,8 @@ for marker in (
     "async function chosenLogs(", "webkitdirectory",
     "trace-", "evidence-manifest.json", "progress.json",
     "downloadBlob(", "localStorage", "zipCreating",
+    "QUICK_IDS = [", "modeToggle", "readyZipLink", "readyZipUrl",
+    "const visibleTests = () =>", "logs.mode === 'none'", "attachedFiles.some",
 ):
     assert marker in source, f"Missing tester feature/provenance: {marker}"
 
