@@ -10,6 +10,10 @@ import java.util.zip.ZipOutputStream
  * The archive is streamed directly to the user-selected SAF destination.
  */
 object DiagnosticEvidenceArchive {
+    internal fun directories(workspaces: List<File>): List<File> = workspaces.flatMap {
+        listOf(File(it, "logs"), File(it, "reports/usb-sessions"))
+    }.distinctBy { it.absolutePath }
+
     private val diagnosticName = Regex(
         "^(?:log-|trace-|session-summary-|usb-|diagnostic-|session-).+\\.(?:txt|json|log|bin|gz|csv|zip)$",
         RegexOption.IGNORE_CASE

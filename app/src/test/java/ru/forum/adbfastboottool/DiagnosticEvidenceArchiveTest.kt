@@ -51,4 +51,41 @@ class DiagnosticEvidenceArchiveTest {
             folder.deleteRecursively()
         }
     }
+
+    @Test fun exportIncludesLogsAndUsbSessionSnapshotsAcrossWorkspaceRoots() {
+        val folder = Files.createTempDirectory("nekoflash-usb-export-").toFile()
+        try {
+            val privateWorkspace = folder.resolve("private").apply { mkdirs() }
+            val publicWorkspace = folder.resolve("public").apply { mkdirs() }
+            val expected = listOf(privateWorkspace, publicWorkspace).flatMapIndexed { index, workspace ->
+                listOf("logs/trace-$index.bin", "reports/usb-sessions/usb-session-$index.json",
+                    "reports/usb-sessions/usb-session-$index.txt").map { relative ->
+                    workspace.resolve(relative).apply {
+                        parentFile.mkdirs()
+                        writeBytes(byteArrayOf(0, 127, -1, index.toByte()))
+                    }
+                }
+            }
+            // Do not scan arbitrary workspace files or import an earlier whole report.
+            publicWorkspace.resolve("usb-unrelated.txt").writeText("outside diagnostic directories")
+            publicWorkspace.resolve("reports/usb-unrelated.txt").writeText("unrelated report")
+            val roots = DiagnosticEvidenceArchive.directories(
+                listOf(privateWorkspace, publicWorkspace, privateWorkspace)
+            )
+            val out = ByteArrayOutputStream()
+            assertEquals(6, DiagnosticEvidenceArchive.write(out, roots))
+            val exported = mutableMapOf<String, ByteArray>()
+            ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    exported[entry.name.substringAfterLast('/')] = zip.readBytes()
+                    zip.closeEntry()
+                }
+            }
+            assertEquals(expected.map { it.name }.toSet(), exported.keys)
+            expected.forEach { assertArrayEquals(it.readBytes(), exported[it.name]) }
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
 }

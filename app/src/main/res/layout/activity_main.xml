@@ -248,6 +248,7 @@
                     android:layout_height="32dp"
                     android:layout_marginStart="4dp"
                     android:contentDescription="@string/layout_operation_dismiss_status_desc"
+                    android:padding="0dp"
                     android:insetTop="0dp"
                     android:insetBottom="0dp"
                     android:minWidth="0dp"

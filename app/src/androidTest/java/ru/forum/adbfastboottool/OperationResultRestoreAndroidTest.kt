@@ -3,6 +3,7 @@ package ru.forum.adbfastboottool
 import android.app.Application
 import android.view.View
 import android.widget.EditText
+import android.widget.TextView
 import androidx.lifecycle.MutableLiveData
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
@@ -140,9 +141,14 @@ class OperationResultRestoreAndroidTest {
             scenario.onActivity { it.findViewById<EditText>(R.id.etCommand).setText("rev47 saved draft") }
             // First prove ordinary recreation keeps this session's result visible.
             scenario.recreate()
+            waitUi(scenario) { it.findViewById<View>(R.id.btnOperationStripDismiss).width > 0 }
             scenario.onActivity {
                 assertEquals(originalSession, sessionId())
                 assertEquals(View.VISIBLE, it.findViewById<View>(R.id.cardOperationStrip).visibility)
+                val close = it.findViewById<TextView>(R.id.btnOperationStripDismiss)
+                assertTrue("Dismiss button has no room for its close glyph",
+                    close.width - close.compoundPaddingLeft - close.compoundPaddingRight >=
+                        close.paint.measureText(close.text.toString()))
             }
             // Keep Android's saved Bundle but replace the execution session after
             // the old Activity is destroyed, as happens after process recreation.
@@ -169,6 +175,14 @@ class OperationResultRestoreAndroidTest {
                 }
                 assertEquals(pending, journal.readOperation())
                 assertArrayEquals(originalBytes, checkpoint.readBytes())
+                // A hidden restored result must not hide the next operation.
+                beginProgress(scenario)
+                finishPending(scenario)
+                scenario.onActivity { it.findViewById<View>(R.id.btnOperationStripDismiss).performClick() }
+                scenario.recreate()
+                scenario.onActivity {
+                    assertEquals(View.GONE, it.findViewById<View>(R.id.cardOperationStrip).visibility)
+                }
             } finally {
                 instrumentation.runOnMainSync { monitor.removeLifecycleCallback(callback) }
             }

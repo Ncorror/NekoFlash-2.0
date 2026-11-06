@@ -2210,12 +2210,14 @@ class MainActivity : AppCompatActivity() {
         viewModel.currentLogFile()?.parentFile
             ?: File(getExternalFilesDir(null) ?: filesDir, "NekoFlash/logs")
 
-    private fun diagnosticEvidenceDirectories(): List<File> = listOfNotNull(
-        activeDiagnosticLogsDirectory(),
-        File(getExternalFilesDir(null) ?: filesDir, "NekoFlash/logs"),
-        File(filesDir, "NekoFlash/logs"),
-        if (::workspacePath.isInitialized) File(workspacePath, "logs") else null
-    ).distinctBy { it.absolutePath }
+    private fun diagnosticEvidenceDirectories(): List<File> = DiagnosticEvidenceArchive.directories(
+        listOfNotNull(
+            activeDiagnosticLogsDirectory().parentFile,
+            File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"),
+            File(filesDir, "NekoFlash"),
+            if (::workspacePath.isInitialized) workspacePath else null
+        )
+    )
 
     private fun requestDiagnosticArchive() {
         MaterialAlertDialogBuilder(this)
