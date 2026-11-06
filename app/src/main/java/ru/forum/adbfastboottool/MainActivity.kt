@@ -121,6 +121,7 @@ class MainActivity : AppCompatActivity() {
     // Keep completed checkpoint evidence, but do not resurrect its strip after
     // an Activity cold launch (including force-stop and process recreation).
     private var hideRestoredTerminalResultOnColdLaunch: Boolean = false
+    private var operationSessionId: String? = null
 
     private val actionUsbPermission: String by lazy { "$packageName.USB_PERMISSION" }
     private val folderName = "NekoFlash"
@@ -299,7 +300,12 @@ class MainActivity : AppCompatActivity() {
         usbManager = getSystemService(Context.USB_SERVICE) as UsbManager
         viewModel = DeviceSessionStore.attachUi(application)
         viewModelReady = true
-        hideRestoredTerminalResultOnColdLaunch = savedInstanceState == null
+        operationSessionId = viewModel.currentDiagnosticSessionSummary().sessionId
+        // A non-null Bundle can also belong to a process Android has killed.
+        // Only a screen recreated within the same execution session may keep
+        // a live result visible; a disk-restored checkpoint stays in reports.
+        hideRestoredTerminalResultOnColdLaunch =
+            savedInstanceState?.getString(STATE_OPERATION_SESSION_ID) != operationSessionId
         operationStoredProgressHidden = savedInstanceState?.getBoolean(
             STATE_HIDE_STORED_OPERATION_PROGRESS,
             false
@@ -489,6 +495,7 @@ class MainActivity : AppCompatActivity() {
         outState.putString("mass_picker_partition", pendingMassPartition)
         if (::massQueueUi.isInitialized) outState.putBundle("mass_queue_ui", massQueueUi.saveFormState())
         outState.putString(STATE_SELECTED_WINDOW, selectedWindow)
+        outState.putString(STATE_OPERATION_SESSION_ID, operationSessionId)
         outState.putBoolean(STATE_HIDE_STORED_OPERATION_PROGRESS, operationStoredProgressHidden)
         outState.putString(STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT, operationHiddenProgressFingerprint)
         outState.putBoolean(STATE_OPERATION_CANCEL_REQUESTED, operationCancelRequested)
@@ -4758,6 +4765,7 @@ class MainActivity : AppCompatActivity() {
         private const val PREF_LANGUAGE_TAG = "language_tag"
         private const val PREF_LAST_WINDOW = "last_window"
         private const val STATE_SELECTED_WINDOW = "state_selected_window"
+        private const val STATE_OPERATION_SESSION_ID = "state_operation_session_id"
         private const val STATE_HIDE_STORED_OPERATION_PROGRESS = "state_hide_stored_operation_progress"
         private const val STATE_HIDDEN_OPERATION_PROGRESS_FINGERPRINT =
             "state_hidden_operation_progress_fingerprint"
