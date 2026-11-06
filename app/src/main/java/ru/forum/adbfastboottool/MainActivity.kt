@@ -4450,8 +4450,9 @@ class MainActivity : AppCompatActivity() {
             operationStripDismissedSignature = null
             cancelScheduledOperationStripHide()
         } else if (finished && signature != null) {
-            val autoHide = progress.outcome == DeviceViewModel.OperationOutcomeKind.SUCCESS ||
-                progress.outcome == DeviceViewModel.OperationOutcomeKind.CANCELLED
+            val autoHide = OperationResultRestorePolicy.shouldAutoDismissStrip(
+                progress.outcome?.name
+            )
             if (autoHide && operationStripScheduledSignature != signature) {
                 cancelScheduledOperationStripHide()
                 operationStripScheduledSignature = signature
@@ -4466,7 +4467,12 @@ class MainActivity : AppCompatActivity() {
                     operationStripHideRunnable = null
                 }
                 operationStripHideRunnable = hideRunnable
-                operationStripHandler.postDelayed(hideRunnable, OPERATION_STRIP_SUCCESS_HOLD_MS)
+                val holdMs = if (progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING) {
+                    OPERATION_STRIP_VERIFY_PENDING_HOLD_MS
+                } else {
+                    OPERATION_STRIP_SUCCESS_HOLD_MS
+                }
+                operationStripHandler.postDelayed(hideRunnable, holdMs)
             } else if (!autoHide) {
                 cancelScheduledOperationStripHide()
             }
@@ -4745,6 +4751,7 @@ class MainActivity : AppCompatActivity() {
         private const val EXTRA_USB_INTENT_CONSUMED = "nekoflash_usb_intent_consumed"
         private const val STARTUP_USB_SCAN_DELAY_MS = 350L
         private const val OPERATION_STRIP_SUCCESS_HOLD_MS = 9_000L
+        private const val OPERATION_STRIP_VERIFY_PENDING_HOLD_MS = 20_000L
         private const val MODE_SWITCH_SCAN_INTERVAL_MS = 750L
         private const val MODE_SWITCH_SCAN_ATTEMPTS = 16
         private const val PREFS_NAME = "settings"
