@@ -2068,10 +2068,11 @@ class MainActivity : AppCompatActivity() {
         enableOverlayProtection()
         viewModel.refreshQuickFlashSource()
         updateOtgStatus()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (Environment.isExternalStorageManager() && !::workspacePath.isInitialized) {
-                initWorkspace()
-            }
+        if (PermissionGate.hasStorage(this)) {
+            if (!::workspacePath.isInitialized) initWorkspace()
+        } else {
+            // Permission may be revoked while the activity is backgrounded.
+            viewModel.configureLogDirectory(File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"))
         }
     }
 
