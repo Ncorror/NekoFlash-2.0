@@ -13,4 +13,9 @@ internal object OperationResultRestorePolicy {
         activeOperation: Boolean,
         finishedResult: Boolean
     ): Boolean = coldLaunch && !activeOperation && finishedResult
+
+    // The UI may release a "verification needed" notice after a readable hold.
+    // The persisted verdict/evidence are never auto-acknowledged or rewritten.
+    fun shouldAutoDismissStrip(outcome: String?): Boolean = outcome in
+        setOf("SUCCESS", "CANCELLED", "VERIFY_PENDING")
 }
