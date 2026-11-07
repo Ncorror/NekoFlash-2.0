@@ -22,7 +22,15 @@ def git_blob_sha(data):
 # REV31 allows ONE exact raw-shell evidence directory argument in the ADB
 # constructor. Rebuild the old blob in memory; unrelated orchestration edits
 # and changes elsewhere in DeviceViewModel must continue to fail this guard.
-if git_blob_sha(raw_vm) != expected_blob:
+# REV51 reviews the complete DeviceViewModel snapshot with lossless
+# persistent event logging. Pin the exact Git blob; unknown changes still fail.
+rev51_lossless_vm_blob = '1c31cf4e1b024e3a602aa2445f8d8ebfc82ad9f3'
+if git_blob_sha(raw_vm) == rev51_lossless_vm_blob:
+    journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
+    assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body
+    assert 'if (duplicate)' not in journal_body
+    assert 'recordDuplicateSuppressed()' not in journal_body
+elif git_blob_sha(raw_vm) != expected_blob:
     reviewed_change = (
         b'                keyDirectory = adbKeyDir,\n'
         b'                // The exact binary shell streams live beside the public\n'
