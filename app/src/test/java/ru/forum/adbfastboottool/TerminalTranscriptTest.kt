@@ -24,6 +24,25 @@ class TerminalTranscriptTest {
         assertEquals("⚠️ cancelled", selected("⚠️ cancelled"))
         assertEquals("custom failure", TerminalTranscript.select("custom failure", DiagnosticLogPolicy.Level.ERROR, false, false, false))
     }
+    @Test fun recoveredEarlyShellCloseIsInformationalAndTerminalOnlyShowsRealFailures() {
+        // The wire-level CLSE still happens on Android 14, but the one-shot
+        // shell-v2 decoder can recover a complete stdout and explicit EXIT=0.
+        // Preserve the entire event in the disk journal; do not display it as
+        // an alarming warning when no operation actually failed.
+        val recovered = "ℹ️ ADB stream closed during write local=5, expectedRemote=4, " +
+            "receivedRemote=4, payloadBytes=5, bufferedResponseBytes=26, " +
+            "dispatcherGeneration=1, transportConnected=true"
+        assertEquals(DiagnosticLogPolicy.Level.INFO, DiagnosticLogPolicy.classify(recovered).level)
+        assertNull(selected(recovered, terminal = true, protocol = true))
+        assertNull(selected(recovered))
+        // A failed/nonrecoverable stream must still remain visible.
+        val failed = recovered.replaceFirst("ℹ️", "❌")
+        assertEquals(DiagnosticLogPolicy.Level.ERROR, DiagnosticLogPolicy.classify(failed).level)
+        assertEquals(failed, selected(failed, terminal = true, protocol = true))
+        assertEquals("exit: 0", selected("=== ADB SHELL EXIT: 0 ===", terminal = true, protocol = true))
+        assertEquals("REV53_SHORT_OK", selected("│ REV53_SHORT_OK", terminal = true, protocol = true))
+    }
+
     @Test fun repeatedOutputRemainsInOrderAndOnlyViewportIsBounded() {
         val transcript = TerminalTranscript()
         repeat(3500) { transcript.append("line $it") }
