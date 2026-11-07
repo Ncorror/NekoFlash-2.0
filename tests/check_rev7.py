@@ -29,22 +29,43 @@ rev51_lossless_vm_blob = '1c31cf4e1b024e3a602aa2445f8d8ebfc82ad9f3'
 # were added to this exact orchestrator blob. Unknown changes still fail.
 rev52_admission_vm_blob = 'a0e2f3c6ef4271a124bcf80a7280d55edbb9de3b'
 rev52_explicit_transport_vm_blob = '25c0302750d40cf713833339dc492289bbec3aae'
-if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
+# Terminal Lab on REV53 adds exactly one interruption gate to the reviewed
+# REV52 orchestrator. Normalize only that exact, hash-pinned overlay; keep
+# every ADB/USB/diagnostic change from main inside the existing source guard.
+terminal_only_blob = 'bef17c6b0378cd4ee9a4ddbbf2c375abf227e7e2'
+terminal_cancel = b"""    internal fun cancelTerminalOperation(): Boolean = synchronized(operationLaunchLock) {
+        val task = activeServiceOperation ?: return@synchronized false
+        if (task.id != terminalOperationId || task.job.isCompleted) return@synchronized false
+        cancelActiveOperation()
+        true
+    }
+
+"""
+if git_blob_sha(raw_vm) == terminal_only_blob:
+    assert raw_vm.count(terminal_cancel) == 1, 'Unexpected terminal interruption method'
+    reviewed_vm = raw_vm.replace(terminal_cancel, b'', 1)
+    assert git_blob_sha(reviewed_vm) == rev52_explicit_transport_vm_blob, (
+        'Terminal Lab altered REV52/53 orchestration beyond the approved gate'
+    )
+else:
+    reviewed_vm = raw_vm
+reviewed_blob = git_blob_sha(reviewed_vm)
+if reviewed_blob in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
     journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
     assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body
     assert 'if (duplicate)' not in journal_body
     assert 'recordDuplicateSuppressed()' not in journal_body
-    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
+    if reviewed_blob in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
         admission = vm.split('private fun startOperation(')[1].split('val gen = operationGeneration.incrementAndGet()')[0]
         assert 'UsbOperationAdmission.allowed(' in admission
         assert 'FlashOperationService.submit' not in admission
         assert 'No connected ADB/Fastboot device' in admission
         assert 'requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT' in vm
-        if git_blob_sha(raw_vm) == rev52_explicit_transport_vm_blob:
+        if reviewed_blob == rev52_explicit_transport_vm_blob:
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT') == 12
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.ADB') == 7
             assert vm.count('startOperation(') == 20  # 19 call sites and the function declaration
-elif git_blob_sha(raw_vm) != expected_blob:
+elif reviewed_blob != expected_blob:
     reviewed_change = (
         b'                keyDirectory = adbKeyDir,\n'
         b'                // The exact binary shell streams live beside the public\n'
@@ -61,18 +82,7 @@ elif git_blob_sha(raw_vm) != expected_blob:
     sparse_before = b'                require(directory.usableSpace >= image.largestPartBytes) {\n'
     sparse_after = b'                require(hasImmediateSparseSpace(directory, image.largestPartBytes)) {\n'
     assert raw_vm.count(sparse_after) == 1, 'Unexpected REV45 sparse preflight call-site'
-    # The terminal key bar may interrupt only its own job, atomically with
-    # respect to operation handoff. Preserve the hashes of all other VM code.
-    terminal_cancel = b"""    internal fun cancelTerminalOperation(): Boolean = synchronized(operationLaunchLock) {
-        val task = activeServiceOperation ?: return@synchronized false
-        if (task.id != terminalOperationId || task.job.isCompleted) return@synchronized false
-        cancelActiveOperation()
-        true
-    }
-
-"""
-    assert raw_vm.count(terminal_cancel) == 1, 'Unexpected terminal-only interrupt method'
-    protected_vm = raw_vm.replace(terminal_cancel, b'', 1).replace(reviewed_change, original, 1)
+    protected_vm = reviewed_vm.replace(reviewed_change, original, 1)
     protected_vm = protected_vm.replace(sparse_after, sparse_before, 1)
     assert git_blob_sha(protected_vm) == expected_blob, (
         'DeviceViewModel changed outside the reviewed REV31 evidence path'
