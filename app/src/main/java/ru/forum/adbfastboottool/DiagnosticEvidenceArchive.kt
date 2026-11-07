@@ -26,7 +26,7 @@ object DiagnosticEvidenceArchive {
     // Only diagnostic artifacts: do not accidentally bundle firmware IMG/APK
     // placed in the same folder. Extensions are not capped for known evidence.
     private val diagnosticName = Regex(
-        "^(?:log-|trace-|session-summary-|usb-|diagnostic-|session-).+",
+        "^(?:(?:log-|trace-|session-summary-|usb-|diagnostic-|session-|crash-).+|last-crash-marker\\.txt)$",
         RegexOption.IGNORE_CASE
     )
 
