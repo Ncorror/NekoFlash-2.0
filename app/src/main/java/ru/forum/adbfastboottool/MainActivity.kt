@@ -268,8 +268,10 @@ class MainActivity : AppCompatActivity() {
             // RecyclerView may restore an old scroll offset while the IME
             // and landscape body are being remeasured. Replay an explicit
             // command-follow request after the actual viewport changes.
-            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-                if (terminalReplyFollowPending) {
+            addOnLayoutChangeListener { _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                val resized = right - left != oldRight - oldLeft ||
+                    bottom - top != oldBottom - oldTop
+                if (resized && terminalReplyFollowPending) {
                     terminalReplyFollowAttempts = 0
                     scheduleTerminalReplyFollow()
                 }
@@ -282,8 +284,11 @@ class MainActivity : AppCompatActivity() {
                 }
             })
         }
-        findViewById<View>(R.id.rootCoordinator).addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            if (terminalReplyFollowPending) {
+        findViewById<View>(R.id.rootCoordinator).addOnLayoutChangeListener {
+            _, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+            val resized = right - left != oldRight - oldLeft ||
+                bottom - top != oldBottom - oldTop
+            if (resized && terminalReplyFollowPending) {
                 terminalReplyFollowAttempts = 0
                 scheduleTerminalReplyFollow()
             }
