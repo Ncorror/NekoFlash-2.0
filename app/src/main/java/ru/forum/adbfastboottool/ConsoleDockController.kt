@@ -106,9 +106,23 @@ internal class ConsoleDockController(
     fun open(requestCommandFocus: Boolean = false) {
         focusCommandWhenExpanded = requestCommandFocus
         if (behavior.state == BottomSheetBehavior.STATE_EXPANDED) {
-            focusPendingCommandInput()
+            // Material can restore EXPANDED without dispatching a state-change
+            // callback. Reconcile the header and renderer even on a no-op open.
+            renderState(BottomSheetBehavior.STATE_EXPANDED)
+            scheduleVisibleBodyHeightUpdate()
         } else {
             behavior.state = BottomSheetBehavior.STATE_EXPANDED
+        }
+    }
+
+    /** Called after Android restores CoordinatorLayout/BottomSheet view state. */
+    fun restoreState(expanded: Boolean) {
+        val target = if (expanded) BottomSheetBehavior.STATE_EXPANDED else BottomSheetBehavior.STATE_COLLAPSED
+        if (behavior.state == target) {
+            renderState(target)
+            scheduleVisibleBodyHeightUpdate()
+        } else {
+            behavior.state = target
         }
     }
 
