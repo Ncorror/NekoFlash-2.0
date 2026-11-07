@@ -1176,7 +1176,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     internal fun runFastbootTerminalPlan(steps: List<FastbootExecutionStep>, expectedSerial: String? = null, sparseLimit: Long = 0) {
         val heavy = steps.any { it !is FastbootExecutionStep.Raw && it !is FastbootExecutionStep.Inspect && it !is FastbootExecutionStep.PartitionCommand }
         startOperation(text(R.string.notif_fastboot_command), text(R.string.rev21_preparing_plan),
-            heavy = heavy, expectedFastbootSerial = expectedSerial) {
+            heavy = heavy, expectedFastbootSerial = expectedSerial,
+            requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val context = kotlinx.coroutines.currentCoroutineContext()
@@ -2067,6 +2068,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         heavy: Boolean = true,
         prepareFastbootSession: Boolean = true,
         expectedFastbootSerial: String? = null,
+        requiredTransport: UsbOperationAdmission.RequiredTransport = UsbOperationAdmission.RequiredTransport.ANY_USB,
         block: suspend OperationContext.() -> Unit
     ) {
         synchronized(operationLaunchLock) {
@@ -2087,6 +2089,24 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             if (operationJob != null || NativeUsbfsBackend.hasActiveTransfer ||
                 NativeUsbfsBackend.backendState().nativeTransferActive) {
                 log("⚠️ Another USB operation is still active. Wait for it to finish first or perform a safe cancel.")
+                return
+            }
+            if (!UsbOperationAdmission.allowed(
+                    requiredTransport,
+                    fastbootProtocol?.isConnected == true,
+                    adbProtocol?.isConnected == true
+                )) {
+                // Android 14+ refuses connectedDevice FGS promotion if no
+                // qualifying live transport/USB grant exists. Reject locally
+                // before persisting PREPARING or starting a service. No command
+                // is sent, and no stale Operation Center result is created.
+                val reason = when (requiredTransport) {
+                    UsbOperationAdmission.RequiredTransport.FASTBOOT -> text(R.string.error_no_fastboot)
+                    UsbOperationAdmission.RequiredTransport.ADB -> text(R.string.error_no_adb)
+                    UsbOperationAdmission.RequiredTransport.ANY_USB ->
+                        "No connected ADB/Fastboot device. Connect the target over OTG."
+                }
+                log(DiagnosticLogPolicy.Level.ERROR, "ERROR: $reason Command was not sent.")
                 return
             }
             val gen = operationGeneration.incrementAndGet()
