@@ -238,6 +238,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="logs_export_continue">Choose ZIP destination</string>
     <string name="logs_export_done">Diagnostic ZIP saved. Files included: %1$d. Attach it to the TestBook report.</string>
     <string name="logs_export_failed">Could not export diagnostics: %1$s</string>
+    <string name="logs_export_incomplete">ZIP created, but diagnostic evidence is incomplete or still changing: %1$d files, %2$d warnings. Read EXPORT-MANIFEST.txt; do not treat this as a complete report.</string>
     <string name="logs_sheet_title">LOGS &amp; SESSIONS</string>
     <string name="logs_current_summary">Current session</string>
     <string name="logs_current_compact">Compact log</string>
