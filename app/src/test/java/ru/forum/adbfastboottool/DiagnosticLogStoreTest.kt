@@ -1,8 +1,10 @@
 package ru.forum.adbfastboottool
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.io.IOException
 import java.nio.file.Files
 
 class DiagnosticLogStoreTest {
@@ -78,6 +80,44 @@ class DiagnosticLogStoreTest {
             DiagnosticLogStore(folder, "fresh-session")
             assertTrue(older.exists())
             assertEquals("historical incident", older.readText())
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun disappearedActiveSegmentIsNotSilentlyRecreatedWithoutHeader() {
+        val folder = Files.createTempDirectory("nekoflash-disappeared-log").toFile()
+        try {
+            val store = DiagnosticLogStore(folder, "rev51-disappeared")
+            store.appendCompact("# NekoFlash compact log\n")
+            val active = store.currentCompactFile()!!
+            assertTrue(active.delete()) // simulate external file removal, never done by the store
+            try {
+                store.appendCompact("[2026-11-07] late event\n")
+                throw AssertionError("The active segment must not be recreated")
+            } catch (expected: IOException) {
+                assertTrue(expected.message.orEmpty().contains("disappeared or changed size"))
+            }
+            assertFalse(active.exists())
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun externallyTruncatedActiveSegmentRefusesToPretendHistoryIsComplete() {
+        val folder = Files.createTempDirectory("nekoflash-truncated-log").toFile()
+        try {
+            val store = DiagnosticLogStore(folder, "rev51-truncated")
+            store.appendTrace("# NekoFlash protocol trace\n")
+            val active = store.currentTraceFile()!!
+            active.writeText("") // simulate external truncation
+            try {
+                store.appendTrace("tail after lost history\n")
+                throw AssertionError("A truncated segment must be detected")
+            } catch (expected: IOException) {
+                assertTrue(expected.message.orEmpty().contains("disappeared or changed size"))
+            }
+            assertEquals("", active.readText())
         } finally {
             folder.deleteRecursively()
         }

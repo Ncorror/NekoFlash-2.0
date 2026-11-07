@@ -11,9 +11,12 @@ args.output.mkdir(parents=True, exist_ok=True)
 names = ['mass-1000-header', 'mass-999-restored'] + [
     f'{configuration}-{page}'
     for configuration in ('portrait', 'large', 'landscape-large')
-    for page in ('home', 'quick', 'sideload', 'unlock', 'settings', 'mass-empty', 'tools')
+    for page in ('home', 'quick', 'sideload', 'unlock', 'settings', 'mass-empty')
 ]
 names += ['terminal-command', 'terminal-keyboard', 'terminal-landscape', 'import-copying', 'import-cancelled']
+names += ['operation-running', 'operation-verify_pending', 'operation-failed', 'operation-success',
+          'operation-cancelled', 'operation-interrupted', 'operation-landscape-large', 'operation-cancelling']
+names += ['terminal-rotated-command-landscape', 'terminal-rotated-command-portrait']
 missing = []
 for name in names:
     result = subprocess.run([

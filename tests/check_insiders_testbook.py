@@ -23,8 +23,31 @@ for marker in (
     "async function chosenLogs(", "webkitdirectory",
     "trace-", "evidence-manifest.json", "progress.json",
     "downloadBlob(", "localStorage", "zipCreating",
+    "QUICK_IDS = [", "modeToggle", "readyZipLink", "readyZipUrl",
+    "const visibleTests = () =>", "logs.mode === 'none'", "attachedFiles.some",
 ):
     assert marker in source, f"Missing tester feature/provenance: {marker}"
+
+# REV50: A content:// Android Chrome opening may deny browser clipboard
+# and blob downloads. Preserve user-controlled text/export escape hatches.
+for marker in (
+    'function openManualCopy(value)', "id=\"manualCopyText\"",
+    "'manualCopyDialog').hidden = false", "document.execCommand('copy')",
+    "navigator.clipboard?.writeText", "id=\"readyJsonLink\"",
+    "id=\"shareZip\"", "id=\"saveZipFile\"",
+    "id=\"manualJson\"", "function canShareFile(blob, filename)",
+    "async function shareFile(blob, filename)",
+    "async function saveFileWithPicker(blob, filename)",
+    "location.protocol === 'content:'", "blobCRC(blob)",
+    "const zip = await makeStoreZip(entries)",
+):
+    assert marker in source, f"Missing REV50 Android browser fallback: {marker}"
+# A click cannot attest that Android wrote a file. No previous auto-click
+# reporting false success on programmatic JSON downloads.
+assert "a.click();" not in source
+assert "downloadBlob(new Blob([json]" in source
+assert "readyJsonName = filename" in source
+assert "readyZipBlob = zip" in source
 
 for old in ("485f0e0f314d32dc94ee31524ad53c2a856ab484f2d4f39593a6c6a1480f729a",
             "41021696162", "12961957458"):

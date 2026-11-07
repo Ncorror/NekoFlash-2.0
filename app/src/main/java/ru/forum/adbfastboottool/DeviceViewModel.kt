@@ -290,10 +290,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private var sessionSummaryFile: File? = null
     private var logFileConfigured = false
     private var configuredWorkspacePath: String? = null
-    private var lastCompactMessage: String? = null
-    private var lastCompactDeclaredLevel: DiagnosticLogPolicy.Level? = null
-    private var lastCompactMessageAtMs: Long = 0L
-    private var suppressedDuplicateCount: Long = 0L
     private var lastSummaryPersistAtMs: Long = 0L
     private var workspaceRoot: File? = null
     private var lastUsbSessionSnapshot: UsbSessionSnapshot? = null
@@ -425,34 +421,18 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         synchronized(logLock) {
             TerminalTranscript.select(message, declaredLevel, terminalSubmission.get() == true,
                 protocol, isTerminalOperation)?.let(::appendTerminalLocked)
-            val now = System.currentTimeMillis()
-            val duplicate = message == lastCompactMessage &&
-                declaredLevel == lastCompactDeclaredLevel &&
-                now - lastCompactMessageAtMs <= DiagnosticLogPolicy.duplicateWindowMs()
-            if (duplicate) {
-                suppressedDuplicateCount += 1L
-                diagnosticSessionTracker.recordDuplicateSuppressed()
-                lastCompactMessageAtMs = now
-                return
-            }
-            flushSuppressedDuplicatesLocked()
+            // All emitted events, including identical consecutive messages, must
+            // reach the on-disk beta journal. Only the live UI is bounded.
             if (message.trim().startsWith("💡")) {
                 lines.removeAll { it.trim().startsWith("💡") }
             }
             appendCompactMessageLocked(message, declaredLevel)
-            lastCompactMessage = message
-            lastCompactDeclaredLevel = declaredLevel
-            lastCompactMessageAtMs = now
         }
     }
 
     fun clearLog() {
         synchronized(logLock) {
-            flushSuppressedDuplicatesLocked()
             lines.clear()
-            lastCompactMessage = null
-            lastCompactDeclaredLevel = null
-            suppressedDuplicateCount = 0L
         }
         log(text(R.string.log_cleared))
     }
@@ -485,13 +465,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             lastSummaryPersistAtMs = now
             persistSessionSummary()
         }
-    }
-
-    private fun flushSuppressedDuplicatesLocked() {
-        if (suppressedDuplicateCount <= 0L) return
-        val repeated = "↻ Previous line repeated $suppressedDuplicateCount time(s); duplicates collapsed."
-        suppressedDuplicateCount = 0L
-        appendCompactMessageLocked(repeated, DiagnosticLogPolicy.Level.INFO)
     }
 
     private fun appendRawToLogFile(text: String) {
@@ -537,7 +510,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun flushDiagnostics(reason: String, terminal: Boolean = false) {
         synchronized(logLock) {
-            flushSuppressedDuplicatesLocked()
             if (terminal) diagnosticSessionTracker.recordTermination(reason)
             appendRawToTraceFile(
                 formatLogLine(
@@ -977,15 +949,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun currentLogFiles(): List<File> = logStore?.compactFiles().orEmpty()
     fun currentTraceLogFiles(): List<File> = logStore?.traceFiles().orEmpty()
     fun currentSessionSummaryFile(): File? = synchronized(logLock) {
-        flushSuppressedDuplicatesLocked()
         persistSessionSummary()
     }
     fun currentDiagnosticSessionSummary(): DiagnosticSessionTracker.Snapshot = synchronized(logLock) {
-        flushSuppressedDuplicatesLocked()
         diagnosticSessionTracker.snapshot()
     }
     fun logSnapshot(): List<String> = synchronized(logLock) {
-        flushSuppressedDuplicatesLocked()
         lines.toList()
     }
     fun currentConnectionInfo(): String? = connectedDeviceInfo
@@ -1003,7 +972,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun refreshFastbootDiagnostics() {
-        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false) {
+        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol
             if (proto?.isConnected == true) {
                 val diagnostics = proto.refreshDiagnostics(force = true)
@@ -1071,7 +1040,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         onClearInfo: (String, Boolean) -> Unit,
         onAuthExpired: () -> Unit = {}
     ) {
-        startOperation(text(R.string.notif_fastboot_command), "Mi Unlock", heavy = true) {
+        startOperation(text(R.string.notif_fastboot_command), "Mi Unlock", heavy = true, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol
             if (proto?.isConnected != true) {
                 val message = "Device is not in Fastboot mode. Put it into Fastboot and connect it over OTG."
@@ -1195,7 +1164,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             text(R.string.notif_fastboot_command),
             text(R.string.notif_executing, cmd),
             heavy = heavy,
-            expectedFastbootSerial = expectedSerial
+            expectedFastbootSerial = expectedSerial,
+            requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
@@ -1207,7 +1177,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     internal fun runFastbootTerminalPlan(steps: List<FastbootExecutionStep>, expectedSerial: String? = null, sparseLimit: Long = 0) {
         val heavy = steps.any { it !is FastbootExecutionStep.Raw && it !is FastbootExecutionStep.Inspect && it !is FastbootExecutionStep.PartitionCommand }
         startOperation(text(R.string.notif_fastboot_command), text(R.string.rev21_preparing_plan),
-            heavy = heavy, expectedFastbootSerial = expectedSerial) {
+            heavy = heavy, expectedFastbootSerial = expectedSerial,
+            requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val context = kotlinx.coroutines.currentCoroutineContext()
@@ -1257,7 +1228,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         require(slot == "a" || slot == "b") { "Invalid slot" }
         startOperation(
             text(R.string.notif_fastboot_command),
-            text(R.string.notif_executing, "set_active:$slot")
+            text(R.string.notif_executing, "set_active:$slot"),
+            requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
@@ -1273,7 +1245,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun runFastbootDownloadAndRun(file: File, commandAfterDownload: String, expectedSerial: String? = null) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload), expectedFastbootSerial = expectedSerial) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, commandAfterDownload), expectedFastbootSerial = expectedSerial, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.downloadAndRun(file, commandAfterDownload)) {
                 failOperation(text(R.string.rev11_fastboot_download_failed, commandAfterDownload))
@@ -1283,14 +1255,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
 
     fun runFastbootLogicalPartitionCommand(command: String) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, command)) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, command), requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.runLogicalPartitionCommand(command)) failOperation(text(R.string.rev11_fastboot_logical_failed, command))
         }
     }
 
     fun inspectFastbootLogicalPartition(partition: String, expectedSerial: String? = null) {
-        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false, expectedFastbootSerial = expectedSerial) {
+        startOperation(text(R.string.notif_fastboot_diagnostics), text(R.string.notif_updating_device), heavy = false, expectedFastbootSerial = expectedSerial, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (proto.inspectLogicalPartition(partition) == null) {
                 failOperation(text(R.string.rev11_fastboot_logical_info_failed, partition))
@@ -1299,7 +1271,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun runFastbootFetch(partition: String, outputFile: File, slot: String? = null, expectedSerial: String? = null) {
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition"), expectedFastbootSerial = expectedSerial) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, "fetch $partition"), expectedFastbootSerial = expectedSerial, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
                 ?: failOperation("Could not apply Fastboot slot for $partition")
@@ -1311,7 +1283,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun runFastbootPartitionCommand(wirePrefix: String, partition: String, slot: String? = null, expectedSerial: String? = null) {
         val label = "$wirePrefix $partition" + slot?.let { " --slot=$it" }.orEmpty()
-        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false, expectedFastbootSerial = expectedSerial) {
+        startOperation(text(R.string.notif_fastboot_command), text(R.string.notif_executing, label), heavy = false, expectedFastbootSerial = expectedSerial, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
             val targets = proto.resolveSlotPartitionTargets(partition, slot)
@@ -1324,7 +1296,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun runAdbService(service: String) {
-        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, service)) {
+        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, service), requiredTransport = UsbOperationAdmission.RequiredTransport.ADB) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.runService(service)) failOperation("ADB service failed: $service")
             if (AdbServiceCompletionPolicy.expectsOneWayDisconnect(service)) {
@@ -1352,7 +1324,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         startOperation(
             text(R.string.notif_adb_command),
             text(R.string.notif_executing, label),
-            heavy = !interactive
+            heavy = !interactive,
+            requiredTransport = UsbOperationAdmission.RequiredTransport.ADB
         ) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
@@ -1409,7 +1382,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun runAdbPush(localFile: File, remotePath: String) {
-        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "push ${localFile.name} $remotePath")) {
+        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "push ${localFile.name} $remotePath"), requiredTransport = UsbOperationAdmission.RequiredTransport.ADB) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
             if (!proto.pushPath(localFile, remotePath)) failOperation("ADB push failed")
@@ -1417,7 +1390,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun runAdbPull(remotePath: String, localFile: File) {
-        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "pull $remotePath")) {
+        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "pull $remotePath"), requiredTransport = UsbOperationAdmission.RequiredTransport.ADB) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
             if (!proto.pullFile(remotePath, localFile)) failOperation("ADB pull failed")
@@ -1425,7 +1398,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     fun runAdbInstall(packageFile: File, options: List<String>) {
-        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install ${packageFile.name}")) {
+        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install ${packageFile.name}"), requiredTransport = UsbOperationAdmission.RequiredTransport.ADB) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
             val context = kotlinx.coroutines.currentCoroutineContext()
@@ -1435,7 +1408,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun runAdbInstallMultiple(apkFiles: List<File>, options: List<String>) {
         val names = apkFiles.joinToString(" ") { it.name }
-        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install-multiple $names")) {
+        startOperation(text(R.string.notif_adb_command), text(R.string.notif_executing, "install-multiple $names"), requiredTransport = UsbOperationAdmission.RequiredTransport.ADB) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
             if (!proto.installMultipleApks(apkFiles, options)) failOperation("install-multiple failed")
@@ -1451,7 +1424,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         startOperation(
             text(R.string.notif_flash_img),
             text(R.string.notif_flashing_partition, source.displayName, label),
-            expectedFastbootSerial = expectedSerial
+            expectedFastbootSerial = expectedSerial,
+            requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT
         ) {
             val proto = fastbootProtocol ?: failOperation(text(R.string.error_no_fastboot))
             if (!proto.isConnected) failOperation(text(R.string.error_no_fastboot))
@@ -1686,7 +1660,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         // Never reorder operator-defined targets. Execution order must be visible order.
         val ordered = queue
 
-        startOperation(text(R.string.notif_flash_img), "Flash queue: ${ordered.size} item(s) Do not disconnect the cable.") {
+        startOperation(text(R.string.notif_flash_img), "Flash queue: ${ordered.size} item(s) Do not disconnect the cable.", requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
             setOperationSteps(ordered.mapIndexed { index, item ->
                 OperationStep(
                     index = index + 1,
@@ -2046,7 +2020,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))
 
     internal fun runSideload(source: FirmwareSource) {
-        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, source.displayName)) {
+        startOperation(text(R.string.notif_adb_sideload), text(R.string.notif_sideload_sending, source.displayName), requiredTransport = UsbOperationAdmission.RequiredTransport.ADB) {
             val proto = adbProtocol ?: failOperation(text(R.string.error_no_adb))
             if (!proto.isConnected) failOperation(text(R.string.error_no_adb))
             if (proto.peerMode != AdbProtocol.PeerMode.SIDELOAD) {
@@ -2098,6 +2072,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         heavy: Boolean = true,
         prepareFastbootSession: Boolean = true,
         expectedFastbootSerial: String? = null,
+        requiredTransport: UsbOperationAdmission.RequiredTransport = UsbOperationAdmission.RequiredTransport.ANY_USB,
         block: suspend OperationContext.() -> Unit
     ) {
         synchronized(operationLaunchLock) {
@@ -2118,6 +2093,24 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             if (operationJob != null || NativeUsbfsBackend.hasActiveTransfer ||
                 NativeUsbfsBackend.backendState().nativeTransferActive) {
                 log("⚠️ Another USB operation is still active. Wait for it to finish first or perform a safe cancel.")
+                return
+            }
+            if (!UsbOperationAdmission.allowed(
+                    requiredTransport,
+                    fastbootProtocol?.isConnected == true,
+                    adbProtocol?.isConnected == true
+                )) {
+                // Android 14+ refuses connectedDevice FGS promotion if no
+                // qualifying live transport/USB grant exists. Reject locally
+                // before persisting PREPARING or starting a service. No command
+                // is sent, and no stale Operation Center result is created.
+                val reason = when (requiredTransport) {
+                    UsbOperationAdmission.RequiredTransport.FASTBOOT -> text(R.string.error_no_fastboot)
+                    UsbOperationAdmission.RequiredTransport.ADB -> text(R.string.error_no_adb)
+                    UsbOperationAdmission.RequiredTransport.ANY_USB ->
+                        "No connected ADB/Fastboot device. Connect the target over OTG."
+                }
+                log(DiagnosticLogPolicy.Level.ERROR, "ERROR: $reason Command was not sent.")
                 return
             }
             val gen = operationGeneration.incrementAndGet()

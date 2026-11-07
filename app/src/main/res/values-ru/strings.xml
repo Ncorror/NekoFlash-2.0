@@ -157,17 +157,17 @@
     <!-- 2.5.1 Classic Recovery UI -->
 
     <!-- 2.5.2 Operation Center UI -->
-    <string name="layout_operation_center_title">ОПЕРАЦИОННЫЙ ЦЕНТР</string>
-    <string name="layout_operation_center_idle">ГОТОВО · Активной операции нет</string>
-    <string name="layout_operation_center_running">ВЫПОЛНЯЕТСЯ · Не отключайте USB/OTG</string>
-    <string name="layout_operation_center_cancelling">ОТМЕНА · Безопасно завершаем USB-операцию</string>
-    <string name="layout_operation_center_cancelling_task">Безопасное завершение операции</string>
+    <string name="layout_operation_center_title">Операционный центр</string>
+    <string name="layout_operation_center_idle">Активной операции нет</string>
+    <string name="layout_operation_center_running">Выполняется</string>
+    <string name="layout_operation_center_cancelling">Отмена…</string>
+    <string name="layout_operation_center_cancelling_task">Останавливаем операцию</string>
     <string name="layout_operation_center_cancelling_detail">Ждём остановки активной USB-передачи и корректного закрытия сессии. Не отключайте кабель.</string>
     <string name="layout_operation_cancelling_action">Отмена…</string>
-    <string name="layout_operation_center_completed">ЗАВЕРШЕНО · Операция выполнена успешно</string>
-    <string name="layout_operation_center_failed">ОШИБКА · Проверьте детали перед повтором</string>
+    <string name="layout_operation_center_completed">Выполнено успешно</string>
+    <string name="layout_operation_center_failed">Ошибка операции</string>
     <string name="layout_operation_center_last_event_empty">Последнее событие: —</string>
-    <string name="layout_operation_center_last_event">Техническая деталь: %1$s</string>
+    <string name="layout_operation_center_last_event">Последняя запись журнала: %1$s</string>
     <string name="layout_operation_console">Открыть консоль</string>
     <string name="layout_operation_cancel">Отменить операцию</string>
     <plurals name="layout_operation_steps_more">
@@ -237,6 +237,12 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_login_retry">Повторить вход</string>
     <string name="mi_login_missing_cookies">Xiaomi завершила вход, но не вернула обязательные cookies сессии unlockApi. Повторите вход или сначала выйдите из Mi Аккаунта в браузере.</string>
     <string name="mi_login_cancelled_by_user">Вход отменён пользователем.</string>
+    <string name="logs_export_zip">Экспорт всех логов в ZIP</string>
+    <string name="logs_export_raw_warning">В архив войдут исходные журналы без очистки. Они могут содержать идентификаторы устройств и вывод команд. Сохраняй ZIP и передавай только проверенной команде тестирования. Исходные файлы не изменятся и не удалятся.</string>
+    <string name="logs_export_continue">Выбрать место для ZIP</string>
+    <string name="logs_export_done">ZIP журналов сохранён. Файлов в архиве: %1$d. Приложи его к отчёту TestBook.</string>
+    <string name="logs_export_failed">Не удалось экспортировать журналы: %1$s</string>
+    <string name="logs_export_incomplete">ZIP создан, но история диагностики неполная или менялась при экспорте. Файлов: %1$d. Предупреждений: %2$d. Проверь EXPORT-MANIFEST.txt; не считай архив полным отчётом.</string>
     <string name="logs_sheet_title">ЛОГИ И СЕССИИ</string>
     <string name="logs_current_summary">Текущая сессия</string>
     <string name="logs_current_compact">Компактный лог</string>
@@ -276,9 +282,9 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="device_bool_no">нет</string>
     <string name="device_bool_unknown">неизвестно</string>
     <!-- UI/UX audit: persistent Operation Center and non-blocking Console -->
-    <string name="layout_operation_center_subtitle">Прогресс, текущий шаг и итог всегда здесь. Консоль открывается только по вашему действию.</string>
-    <string name="layout_operation_center_cancelled">ОТМЕНЕНО · Операция безопасно остановлена</string>
-    <string name="layout_operation_center_verify_pending">НУЖНА ПРОВЕРКА · Требуется подтверждение результата</string>
+    <string name="layout_operation_center_subtitle">Прогресс и результат появятся здесь после запуска операции.</string>
+    <string name="layout_operation_center_cancelled">Отменено</string>
+    <string name="layout_operation_center_verify_pending">Нужна проверка</string>
     <string name="layout_operation_center_current_label">СЕЙЧАС</string>
     <string name="layout_operation_center_result_label">ИТОГ</string>
     <string name="layout_operation_center_working">Операция выполняется</string>
@@ -546,4 +552,10 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev26_import_progress_known">Скопировано %1$s из %2$s</string>
     <string name="rev26_import_progress_unknown">Скопировано %1$s · размер источника неизвестен</string>
     <string name="rev26_import_space">Недостаточно места. Нужно: %1$s; доступно: %2$s.</string>
+    <string name="operation_hint_running">Не отключай USB/OTG. Окно можно свернуть — операция продолжится.</string>
+    <string name="operation_hint_success">Операция завершилась успешно. Подробности и журналы доступны ниже.</string>
+    <string name="operation_hint_pending">Результат ещё не подтверждён. Перед продолжением проверь экран устройства или Recovery. Завершение передачи само по себе не подтверждает установку.</string>
+    <string name="operation_hint_cancelled">Операция отменена. Уже записанные изменения не откатываются — перед продолжением проверь устройство.</string>
+    <string name="operation_hint_failed">Перед повтором проверь подробности и состояние устройства. Журналы доступны ниже.</string>
+    <string name="operation_hint_interrupted">Операция прервалась. Перед повтором проверь устройство и журналы.</string>
 </resources>

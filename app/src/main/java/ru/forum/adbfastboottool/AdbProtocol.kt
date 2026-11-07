@@ -1836,12 +1836,30 @@ class AdbProtocol(
         }
         try {
             // Close stdin for one-shot shell/v2 commands.
-            if (!writeShellPacket(stream, SHELL_ID_CLOSE_STDIN, EMPTY_PAYLOAD)) {
+            val stdinCloseAcked = writeShellPacket(
+                stream, SHELL_ID_CLOSE_STDIN, EMPTY_PAYLOAD, allowBufferedEarlyClose = true
+            )
+            if (!ShellV2EarlyClosePolicy.mayDrainAfterCloseStdin(
+                    stdinCloseAcked, stream.closed, pendingByteCount(stream), cancelled
+                )) {
                 return result(false)
             }
+            if (!stdinCloseAcked && logOutput) {
+                onLog("ℹ️ shell_v2: peer closed during CLOSE_STDIN; decoding already buffered response (no retry)")
+            }
 
-            while (!cancelled && !stream.closed) {
-                val header = readShellPacketHeader(stream) ?: break
+            // The peer can close after sending the complete reply but before
+            // ACKing CLOSE_STDIN. Drain *only* bytes received for this local
+            // stream. A truncated/malformed EXIT never counts as success.
+            while (!cancelled && (!stream.closed || pendingByteCount(stream) > 0)) {
+                val header = readShellPacketHeader(stream)
+                if (header == null) {
+                    if (stream.closed && pendingByteCount(stream) > 0) {
+                        onLog("❌ shell_v2: incomplete buffered frame after peer close")
+                        return result(false)
+                    }
+                    break
+                }
                 when (header.id) {
                     SHELL_ID_STDOUT -> {
                         val data = readAdbStreamExact(stream, header.length) ?: return result(false)
@@ -1854,9 +1872,13 @@ class AdbProtocol(
                         stderrDisplay?.accept(data)
                     }
                     SHELL_ID_EXIT -> {
-                        val data = readAdbStreamExact(stream, header.length) ?: EMPTY_PAYLOAD
-                        exitCode = data.firstOrNull()?.toInt()?.and(0xFF) ?: 0
-                        // The final decoder flush logs any trailing line before EXIT.
+                        val data = readAdbStreamExact(stream, header.length) ?: return result(false)
+                        exitCode = ShellV2EarlyClosePolicy.completeExitCode(header.length, data)
+                            ?: run {
+                                onLog("❌ shell_v2: invalid EXIT payload length=${header.length}")
+                                return result(false)
+                            }
+                        // Exit success requires the real explicit one-byte code.
                     }
                     SHELL_ID_STDIN, SHELL_ID_CLOSE_STDIN -> {
                         if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
@@ -1872,7 +1894,7 @@ class AdbProtocol(
                 }
             }
             if (exitCode == null && logOutput) onLog("⚠️ shell_v2 finished without an exit packet")
-            return result(exitCode == 0 && !cancelled)
+            return result(ShellV2EarlyClosePolicy.succeeded(exitCode, cancelled))
         } catch (error: Exception) {
             onLog("❌ ADB shell/v2 failure or evidence storage error: ${error.message ?: error.javaClass.simpleName}")
             return try {
@@ -2020,7 +2042,7 @@ class AdbProtocol(
                     if (header.dataLength > 0) readData(header.dataLength)
                     if (!packetTargetsLocalStream(header, localId)) {
                         acknowledgeRemoteClose(header.arg1, header.arg0)
-                        onLog("ℹ️ ADB open: ignored stale CLSE for local=${header.arg1}, expected local=$localId")
+                        onLog("ℹ️ ADB open: ignored stale CLSE local=${header.arg1}, remote=${header.arg0}, expected local=$localId, generation=${dispatcherGeneration.get()}")
                         continue
                     }
                     acknowledgeRemoteClose(localId, header.arg0)
@@ -2073,28 +2095,34 @@ class AdbProtocol(
      * frame. A single 64-KiB SYNC DATA record can span many 4-KiB A_WRTEs.
      * Preserve the byte stream intact and wait for the ACK of every WRTE.
      */
-    private fun writeAdbStream(stream: AdbStream, payload: ByteArray): Boolean {
+    private fun writeAdbStream(
+        stream: AdbStream, payload: ByteArray, allowBufferedEarlyClose: Boolean = false
+    ): Boolean {
         if (stream.closed || cancelled) return false
         if (payload.size <= peerMaxPayloadSize) {
-            return writeAdbStreamChunk(stream, payload)
+            return writeAdbStreamChunk(stream, payload, allowBufferedEarlyClose)
         }
         for (slice in AdbInteractiveInputChunkPolicy.fragments(
             payload.size, peerMaxPayloadSize, framingBytes = 0
         )) {
             if (stream.closed || cancelled) return false
-            if (!writeAdbStreamChunk(stream, payload.copyOfRange(slice.first, slice.last + 1))) {
+            if (!writeAdbStreamChunk(
+                    stream, payload.copyOfRange(slice.first, slice.last + 1), allowBufferedEarlyClose
+                )) {
                 return false
             }
         }
         return true
     }
 
-    private fun writeAdbStreamChunk(stream: AdbStream, payload: ByteArray): Boolean {
+    private fun writeAdbStreamChunk(
+        stream: AdbStream, payload: ByteArray, allowBufferedEarlyClose: Boolean
+    ): Boolean {
         if (stream.closed || cancelled) return false
         sendMessageInternal(A_WRTE, stream.localId, stream.remoteId, payload)
         while (!cancelled) {
             val header = readHeader(timeoutMs = 10_000) ?: run {
-                onLog("❌ ADB stream: no ACK for WRTE")
+                onLog("❌ ADB stream: no ACK for WRTE local=${stream.localId}, remote=${stream.remoteId}, bytes=${payload.size}, pending=${pendingByteCount(stream)}, generation=${dispatcherGeneration.get()}")
                 return false
             }
             when (header.command) {
@@ -2119,9 +2147,19 @@ class AdbProtocol(
                         acknowledgeRemoteClose(header.arg1, header.arg0)
                         continue
                     }
+                    val expectedRemote = stream.remoteId
                     stream.remoteId = header.arg0
                     closeAdbStream(stream)
-                    onLog("❌ ADB stream closed during write")
+                    // Only a one-shot shell/v2 CLOSE_STDIN caller may recover
+                    // by decoding its same-channel buffered response. All
+                    // other writes still fail; no command is ever retried.
+                    val buffered = pendingByteCount(stream)
+                    val canInspect = allowBufferedEarlyClose && buffered > 0
+                    val symbol = if (canInspect) "⚠️" else "❌"
+                    onLog("$symbol ADB stream closed during write local=${stream.localId}, " +
+                        "expectedRemote=$expectedRemote, receivedRemote=${header.arg0}, " +
+                        "payloadBytes=${payload.size}, bufferedResponseBytes=$buffered, " +
+                        "dispatcherGeneration=${dispatcherGeneration.get()}, transportConnected=$isConnected")
                     return false
                 }
                 else -> {
@@ -2237,13 +2275,16 @@ class AdbProtocol(
         return if (written == length) out else null
     }
 
-    private fun writeShellPacket(stream: AdbStream, id: Int, payload: ByteArray): Boolean {
+    private fun writeShellPacket(
+        stream: AdbStream, id: Int, payload: ByteArray,
+        allowBufferedEarlyClose: Boolean = false
+    ): Boolean {
         val packet = ByteBuffer.allocate(SHELL_PACKET_HEADER + payload.size).order(ByteOrder.LITTLE_ENDIAN).apply {
             put(id.toByte())
             putInt(payload.size)
             put(payload)
         }.array()
-        return writeAdbStream(stream, packet)
+        return writeAdbStream(stream, packet, allowBufferedEarlyClose)
     }
 
     private fun readShellPacketHeader(stream: AdbStream): ShellPacketHeader? {
