@@ -510,7 +510,8 @@ class TerminalAndImportAndroidTest {
                 val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
                 val prompt = activity.findViewById<View>(R.id.consoleInputBar)
                 val workspace = activity.findViewById<View>(R.id.terminalWorkspace)
-                expanded(activity) && output.childCount > 0 && output.bottom == prompt.top &&
+                val last = output.layoutManager?.findViewByPosition((output.adapter?.itemCount ?: 0) - 1)
+                expanded(activity) && last != null && prompt.top == last.bottom + output.paddingBottom &&
                     prompt.bottom < workspace.height && prompt.height > 0
             }
             scenario.onActivity { activity ->
@@ -568,6 +569,9 @@ class TerminalAndImportAndroidTest {
 
     private fun checkInlineResponseWithIme(scenario: ActivityScenario<MainActivity>, token: String) {
         scenario.onActivity { command(it, "fastboot $token") }
+        waitUntil("terminal accepted $token") {
+            vm().terminalSnapshot().any { it.startsWith("❌") && it.contains(token) }
+        }
         var geometry = ""
         try {
             waitUi(scenario, "visible $token result with the keyboard open") { activity ->
@@ -575,17 +579,19 @@ class TerminalAndImportAndroidTest {
                 val prompt = activity.findViewById<View>(R.id.consoleInputBar)
                 val root = activity.findViewById<View>(R.id.rootCoordinator)
                 val panel = activity.findViewById<View>(R.id.consolePanel)
-                val visibleRow = (0 until output.childCount).any { index ->
-                    val row = output.getChildAt(index) as TextView
+                val promptRect = Rect()
+                prompt.getGlobalVisibleRect(promptRect)
+                val visibleRows = (0 until output.childCount).map { output.getChildAt(it) as TextView }
+                val visibleRow = visibleRows.any { row ->
                     val rect = Rect()
                     row.text.startsWith("❌") && row.text.contains(token) &&
-                        row.getGlobalVisibleRect(rect) && rect.height() >= row.lineHeight
+                        row.getGlobalVisibleRect(rect) && rect.height() >= row.lineHeight && rect.bottom <= promptRect.top
                 }
-                geometry = "root=${root.height}, sheetTop=${panel.top}, " +
+                val ime = ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime())
+                geometry = "root=${root.height}, sheetTop=${panel.top}, ime=$ime, rows=${visibleRows.map { it.text }}, " +
                     "offset=${BottomSheetBehavior.from(panel).expandedOffset}, " +
                     "output=${output.height}/${output.childCount}, prompt=${prompt.top}/${prompt.height}"
-                visibleRow && output.bottom == prompt.top &&
-                    ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+                visibleRow && ime == true
             }
         } catch (failure: IllegalStateException) {
             AndroidUiCapture.save(scenario, "terminal-lab-compact.png")

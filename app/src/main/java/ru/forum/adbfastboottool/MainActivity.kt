@@ -273,7 +273,6 @@ class MainActivity : AppCompatActivity() {
         )
         consoleDockController = ConsoleDockController(
             this,
-            rvConsoleOutput,
             onExpanded = { flushConsoleRender(pinToBottom = true) },
         ).also { it.initialize() }
         findViewById<View>(R.id.btnConsoleLogs).setOnClickListener { showLogsMenu() }
@@ -4754,13 +4753,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun scrollConsoleToBottom() {
-        val lastPosition = consoleLogAdapter.itemCount - 1
-        if (lastPosition < 0) return
         rvConsoleOutput.post {
-            if (!isFinishing && !isDestroyed &&
+            val lastPosition = consoleLogAdapter.itemCount - 1
+            if (lastPosition >= 0 && !isFinishing && !isDestroyed &&
                 consoleDockController.isExpanded && !hasSelectedConsoleText()
             ) {
-                rvConsoleOutput.scrollToPosition(lastPosition)
+                val manager = rvConsoleOutput.layoutManager as LinearLayoutManager
+                manager.scrollToPositionWithOffset(lastPosition, 0)
             }
         }
     }
