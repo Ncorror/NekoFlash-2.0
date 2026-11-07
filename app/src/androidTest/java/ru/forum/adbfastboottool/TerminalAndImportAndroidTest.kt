@@ -268,11 +268,19 @@ class TerminalAndImportAndroidTest {
         try {
             waitUi(scenario, "command result rendered below the terminal header") { activity ->
                 val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
-                ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
-                    ?.isVisible(WindowInsetsCompat.Type.ime()) == false &&
+                // Some Android 14 IMEs keep the visible-insets flag true even
+                // after a hide request. That does not mean terminal rows are
+                // missing. Assert actual on-screen geometry and rendered text,
+                // including if the keyboard remains open after the command.
+                val outputRect = Rect()
+                output.isShown && output.height > 0 &&
+                    output.getGlobalVisibleRect(outputRect) && outputRect.height() > 0 &&
                     output.adapter!!.itemCount == vm().terminalSnapshot().size &&
                     (0 until output.childCount).any { index ->
-                        (output.getChildAt(index) as? TextView)?.text?.contains(token) == true
+                        val row = output.getChildAt(index) as? TextView
+                        val rowRect = Rect()
+                        row != null && row.text.contains(token) &&
+                            row.getGlobalVisibleRect(rowRect) && rowRect.height() > 0
                     }
             }
         } catch (failure: IllegalStateException) {
