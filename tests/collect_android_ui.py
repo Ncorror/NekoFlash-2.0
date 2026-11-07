@@ -16,6 +16,7 @@ names = ['mass-1000-header', 'mass-999-restored'] + [
 names += ['terminal-command', 'terminal-keyboard', 'terminal-landscape', 'import-copying', 'import-cancelled']
 names += ['operation-running', 'operation-verify_pending', 'operation-failed', 'operation-success',
           'operation-cancelled', 'operation-interrupted', 'operation-landscape-large', 'operation-cancelling']
+names += ['terminal-rotated-command-landscape', 'terminal-rotated-command-portrait']
 missing = []
 for name in names:
     result = subprocess.run([

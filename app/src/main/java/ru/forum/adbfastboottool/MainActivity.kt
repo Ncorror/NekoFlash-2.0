@@ -281,9 +281,6 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.terminalOperationStatus).setOnClickListener { openOperationCenter() }
         savedInstanceState?.getStringArrayList("rev26.terminal.history")?.let { commandHistory.addAll(it) }
         historyIndex = savedInstanceState?.getInt("rev26.terminal.historyIndex", commandHistory.size) ?: commandHistory.size
-        if (savedInstanceState?.getBoolean("rev26.terminal.open") == true) {
-            rvConsoleOutput.post { consoleDockController.open() }
-        }
         tvStatus = findViewById(R.id.tvStatus)
         tvOtgStatus = findViewById(R.id.tvOtgStatus)
         updateOtgStatus()
@@ -504,6 +501,16 @@ class MainActivity : AppCompatActivity() {
             intent.removeExtra(WelcomeActivity.EXTRA_STARTUP_SCAN_AFTER_WELCOME)
             viewModel.log("USB attach continued after the required welcome gate; running a safe startup scan.")
             scheduleStartupUsbDiscovery()
+        }
+    }
+
+    override fun onPostCreate(savedInstanceState: Bundle?) {
+        super.onPostCreate(savedInstanceState)
+        if (::consoleDockController.isInitialized) {
+            // CoordinatorLayout restores the Material behavior after onStart,
+            // without invoking its state callback. Reconcile only after that
+            // restore, when ViewModel and transcript observers are ready.
+            consoleDockController.restoreState(savedInstanceState?.getBoolean("rev26.terminal.open") == true)
         }
     }
 

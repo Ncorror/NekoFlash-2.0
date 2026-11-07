@@ -25,6 +25,8 @@ import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.lifecycle.MutableLiveData
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.core.app.ActivityScenario
@@ -240,6 +242,104 @@ class TerminalAndImportAndroidTest {
             }
         } else {
             shell("settings put system font_scale $value")
+        }
+    }
+
+    private fun showCommandIme(scenario: ActivityScenario<MainActivity>) {
+        scenario.onActivity { activity ->
+            val input = activity.findViewById<EditText>(R.id.etCommand)
+            input.requestFocus()
+            WindowInsetsControllerCompat(activity.window, input).show(WindowInsetsCompat.Type.ime())
+        }
+        waitUi(scenario, "command keyboard visible") {
+            ViewCompat.getRootWindowInsets(it.findViewById(R.id.rootCoordinator))
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        }
+    }
+
+    private fun checkRenderedCommand(scenario: ActivityScenario<MainActivity>, token: String) {
+        waitUntil("invalid command reached the retained transcript") {
+            vm().terminalSnapshot().any { it.startsWith("❌") && it.contains(token) }
+        }
+        scenario.onActivity { activity ->
+            WindowInsetsControllerCompat(activity.window, activity.findViewById(R.id.rootCoordinator))
+                .hide(WindowInsetsCompat.Type.ime())
+        }
+        waitUi(scenario, "command result rendered below the terminal header") { activity ->
+            val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+            ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                ?.isVisible(WindowInsetsCompat.Type.ime()) == false &&
+                output.adapter!!.itemCount == vm().terminalSnapshot().size &&
+                (0 until output.childCount).any { index ->
+                    (output.getChildAt(index) as? TextView)?.text?.contains(token) == true
+                }
+        }
+        scenario.onActivity { activity ->
+            assertTrue((field(activity, "consoleDockController") as ConsoleDockController).isExpanded)
+            assertEquals(View.GONE, activity.findViewById<View>(R.id.tvConsolePeek).visibility)
+            assertEquals(activity.getString(R.string.layout_icon_down),
+                activity.findViewById<TextView>(R.id.tvConsoleToggle).text.toString())
+            visible(activity.findViewById(R.id.btnConsoleLogs))
+            visible(activity.findViewById(R.id.btnConsoleClose))
+            visible(activity.findViewById(R.id.etCommand))
+            assertTrue(activity.findViewById<RecyclerView>(R.id.rvConsoleOutput).height > 0)
+        }
+    }
+
+    @Test fun commandsAfterRotationRenderInTheBodyAndKeepTheExpandedHeader() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+            waitUi(scenario, "terminal initially expanded") { expanded(it) }
+            showCommandIme(scenario)
+            scenario.onActivity { command(it, "fastboot до_поворота49") }
+            checkRenderedCommand(scenario, "до_поворота49")
+
+            // Keep IME open while rotating, then send through the normal Send
+            // button without touching Open again (which could mask the bug).
+            showCommandIme(scenario)
+            scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
+            waitUi(scenario, "landscape restored") {
+                it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && expanded(it)
+            }
+            showCommandIme(scenario)
+            scenario.onActivity { command(it, "fastboot горизонталь49") }
+            checkRenderedCommand(scenario, "горизонталь49")
+            AndroidUiCapture.save(scenario, "terminal-rotated-command-landscape.png")
+
+            showCommandIme(scenario)
+            scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            waitUi(scenario, "portrait restored") {
+                it.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT && expanded(it)
+            }
+            showCommandIme(scenario)
+            scenario.onActivity { command(it, "fastboot портрет49") }
+            checkRenderedCommand(scenario, "портрет49")
+            scenario.recreate()
+            scenario.onActivity { command(it, "fastboot пересоздание49") }
+            checkRenderedCommand(scenario, "пересоздание49")
+            AndroidUiCapture.save(scenario, "terminal-rotated-command-portrait.png")
+
+            // Material's real Parcelable restore changes its state silently.
+            // Reproduce that boundary and check a no-op Open catches up rows.
+            var savedSheet: android.os.Parcelable? = null
+            scenario.onActivity { activity ->
+                val panel = activity.findViewById<View>(R.id.consolePanel)
+                val parent = activity.findViewById<CoordinatorLayout>(R.id.rootCoordinator)
+                val behavior = BottomSheetBehavior.from(panel)
+                savedSheet = behavior.onSaveInstanceState(parent, panel)
+                (field(activity, "consoleDockController") as ConsoleDockController).collapse()
+            }
+            waitUi(scenario, "terminal collapsed before restoring Material state") {
+                BottomSheetBehavior.from(it.findViewById<View>(R.id.consolePanel)).state == BottomSheetBehavior.STATE_COLLAPSED
+            }
+            scenario.onActivity { activity ->
+                val panel = activity.findViewById<View>(R.id.consolePanel)
+                val parent = activity.findViewById<CoordinatorLayout>(R.id.rootCoordinator)
+                BottomSheetBehavior.from(panel).onRestoreInstanceState(parent, panel, requireNotNull(savedSheet))
+                activity.findViewById<View>(R.id.btnTerminalOpen).performClick()
+                command(activity, "fastboot восстановление49")
+            }
+            checkRenderedCommand(scenario, "восстановление49")
         }
     }
 
