@@ -157,17 +157,17 @@ Not requested:
     <!-- 2.5.1 Classic Recovery UI -->
 
     <!-- 2.5.2 Operation Center UI -->
-    <string name="layout_operation_center_title">OPERATION CENTER</string>
-    <string name="layout_operation_center_idle">READY · No active operation</string>
-    <string name="layout_operation_center_running">IN PROGRESS · Keep USB/OTG connected</string>
-    <string name="layout_operation_center_cancelling">CANCELLING · Finishing USB cleanup safely</string>
-    <string name="layout_operation_center_cancelling_task">Finishing cancellation safely</string>
+    <string name="layout_operation_center_title">Operation Center</string>
+    <string name="layout_operation_center_idle">No active operation</string>
+    <string name="layout_operation_center_running">In progress</string>
+    <string name="layout_operation_center_cancelling">Cancelling…</string>
+    <string name="layout_operation_center_cancelling_task">Stopping the operation</string>
     <string name="layout_operation_center_cancelling_detail">Waiting for the active USB transfer to stop and the session to close cleanly. Keep the cable connected.</string>
     <string name="layout_operation_cancelling_action">Cancelling…</string>
-    <string name="layout_operation_center_completed">COMPLETED · Operation finished successfully</string>
-    <string name="layout_operation_center_failed">FAILED · Review the details before retrying</string>
+    <string name="layout_operation_center_completed">Completed successfully</string>
+    <string name="layout_operation_center_failed">Operation failed</string>
     <string name="layout_operation_center_last_event_empty">Last event: —</string>
-    <string name="layout_operation_center_last_event">Technical note: %1$s</string>
+    <string name="layout_operation_center_last_event">Latest log entry: %1$s</string>
     <string name="layout_operation_console">Open console</string>
     <string name="layout_operation_cancel">Cancel operation</string>
     <plurals name="layout_operation_steps_more">
@@ -233,6 +233,12 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_login_retry">Try again</string>
     <string name="mi_login_missing_cookies">Xiaomi completed the sign-in, but the required unlockApi session cookies were not returned. Try again or sign out of Xiaomi Account in the browser first.</string>
     <string name="mi_login_cancelled_by_user">Login was cancelled by the user.</string>
+    <string name="logs_export_zip">Export raw diagnostics ZIP</string>
+    <string name="logs_export_raw_warning">This export contains original, unredacted diagnostic files and may include device IDs or sensitive command output. Save the ZIP and share only with the trusted testing team. Original logs will not be changed or removed.</string>
+    <string name="logs_export_continue">Choose ZIP destination</string>
+    <string name="logs_export_done">Diagnostic ZIP saved. Files included: %1$d. Attach it to the TestBook report.</string>
+    <string name="logs_export_failed">Could not export diagnostics: %1$s</string>
+    <string name="logs_export_incomplete">ZIP created, but diagnostic evidence is incomplete or still changing. Files included: %1$d. Warnings: %2$d. Read EXPORT-MANIFEST.txt; do not treat this as a complete report.</string>
     <string name="logs_sheet_title">LOGS &amp; SESSIONS</string>
     <string name="logs_current_summary">Current session</string>
     <string name="logs_current_compact">Compact log</string>
@@ -272,9 +278,9 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="device_bool_no">no</string>
     <string name="device_bool_unknown">unknown</string>
     <!-- UI/UX audit: persistent Operation Center and non-blocking Console -->
-    <string name="layout_operation_center_subtitle">Live progress, current step and result stay here. Console opens only when you ask for it.</string>
-    <string name="layout_operation_center_cancelled">CANCELLED · Operation stopped safely</string>
-    <string name="layout_operation_center_verify_pending">VERIFY RESULT · Confirmation is still required</string>
+    <string name="layout_operation_center_subtitle">Progress and results appear here when an operation starts.</string>
+    <string name="layout_operation_center_cancelled">Cancelled</string>
+    <string name="layout_operation_center_verify_pending">Verification required</string>
     <string name="layout_operation_center_current_label">CURRENT TASK</string>
     <string name="layout_operation_center_result_label">RESULT</string>
     <string name="layout_operation_center_working">Operation in progress</string>
@@ -540,4 +546,10 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev26_import_progress_known">Copied %1$s of %2$s</string>
     <string name="rev26_import_progress_unknown">Copied %1$s · source size unknown</string>
     <string name="rev26_import_space">Not enough free space. Required: %1$s; available: %2$s.</string>
+    <string name="operation_hint_running">Keep USB/OTG connected. You can minimize this window while the operation continues.</string>
+    <string name="operation_hint_success">The operation reported success. Details and logs are available below.</string>
+    <string name="operation_hint_pending">The result is not confirmed yet. Check the target device or Recovery screen before continuing. Transfer progress alone does not confirm installation.</string>
+    <string name="operation_hint_cancelled">The operation was cancelled. Changes already written are not rolled back; check the device before continuing.</string>
+    <string name="operation_hint_failed">Review the details and device state before retrying. The logs are available below.</string>
+    <string name="operation_hint_interrupted">The operation was interrupted. Check the device and logs before retrying.</string>
 </resources>

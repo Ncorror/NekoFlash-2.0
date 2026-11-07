@@ -22,7 +22,29 @@ def git_blob_sha(data):
 # REV31 allows ONE exact raw-shell evidence directory argument in the ADB
 # constructor. Rebuild the old blob in memory; unrelated orchestration edits
 # and changes elsewhere in DeviceViewModel must continue to fail this guard.
-if git_blob_sha(raw_vm) != expected_blob:
+# REV51 reviews the complete DeviceViewModel snapshot with lossless
+# persistent event logging. Pin the exact Git blob; unknown changes still fail.
+rev51_lossless_vm_blob = '1c31cf4e1b024e3a602aa2445f8d8ebfc82ad9f3'
+# REV52 review: only admission before FGS and Fastboot-plan mode check
+# were added to this exact orchestrator blob. Unknown changes still fail.
+rev52_admission_vm_blob = 'a0e2f3c6ef4271a124bcf80a7280d55edbb9de3b'
+rev52_explicit_transport_vm_blob = '25c0302750d40cf713833339dc492289bbec3aae'
+if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
+    journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
+    assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body
+    assert 'if (duplicate)' not in journal_body
+    assert 'recordDuplicateSuppressed()' not in journal_body
+    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
+        admission = vm.split('private fun startOperation(')[1].split('val gen = operationGeneration.incrementAndGet()')[0]
+        assert 'UsbOperationAdmission.allowed(' in admission
+        assert 'FlashOperationService.submit' not in admission
+        assert 'No connected ADB/Fastboot device' in admission
+        assert 'requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT' in vm
+        if git_blob_sha(raw_vm) == rev52_explicit_transport_vm_blob:
+            assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT') == 12
+            assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.ADB') == 7
+            assert vm.count('startOperation(') == 20  # 19 call sites and the function declaration
+elif git_blob_sha(raw_vm) != expected_blob:
     reviewed_change = (
         b'                keyDirectory = adbKeyDir,\n'
         b'                // The exact binary shell streams live beside the public\n'
@@ -51,7 +73,8 @@ assert 'testImplementation(\'junit:junit:4.13.2\')' in (root/'app/build.gradle')
 # Stable, reviewed Home replacement; all other original page/protocol hashes stay guarded.
 home_path = root/'app/src/main/res/layout/page_home.xml'
 raw_home = home_path.read_bytes()
-expected_home_blob = '575c48b6d74a9d0b86fb6a60bd1180847d05c06c'
+# REV48 extracts only the contextual center into its own layout.
+expected_home_blob = '7437ad7b61a11a33844f967a397317f45680840b'
 assert hashlib.sha1(b'blob ' + str(len(raw_home)).encode() + b'\0' + raw_home).hexdigest() == expected_home_blob, 'Unexpected Home layout change'
 from xml.etree import ElementTree as ET
 home = ET.parse(home_path).getroot()
@@ -80,6 +103,11 @@ for field in reviewed_fields:
     attr = b' android:importantForAutofill="no"'
     assert normalized_lines[index].count(attr) == 1, 'Unexpected REV45 Autofill configuration'
     normalized_lines[index] = normalized_lines[index].replace(attr, b'', 1)
+# REV48 hides only the Tools tab; all existing controls/handlers stay intact.
+for i, line in enumerate(normalized_lines):
+    if b'android:id="@+id/btnFastbootSectionTools"' in line:
+        assert line.count(b' android:visibility="gone"') == 1
+        normalized_lines[i] = line.replace(b' android:visibility="gone"', b'', 1)
 original_flash = b''.join(normalized_lines)
 assert hashlib.sha1(b'blob ' + str(len(original_flash)).encode() + b'\0' + original_flash).hexdigest() == expected_flash_blob, 'Unexpected Fastboot layout change'
 flash = ET.parse(flash_path).getroot()
