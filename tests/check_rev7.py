@@ -39,7 +39,18 @@ if git_blob_sha(raw_vm) != expected_blob:
     sparse_before = b'                require(directory.usableSpace >= image.largestPartBytes) {\n'
     sparse_after = b'                require(hasImmediateSparseSpace(directory, image.largestPartBytes)) {\n'
     assert raw_vm.count(sparse_after) == 1, 'Unexpected REV45 sparse preflight call-site'
-    protected_vm = raw_vm.replace(reviewed_change, original, 1)
+    # The terminal key bar may interrupt only its own job, atomically with
+    # respect to operation handoff. Preserve the hashes of all other VM code.
+    terminal_cancel = b"""    internal fun cancelTerminalOperation(): Boolean = synchronized(operationLaunchLock) {
+        val task = activeServiceOperation ?: return@synchronized false
+        if (task.id != terminalOperationId || task.job.isCompleted) return@synchronized false
+        cancelActiveOperation()
+        true
+    }
+
+"""
+    assert raw_vm.count(terminal_cancel) == 1, 'Unexpected terminal-only interrupt method'
+    protected_vm = raw_vm.replace(terminal_cancel, b'', 1).replace(reviewed_change, original, 1)
     protected_vm = protected_vm.replace(sparse_after, sparse_before, 1)
     assert git_blob_sha(protected_vm) == expected_blob, (
         'DeviceViewModel changed outside the reviewed REV31 evidence path'

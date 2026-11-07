@@ -17,6 +17,7 @@ names += ['terminal-command', 'terminal-keyboard', 'terminal-landscape', 'import
 names += ['operation-running', 'operation-verify_pending', 'operation-failed', 'operation-success',
           'operation-cancelled', 'operation-interrupted', 'operation-landscape-large', 'operation-cancelling']
 names += ['terminal-rotated-command-landscape', 'terminal-rotated-command-portrait']
+names += ['terminal-lab-inline', 'terminal-lab-compact']
 missing = []
 for name in names:
     result = subprocess.run([

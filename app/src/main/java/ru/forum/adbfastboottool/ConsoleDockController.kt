@@ -26,8 +26,14 @@ internal class ConsoleDockController(
     private val root: View by lazy { activity.findViewById(R.id.rootCoordinator) }
     private val panel: View by lazy { activity.findViewById(R.id.consolePanel) }
     private val handle: View by lazy { activity.findViewById(R.id.consoleResizeHandle) }
-    private val header: View by lazy { activity.findViewById(R.id.consoleHeader) }
-    private val body: View by lazy { activity.findViewById(R.id.consoleBody) }
+    private val header: LinearLayout by lazy { activity.findViewById(R.id.consoleHeader) }
+    private val body: LinearLayout by lazy { activity.findViewById(R.id.consoleBody) }
+    private val actions: LinearLayout by lazy { activity.findViewById(R.id.terminalHeaderActions) }
+    private val inputBar: LinearLayout by lazy { activity.findViewById(R.id.consoleInputBar) }
+    private val status: LinearLayout by lazy { activity.findViewById(R.id.terminalOperationStatus) }
+    private val keyStrip: View by lazy { activity.findViewById(R.id.terminalKeyStrip) }
+    private val keysMenu: View by lazy { activity.findViewById(R.id.btnTerminalKeysMenu) }
+    private val mode: View by lazy { activity.findViewById(R.id.tvTerminalInputMode) }
     private val toggle: TextView by lazy { activity.findViewById(R.id.tvConsoleToggle) }
     private val peek: TextView by lazy { activity.findViewById(R.id.tvConsolePeek) }
     private val logsButton: View by lazy { activity.findViewById(R.id.btnConsoleLogs) }
@@ -84,6 +90,11 @@ internal class ConsoleDockController(
         // expanding again makes the Close button feel stuck.
 
         bindWindowInsets()
+        val updateHeight = View.OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            scheduleVisibleBodyHeightUpdate()
+        }
+        header.addOnLayoutChangeListener(updateHeight)
+        status.addOnLayoutChangeListener(updateHeight)
         root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
             val headerHeight = activity.findViewById<View>(R.id.usbHeader).height
             if (headerHeight > 0 && behavior.expandedOffset != headerHeight) {
@@ -195,6 +206,7 @@ internal class ConsoleDockController(
         historyUp.visibility = if (isExpanded) View.VISIBLE else View.GONE
         historyDown.visibility = if (isExpanded) View.VISIBLE else View.GONE
         peek.visibility = if (isExpanded) View.GONE else View.VISIBLE
+        mode.visibility = if (isExpanded) View.VISIBLE else View.GONE
         header.contentDescription = activity.getString(
             if (isExpanded) R.string.console_collapse_action_desc else R.string.console_expand_action_desc,
         )
@@ -234,12 +246,37 @@ internal class ConsoleDockController(
     }
 
     private fun updateVisibleBodyHeight(bottomSheet: View = panel) {
-        if (root.height <= 0 || handle.height <= 0 || header.height <= 0) return
+        if (root.height <= 0) return
+        // Use the expanded budget, not the transient sheet top during a slide.
+        // A tall landscape IME may leave room for just a prompt and a few rows.
+        val statusHeight = if (status.visibility == View.VISIBLE) maxOf(status.measuredHeight, status.minimumHeight) else 0
+        val budget = root.height - behavior.expandedOffset - statusHeight
+        val inlineActions = isExpanded && budget < dp(152)
+        val stripVisible = isExpanded && budget >= dp(208)
+        val target = if (inlineActions) inputBar else header
+        if (actions.parent !== target) {
+            (actions.parent as LinearLayout).removeView(actions)
+            target.addView(actions)
+        }
+        val statusTarget = if (inlineActions) actions else body
+        if (status.parent !== statusTarget) {
+            (status.parent as LinearLayout).removeView(status)
+            statusTarget.addView(status, 0, LinearLayout.LayoutParams(
+                if (inlineActions) dp(48) + status.paddingStart + status.paddingEnd else LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT))
+        }
+        header.visibility = if (inlineActions) View.GONE else View.VISIBLE
+        handle.visibility = if (isExpanded && budget < dp(184)) View.GONE else View.VISIBLE
+        keyStrip.visibility = if (stripVisible) View.VISIBLE else View.GONE
+        keysMenu.visibility = if (isExpanded && !stripVisible) View.VISIBLE else View.GONE
+
+        val chrome = (if (header.visibility == View.VISIBLE) header.height else 0) +
+            (if (handle.visibility == View.VISIBLE) handle.height else 0)
 
         val targetHeight = ConsoleSheetPolicy.visibleBodyHeight(
             rootHeightPx = root.height,
             sheetTopPx = bottomSheet.top,
-            chromeHeightPx = handle.height + header.height,
+            chromeHeightPx = chrome,
         )
         val params = body.layoutParams as? LinearLayout.LayoutParams ?: return
         if (params.height == targetHeight && params.weight == 0f) return
@@ -248,6 +285,8 @@ internal class ConsoleDockController(
         params.weight = 0f
         body.layoutParams = params
     }
+
+    private fun dp(value: Int): Int = (value * activity.resources.displayMetrics.density + 0.5f).toInt()
 
     private fun scrollOutputToBottom() {
         val lastPosition = (consoleOutput.adapter?.itemCount ?: 0) - 1
@@ -312,7 +351,7 @@ internal class ConsoleDockController(
         ViewCompat.requestApplyInsets(root)
     }
 
-    private fun hideCommandIme() {
+    fun hideCommandIme() {
         focusCommandWhenExpanded = false
         WindowInsetsControllerCompat(activity.window, root).hide(
             WindowInsetsCompat.Type.ime(),

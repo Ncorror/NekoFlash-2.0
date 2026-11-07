@@ -439,7 +439,7 @@
         <FrameLayout
             android:id="@+id/consoleResizeHandle"
             android:layout_width="match_parent"
-            android:layout_height="20dp"
+            android:layout_height="10dp"
             android:clickable="true"
             android:contentDescription="@string/console_resize_handle_desc"
             android:focusable="true">
@@ -451,131 +451,109 @@
                 android:background="@drawable/bg_console_handle" />
         </FrameLayout>
 
-        <!-- Заголовок CONSOLE — кликабельный, сворачивает/разворачивает -->
         <LinearLayout
             android:id="@+id/consoleHeader"
+            android:background="@drawable/bg_console_header"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_console_header"
-            android:gravity="center_vertical"
-            android:paddingStart="14dp"
-            android:paddingEnd="12dp"
-            android:orientation="horizontal"
+            android:minHeight="48dp"
             android:clickable="true"
-            android:focusable="true" android:minHeight="56dp">
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="4dp">
 
-            <!-- Стрелка состояния (▼ развёрнуто / ▲ свёрнуто) -->
             <TextView
                 android:id="@+id/tvConsoleToggle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/layout_icon_down"
-                android:textColor="@color/accent"
-                android:textSize="11sp"
                 android:layout_marginEnd="8dp"
-                android:fontFamily="monospace" />
+                android:text="@string/layout_icon_down"
+                android:textColor="@color/accent_soft"
+                android:textSize="11sp" />
 
             <TextView
                 android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
                 android:text="@string/layout_console_title"
-                android:textColor="@color/accent"
-                android:textSize="11sp"
-                android:textStyle="bold"
-                android:letterSpacing="0.04"
-                android:fontFamily="monospace" />
+                android:textColor="@color/text_primary"
+                android:textSize="13sp" />
 
-            <!-- Превью последней строки (видно когда свёрнуто) -->
             <TextView
                 android:id="@+id/tvConsolePeek"
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:layout_marginStart="10dp"
-                android:maxLines="1"
+                android:layout_height="wrap_content"
                 android:ellipsize="end"
+                android:maxLines="1"
+                android:fontFamily="monospace"
                 android:textColor="@color/text_muted"
-                android:textSize="11sp"
-                android:fontFamily="monospace" />
+                android:textSize="11sp" />
 
-            <!-- Открывает сохранённые логи и диагностические сессии.
-                 Это действие, а не переключатель режима Console/Terminal. -->
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/btnConsoleLogs"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/console_logs_button"
-                android:padding="13dp"
-                android:visibility="gone"
-                app:srcCompat="@drawable/ic_nf_reports"
-                app:tint="@color/accent" />
+            <TextView
+                android:id="@+id/tvTerminalInputMode"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="6dp"
+                android:fontFamily="monospace"
+                android:text="@string/terminal_lab_mode_host"
+                android:textColor="@color/accent_soft"
+                android:textSize="12sp" />
 
-            <!-- Кнопки истории (видны когда развёрнуто) -->
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnHistoryUp"
-                android:visibility="gone"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:paddingStart="0dp"
-                android:paddingEnd="0dp"
-                android:gravity="center"
-                android:text="@string/layout_icon_up"
-                android:textSize="16sp"
-                android:textColor="@color/text_muted"
-                app:backgroundTint="@color/bg_card"
-                app:cornerRadius="9dp" android:contentDescription="@string/rev18_history_previous" />
+            <LinearLayout
+                android:id="@+id/terminalHeaderActions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/btnConsoleLogs"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/console_logs_button"
+                    android:padding="13dp"
+                    android:visibility="gone"
+                    app:srcCompat="@drawable/ic_nf_reports"
+                    app:tint="@color/accent" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnHistoryDown"
-                android:visibility="gone"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:minWidth="0dp"
-                android:minHeight="0dp"
-                android:paddingStart="0dp"
-                android:paddingEnd="0dp"
-                android:gravity="center"
-                android:text="@string/layout_icon_down"
-                android:textSize="16sp"
-                android:textColor="@color/text_muted"
-                android:layout_marginStart="4dp"
-                app:backgroundTint="@color/bg_card"
-                app:cornerRadius="9dp" android:contentDescription="@string/rev18_history_next" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnTerminalKeysMenu"
+                    style="@style/TerminalAccessoryKey"
+                    android:layout_width="wrap_content"
+                    android:layout_height="48dp"
+                    android:text="@string/terminal_lab_keys"
+                    android:visibility="gone" />
 
-            <androidx.appcompat.widget.AppCompatImageButton
-                android:id="@+id/btnConsoleClose"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="@string/rev26_terminal_close"
-                android:padding="12dp"
-                app:srcCompat="@drawable/ic_close"
-                app:tint="@color/text_primary" />
+                <androidx.appcompat.widget.AppCompatImageButton
+                    android:id="@+id/btnConsoleClose"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/rev26_terminal_close"
+                    android:padding="12dp"
+                    app:srcCompat="@drawable/ic_close"
+                    app:tint="@color/text_primary" />
+            </LinearLayout>
         </LinearLayout>
 
-        <!-- Тело консоли занимает всё пространство между header и нижней кромкой sheet.
-             RelativeLayout сохраняет фиксированную нижнюю строку без вложенных layout_weight. -->
-        <RelativeLayout
+        <LinearLayout
             android:id="@+id/consoleBody"
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1">
+            android:layout_weight="1"
+            android:background="@color/bg_console"
+            android:orientation="vertical">
 
             <LinearLayout
                 android:id="@+id/terminalOperationStatus"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_alignParentTop="true"
                 android:minHeight="48dp"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
@@ -603,72 +581,115 @@
                     app:tint="@color/log_warning" />
             </LinearLayout>
 
-            <!-- Единая строка команды: всегда доступна в развёрнутой Console. -->
-            <LinearLayout
-                android:id="@+id/consoleInputBar"
+            <ru.forum.adbfastboottool.TerminalWorkspaceLayout
+                android:id="@+id/terminalWorkspace"
+                android:importantForAccessibility="no"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvConsoleOutput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:overScrollMode="ifContentScrolls"
+                    android:paddingHorizontal="10dp"
+                    android:paddingTop="4dp"
+                    android:paddingBottom="2dp"
+                    android:scrollbars="vertical" />
+
+                <LinearLayout
+                    android:id="@+id/consoleInputBar"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="10dp"
+                    android:paddingEnd="4dp">
+
+                    <TextView
+                        android:id="@+id/tvTerminalPrompt"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:importantForAccessibility="no"
+                        android:fontFamily="monospace"
+                        android:text="@string/terminal_lab_prompt"
+                        android:textColor="@color/accent_soft"
+                        android:textSize="16sp" />
+
+                    <ru.forum.adbfastboottool.PtyInputEditText
+                        android:id="@+id/etCommand"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:background="@android:color/transparent"
+                        android:fontFamily="monospace"
+                        android:hint="@string/layout_command_hint"
+                        android:textColorHint="@color/text_muted"
+                        android:textColor="@color/text_primary"
+                        android:textSize="14sp"
+                        android:imeOptions="actionSend"
+                        android:inputType="textNoSuggestions"
+                        android:importantForAutofill="no"
+                        android:maxLines="1"
+                        android:paddingHorizontal="4dp" android:minHeight="48dp" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnSend"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_marginStart="2dp"
+                        android:insetTop="0dp"
+                        android:insetBottom="0dp"
+                        android:minWidth="0dp"
+                        android:minHeight="0dp"
+                        android:contentDescription="@string/terminal_send"
+                        android:text=""
+                        app:backgroundTint="@color/bg_console"
+                        app:cornerRadius="13dp"
+                        app:icon="@drawable/ic_send"
+                        app:iconGravity="textStart"
+                        app:iconPadding="0dp"
+                        app:iconSize="21dp"
+                        app:iconTint="@color/accent_soft"
+                        app:strokeColor="#806A4428"
+                        app:strokeWidth="0dp" />
+                </LinearLayout>
+            </ru.forum.adbfastboottool.TerminalWorkspaceLayout>
+
+            <HorizontalScrollView
+                android:id="@+id/terminalKeyStrip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_alignParentBottom="true"
                 android:background="@color/bg_header"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="8dp"
-                android:orientation="horizontal"
-                android:visibility="visible" android:minHeight="56dp">
-
-                <ru.forum.adbfastboottool.PtyInputEditText
-                    android:id="@+id/etCommand"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:background="@drawable/bg_console_input"
-                    android:fontFamily="monospace"
-                    android:hint="@string/layout_command_hint"
-                    android:textColorHint="@color/text_muted"
-                    android:textColor="@color/text_primary"
-                    android:textSize="12sp"
-                    android:imeOptions="actionSend"
-                    android:inputType="textNoSuggestions"
-                    android:importantForAutofill="no"
-                    android:maxLines="1"
-                    android:paddingHorizontal="10dp" android:minHeight="48dp" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnSend"
-                    android:layout_width="50dp"
-                    android:layout_height="48dp"
-                    android:layout_marginStart="7dp"
-                    android:insetTop="0dp"
-                    android:insetBottom="0dp"
-                    android:minWidth="0dp"
-                    android:minHeight="0dp"
-                    android:contentDescription="@string/terminal_send"
-                    android:text=""
-                    app:backgroundTint="@color/bg_elevated"
-                    app:cornerRadius="13dp"
-                    app:icon="@drawable/ic_send"
-                    app:iconGravity="textStart"
-                    app:iconPadding="0dp"
-                    app:iconSize="21dp"
-                    app:iconTint="@color/accent"
-                    app:strokeColor="#806A4428"
-                    app:strokeWidth="1dp" />
-            </LinearLayout>
-
-            <!-- Единый вывод Console. RecyclerView создаёт только видимые строки,
-                 поэтому длинные ADB/Fastboot-сессии не раздувают один TextView. -->
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/rvConsoleOutput"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:layout_below="@id/terminalOperationStatus"
-                android:layout_above="@id/consoleInputBar"
-                android:clipToPadding="false"
+                android:fillViewport="true"
                 android:overScrollMode="ifContentScrolls"
-                android:paddingHorizontal="10dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="2dp"
-                android:scrollbars="vertical" />
-        </RelativeLayout>
+                android:scrollbars="none">
+
+                <LinearLayout
+                    android:id="@+id/terminalKeyButtons"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal">
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHistoryUp"
+                        style="@style/TerminalAccessoryKey"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="@string/terminal_lab_arrow_up"
+                        android:contentDescription="@string/rev18_history_previous" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnHistoryDown"
+                        style="@style/TerminalAccessoryKey"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:text="@string/terminal_lab_arrow_down"
+                        android:contentDescription="@string/rev18_history_next" />
+                </LinearLayout>
+            </HorizontalScrollView>
+        </LinearLayout>
     </LinearLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

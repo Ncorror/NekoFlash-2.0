@@ -7,5 +7,5 @@
     android:includeFontPadding="false"
     android:textIsSelectable="true"
     android:lineSpacingExtra="1dp"
-    android:textColor="@color/log_info"
-    android:textSize="12sp" />
+    android:textColor="@color/text_secondary"
+    android:textSize="14sp" />

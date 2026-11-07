@@ -32,7 +32,9 @@ assert 'PtyInputDelta.rewrite(composing, next)' in widget
 assert 'override fun commitText' in widget
 assert 'override fun deleteSurroundingText' in widget
 assert 'android.R.id.paste' in widget
-assert '"\\u001B[A"' in widget and '"\\u001B[B"' in widget
+key_table = (jvm/'TerminalInputControls.kt').read_text().lower()
+assert 'terminalkey.navigation(code)' in widget.lower() and 'key.wire.tobytearray' in widget.lower()
+assert '"\\u001b[a"' in key_table and '"\\u001b[b"' in key_table
 assert "byteArrayOf('\\n'.code.toByte())" in widget
 assert 'const val DEL: Int = 0x7f' in delta
 

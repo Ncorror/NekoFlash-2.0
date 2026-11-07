@@ -151,7 +151,7 @@
     <string name="console_logs_button">Логи</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
-    <string name="layout_command_hint">adb shell / adb shell getprop / fastboot getvar all</string>
+    <string name="layout_command_hint">Команда adb или fastboot</string>
     <string name="continue_upper">ПРОДОЛЖИТЬ</string>
 
     <!-- 2.5.1 Classic Recovery UI -->
@@ -557,4 +557,25 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="operation_hint_cancelled">Операция отменена. Уже записанные изменения не откатываются — перед продолжением проверь устройство.</string>
     <string name="operation_hint_failed">Перед повтором проверь подробности и состояние устройства. Журналы доступны ниже.</string>
     <string name="operation_hint_interrupted">Операция прервалась. Перед повтором проверь устройство и журналы.</string>
+    <string name="terminal_lab_input_pty">Ввод в adb shell</string>
+    <string name="terminal_lab_mode_host">HOST</string>
+    <string name="terminal_lab_mode_pty">ADB PTY</string>
+    <string name="terminal_lab_prompt">❯</string>
+    <string name="terminal_lab_raw_marker">│</string>
+    <string name="terminal_lab_arrow_up">↑</string>
+    <string name="terminal_lab_arrow_down">↓</string>
+    <string name="terminal_lab_keys">Клавиши</string>
+    <string name="terminal_lab_up">Прежняя команда или стрелка вверх в shell</string>
+    <string name="terminal_lab_down">Следующая команда или стрелка вниз в shell</string>
+    <string name="terminal_lab_left">Переместить курсор влево</string>
+    <string name="terminal_lab_right">Переместить курсор вправо</string>
+    <string name="terminal_lab_interrupt">Прервать команду терминала или очистить черновик</string>
+    <string name="terminal_lab_tab">Дополнить команду или отправить Tab в shell</string>
+    <string name="terminal_lab_escape">Скрыть клавиатуру или отправить Esc в shell</string>
+    <string name="terminal_lab_slash">Вставить косую черту</string>
+    <string name="terminal_lab_dash">Вставить дефис</string>
+    <string name="terminal_lab_home">В начало строки</string>
+    <string name="terminal_lab_end">В конец строки</string>
+    <string name="terminal_lab_pgup">На страницу вверх</string>
+    <string name="terminal_lab_pgdn">На страницу вниз</string>
 </resources>

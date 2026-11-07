@@ -27,7 +27,6 @@ import android.text.InputType
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.view.inputmethod.EditorInfo
 import android.widget.Button
 import android.widget.Spinner
 import android.widget.ArrayAdapter
@@ -85,6 +84,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var rvConsoleOutput: RecyclerView
     private lateinit var consoleLogAdapter: ConsoleLogAdapter
     private lateinit var etCommand: PtyInputEditText
+    private lateinit var terminalInputControls: TerminalInputControls
     private lateinit var consoleDockController: ConsoleDockController
     private lateinit var tvStatus: TextView
     private var tvOtgStatus: TextView? = null
@@ -209,6 +209,7 @@ class MainActivity : AppCompatActivity() {
 
     private val commandHistory = mutableListOf<String>()
     private var historyIndex = -1
+    private var historyDraft = ""
 
     private sealed class TerminalAction {
         data object LocalStatus : TerminalAction()
@@ -260,7 +261,7 @@ class MainActivity : AppCompatActivity() {
         consoleLogAdapter = ConsoleLogAdapter()
         rvConsoleOutput.apply {
             layoutManager = LinearLayoutManager(this@MainActivity).apply {
-                stackFromEnd = true
+                stackFromEnd = false
             }
             adapter = consoleLogAdapter
             itemAnimator = null
@@ -280,6 +281,7 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnTerminalStop).setOnClickListener { requestOperationCancelFromUi() }
         findViewById<View>(R.id.terminalOperationStatus).setOnClickListener { openOperationCenter() }
         savedInstanceState?.getStringArrayList("rev26.terminal.history")?.let { commandHistory.addAll(it) }
+        historyDraft = savedInstanceState?.getString("terminal.historyDraft").orEmpty()
         historyIndex = savedInstanceState?.getInt("rev26.terminal.historyIndex", commandHistory.size) ?: commandHistory.size
         tvStatus = findViewById(R.id.tvStatus)
         tvOtgStatus = findViewById(R.id.tvOtgStatus)
@@ -334,6 +336,7 @@ class MainActivity : AppCompatActivity() {
         enableOverlayProtection()
 
         viewModel.logLines.observe(this) { lines ->
+            terminalInputControls.refreshMode()
             updateOperationCenter(lines)
         }
 
@@ -341,6 +344,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.workspaceImport.state.observe(this) { renderWorkspaceImport(it) }
 
         viewModel.connectionState.observe(this) {
+            terminalInputControls.refreshMode()
             refreshConnectionStatusLabel()
             updateDeviceOverview()
             if (selectedWindow == "unlock") buildUnlockPage()
@@ -364,6 +368,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.transportSessionId.observe(this) { updateDeviceOverview() }
 
         viewModel.operationActive.observe(this) { active ->
+            terminalInputControls.refreshMode()
             val rawProgress = viewModel.operationProgress.value
             if (active) {
                 hideRestoredTerminalResultOnColdLaunch = false
@@ -533,6 +538,7 @@ class MainActivity : AppCompatActivity() {
         if (::consoleDockController.isInitialized) outState.putBoolean("rev26.terminal.open", consoleDockController.isExpanded)
         outState.putStringArrayList("rev26.terminal.history", ArrayList(commandHistory))
         outState.putInt("rev26.terminal.historyIndex", historyIndex)
+        outState.putString("terminal.historyDraft", historyDraft)
         super.onSaveInstanceState(outState)
     }
 
@@ -607,35 +613,13 @@ class MainActivity : AppCompatActivity() {
             requestOperationCancelFromUi()
         }
 
-        findViewById<Button>(R.id.btnHistoryUp).setOnClickListener {
-            if (viewModel.isInteractiveAdbShellActive()) {
-                viewModel.sendInteractiveAdbShellBytes("\u001B[A".toByteArray())
-            } else navigateHistory(-1)
-        }
-        findViewById<Button>(R.id.btnHistoryDown).setOnClickListener {
-            if (viewModel.isInteractiveAdbShellActive()) {
-                viewModel.sendInteractiveAdbShellBytes("\u001B[B".toByteArray())
-            } else navigateHistory(1)
-        }
-
-        findViewById<Button>(R.id.btnSend).setOnClickListener {
-            if (viewModel.isInteractiveAdbShellActive()) {
-                viewModel.sendInteractiveAdbShellBytes(byteArrayOf('\n'.code.toByte()))
-            } else {
-                handleCommandInput()
-            }
-        }
-        etCommand.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_SEND || actionId == EditorInfo.IME_ACTION_DONE) {
-                if (viewModel.isInteractiveAdbShellActive()) {
-                    viewModel.sendInteractiveAdbShellBytes(byteArrayOf('\n'.code.toByte()))
-                } else {
-                    handleCommandInput()
-                }
-                true
-            } else {
-                false
-            }
+        terminalInputControls = TerminalInputControls(this, etCommand, rvConsoleOutput,
+            history = ::navigateHistory,
+            interruptHost = ::interruptHostCommand,
+            hideKeyboard = consoleDockController::hideCommandIme,
+            submitHost = ::handleCommandInput)
+        findViewById<View>(R.id.terminalWorkspace).setOnClickListener {
+            openConsole(requestCommandFocus = true)
         }
 
         findViewById<Button>(R.id.tabHome).setOnClickListener { switchTab("home") }
@@ -967,6 +951,17 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ─── КОМАНДЫ ─────────────────────────────────────────────────────────────
+
+    private fun interruptHostCommand() {
+        if (viewModel.isTerminalOperation && operationCancelRequested) return
+        if (viewModel.cancelTerminalOperation()) {
+            showCancellationRequested()
+        } else {
+            etCommand.text?.clear()
+            historyIndex = commandHistory.size
+            historyDraft = ""
+        }
+    }
 
     private fun handleCommandInput() = viewModel.withTerminalCommand { handleTerminalCommandInput() }
 
@@ -1765,12 +1760,16 @@ class MainActivity : AppCompatActivity() {
             if (commandHistory.size > 50) commandHistory.removeAt(0)
         }
         historyIndex = commandHistory.size
+        historyDraft = ""
     }
 
     private fun navigateHistory(direction: Int) {
         if (commandHistory.isEmpty()) return
-        historyIndex = (historyIndex + direction).coerceIn(0, commandHistory.size)
-        etCommand.setText(if (historyIndex == commandHistory.size) "" else commandHistory[historyIndex])
+        val next = (historyIndex + direction).coerceIn(0, commandHistory.size)
+        if (next == historyIndex) return
+        if (historyIndex == commandHistory.size) historyDraft = etCommand.text.toString()
+        historyIndex = next
+        etCommand.setText(if (historyIndex == commandHistory.size) historyDraft else commandHistory[historyIndex])
         etCommand.setSelection(etCommand.text?.length ?: 0)
     }
 
@@ -4037,11 +4036,15 @@ class MainActivity : AppCompatActivity() {
 
     private fun requestOperationCancelFromUi() {
         if (viewModel.operationActive.value != true || operationCancelRequested) return
+        showCancellationRequested()
+        viewModel.cancelActiveOperation()
+    }
+
+    private fun showCancellationRequested() {
         operationCancelRequested = true
         operationCenterScroll.restoreReadingPosition(0)
         updateOperationCenter(viewModel.logSnapshot())
         renderOperationProgressUi(viewModel.operationProgress.value)
-        viewModel.cancelActiveOperation()
     }
 
     private fun restoreFinishedOperationUiIfNeeded() {

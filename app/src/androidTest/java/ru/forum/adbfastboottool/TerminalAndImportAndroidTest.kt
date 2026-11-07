@@ -19,6 +19,7 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import android.view.View
 import android.widget.EditText
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatDelegate
@@ -494,6 +495,151 @@ class TerminalAndImportAndroidTest {
             }
         }
     }
+    private fun pressKey(activity: MainActivity, key: TerminalKey) {
+        val row = activity.findViewById<LinearLayout>(R.id.terminalKeyButtons)
+        assertTrue(row.findViewWithTag<View>(key).performClick())
+    }
+
+    @Test fun inlineHostPromptPreservesDraftAndSubmitsEnterOnce() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity {
+                it.findViewById<View>(R.id.btnTerminalOpen).performClick()
+                vm().clearTerminal()
+            }
+            waitUi(scenario, "inline prompt follows the short transcript") { activity ->
+                val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                val prompt = activity.findViewById<View>(R.id.consoleInputBar)
+                val workspace = activity.findViewById<View>(R.id.terminalWorkspace)
+                expanded(activity) && output.childCount > 0 && output.bottom == prompt.top &&
+                    prompt.bottom < workspace.height && prompt.height > 0
+            }
+            scenario.onActivity { activity ->
+                val editor = activity.findViewById<PtyInputEditText>(R.id.etCommand)
+                editor.requestFocus()
+                editor.setText("ad")
+                editor.setSelection(2)
+                pressKey(activity, TerminalKey.TAB)
+                assertEquals("adb ", editor.text.toString())
+                editor.append("de")
+                pressKey(activity, TerminalKey.TAB)
+                assertEquals("adb devices ", editor.text.toString())
+                assertFalse(vm().terminalSnapshot().contains("> adb devices"))
+                val key = KeyEvent.KEYCODE_ENTER
+                assertTrue(editor.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, key)))
+                assertTrue(editor.dispatchKeyEvent(KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, key, 1)))
+                assertTrue(editor.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, key)))
+            }
+            waitUntil("exactly one submission") { vm().terminalSnapshot().count { it == "> adb devices" } == 1 }
+
+            val draft = "adb shell echo Байт 🌙"
+            scenario.onActivity { activity ->
+                val editor = activity.findViewById<PtyInputEditText>(R.id.etCommand)
+                val clipboard = activity.getSystemService(ClipboardManager::class.java)
+                clipboard.setPrimaryClip(ClipData.newPlainText("terminal lab", draft))
+                try {
+                    assertTrue(editor.onTextContextMenuItem(android.R.id.paste))
+                } finally {
+                    if (Build.VERSION.SDK_INT >= 28) clipboard.clearPrimaryClip()
+                    else clipboard.setPrimaryClip(ClipData.newPlainText("", ""))
+                }
+                assertEquals(draft, editor.text.toString())
+                pressKey(activity, TerminalKey.LEFT)
+                assertEquals(draft.length - 2, editor.selectionStart)
+                pressKey(activity, TerminalKey.RIGHT)
+                assertEquals(draft.length, editor.selectionStart)
+                pressKey(activity, TerminalKey.UP)
+                assertEquals("adb devices", editor.text.toString())
+            }
+            scenario.recreate()
+            waitUi(scenario, "history selection restored") { expanded(it) }
+            scenario.onActivity { activity ->
+                pressKey(activity, TerminalKey.DOWN)
+                val editor = activity.findViewById<PtyInputEditText>(R.id.etCommand)
+                assertEquals(draft, editor.text.toString())
+                assertFalse(vm().terminalSnapshot().contains("> $draft"))
+                assertEquals(1, vm().terminalSnapshot().count { it == "> adb devices" })
+                visible(editor)
+                visible(activity.findViewById(R.id.btnConsoleClose))
+            }
+            showCommandIme(scenario)
+            AndroidUiCapture.save(scenario, "terminal-lab-inline.png")
+        }
+    }
+
+    @Test fun terminalAccessoryKeysRoutePtyBytesAndStayReachableInLandscape() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+            waitUi(scenario, "terminal expanded") { expanded(it) }
+            scenario.onActivity { activity ->
+                val editor = activity.findViewById<PtyInputEditText>(R.id.etCommand)
+                val received = java.io.ByteArrayOutputStream()
+                editor.configurePty(rawMode = { true }, sink = { received.write(it); true })
+                try {
+                    val before = vm().terminalSnapshot()
+                    for (key in listOf(TerminalKey.UP, TerminalKey.LEFT, TerminalKey.HOME,
+                            TerminalKey.PAGE_DOWN, TerminalKey.SLASH, TerminalKey.TAB)) pressKey(activity, key)
+                    val down = KeyEvent(0L, 0L, KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_C, 0, KeyEvent.META_CTRL_ON)
+                    assertTrue(editor.dispatchKeyEvent(down))
+                    assertTrue(editor.dispatchKeyEvent(KeyEvent.changeAction(down, KeyEvent.ACTION_UP)))
+                    activity.findViewById<View>(R.id.btnSend).performClick()
+                    assertArrayEquals("\u001b[A\u001b[D\u001b[H\u001b[6~/\t\u0003\n".toByteArray(), received.toByteArray())
+                    assertTrue(editor.text.isNullOrEmpty())
+                    assertEquals(before, vm().terminalSnapshot())
+                } finally {
+                    editor.configurePty(rawMode = { vm().isInteractiveAdbShellActive() },
+                        sink = { vm().sendInteractiveAdbShellBytes(it) })
+                }
+
+                // Use the same HOST shortcut against two owners of a real lazy service job.
+                val model = vm()
+                var cancellations = 0
+                val job = ServiceOwnedOperation("lab-job", "fixture", "", false,
+                    cancelTransport = { cancellations++ }, onFinished = { _, _ -> }, execute = {})
+                val active = DeviceViewModel::class.java.getDeclaredField("activeServiceOperation").apply { isAccessible = true }
+                val owner = DeviceViewModel::class.java.getDeclaredField("terminalOperationId").apply { isAccessible = true }
+                assertNull(active.get(model))
+                assertNull(owner.get(model))
+                try {
+                    active.set(model, job)
+                    editor.setText("черновик")
+                    pressKey(activity, TerminalKey.INTERRUPT)
+                    assertEquals(0, cancellations)
+                    assertFalse(job.job.isCancelled)
+                    assertTrue(editor.text.isNullOrEmpty())
+                    owner.set(model, job.id)
+                    pressKey(activity, TerminalKey.INTERRUPT)
+                    assertEquals(1, cancellations)
+                    assertTrue(job.job.isCancelled)
+                } finally {
+                    active.set(model, null)
+                    owner.set(model, null)
+                    job.cancel("lab cleanup")
+                }
+                command(activity, "adb devices")
+                activity.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
+            }
+            waitUi(scenario, "landscape terminal") {
+                expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+            }
+            showCommandIme(scenario)
+            waitUi(scenario, "command output above the compact editor and keyboard") { activity ->
+                val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                val rect = Rect()
+                output.getGlobalVisibleRect(rect) && rect.height() > 0 && output.childCount > 0 &&
+                    output.bottom == activity.findViewById<View>(R.id.consoleInputBar).top
+            }
+            scenario.onActivity { activity ->
+                visible(activity.findViewById(R.id.etCommand))
+                visible(activity.findViewById(R.id.btnConsoleClose))
+                visible(activity.findViewById(R.id.btnConsoleLogs))
+                val strip = activity.findViewById<View>(R.id.terminalKeyStrip)
+                val menu = activity.findViewById<View>(R.id.btnTerminalKeysMenu)
+                visible(if (strip.isShown) strip else menu)
+            }
+            AndroidUiCapture.save(scenario, "terminal-lab-compact.png")
+        }
+    }
+
     @Test fun ptyImeComposingDeletionUnicodeAndPasteDoNotRequireUsb() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }

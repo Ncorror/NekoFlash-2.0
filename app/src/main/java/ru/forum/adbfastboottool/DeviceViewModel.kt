@@ -2281,6 +2281,13 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    internal fun cancelTerminalOperation(): Boolean = synchronized(operationLaunchLock) {
+        val task = activeServiceOperation ?: return@synchronized false
+        if (task.id != terminalOperationId || task.job.isCompleted) return@synchronized false
+        cancelActiveOperation()
+        true
+    }
+
     fun cancelActiveOperation() {
         synchronized(operationLaunchLock) {
             val task = activeServiceOperation

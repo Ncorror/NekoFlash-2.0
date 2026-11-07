@@ -151,7 +151,7 @@ Not requested:
     <string name="console_logs_button">Logs</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
-    <string name="layout_command_hint">adb shell / adb shell getprop / fastboot getvar all</string>
+    <string name="layout_command_hint">adb or fastboot command</string>
     <string name="continue_upper">CONTINUE</string>
 
     <!-- 2.5.1 Classic Recovery UI -->
@@ -551,4 +551,25 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="operation_hint_cancelled">The operation was cancelled. Changes already written are not rolled back; check the device before continuing.</string>
     <string name="operation_hint_failed">Review the details and device state before retrying. The logs are available below.</string>
     <string name="operation_hint_interrupted">The operation was interrupted. Check the device and logs before retrying.</string>
+    <string name="terminal_lab_input_pty">Input to adb shell</string>
+    <string name="terminal_lab_mode_host">HOST</string>
+    <string name="terminal_lab_mode_pty">ADB PTY</string>
+    <string name="terminal_lab_prompt">❯</string>
+    <string name="terminal_lab_raw_marker">│</string>
+    <string name="terminal_lab_arrow_up">↑</string>
+    <string name="terminal_lab_arrow_down">↓</string>
+    <string name="terminal_lab_keys">Keys</string>
+    <string name="terminal_lab_up">Previous command or Up in shell</string>
+    <string name="terminal_lab_down">Next command or Down in shell</string>
+    <string name="terminal_lab_left">Move cursor left</string>
+    <string name="terminal_lab_right">Move cursor right</string>
+    <string name="terminal_lab_interrupt">Interrupt terminal command or clear draft</string>
+    <string name="terminal_lab_tab">Complete command or send Tab to shell</string>
+    <string name="terminal_lab_escape">Hide keyboard or send Escape to shell</string>
+    <string name="terminal_lab_slash">Insert slash</string>
+    <string name="terminal_lab_dash">Insert hyphen</string>
+    <string name="terminal_lab_home">Beginning of line</string>
+    <string name="terminal_lab_end">End of line</string>
+    <string name="terminal_lab_pgup">Page up</string>
+    <string name="terminal_lab_pgdn">Page down</string>
 </resources>

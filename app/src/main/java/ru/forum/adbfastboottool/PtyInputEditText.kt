@@ -29,6 +29,26 @@ internal class PtyInputEditText @JvmOverloads constructor(
     // Shared by the view's InputConnection wrappers and the paste menu.
     private var composing: String = ""
     private var previousRawMode: Boolean? = null
+    private var hostKey: ((TerminalKey) -> Boolean)? = null
+    private var hostSubmit: (() -> Unit)? = null
+    private val handledKeyDowns = mutableSetOf<Int>()
+
+    fun bindTerminalActions(keys: (TerminalKey) -> Boolean, submit: () -> Unit) {
+        hostKey = keys
+        hostSubmit = submit
+    }
+
+    fun isPtyInputActive(): Boolean = raw()
+
+    fun submitLine(): Boolean {
+        if (raw()) return finishRaw(byteArrayOf('\n'.code.toByte()))
+        val submit = hostSubmit ?: return false
+        submit()
+        return true
+    }
+
+    fun pressTerminalKey(key: TerminalKey): Boolean =
+        if (raw()) finishRaw(key.wire.toByteArray(StandardCharsets.UTF_8)) else hostKey?.invoke(key) ?: false
 
     fun configurePty(rawMode: () -> Boolean, sink: (ByteArray) -> Boolean) {
         this.rawMode = rawMode
@@ -54,10 +74,55 @@ internal class PtyInputEditText @JvmOverloads constructor(
     private fun emitText(text: CharSequence?): Boolean =
         emit(text?.toString().orEmpty().toByteArray(StandardCharsets.UTF_8))
 
-    private fun emitDelete(count: Int): Boolean {
-        if (count <= 0) return true
-        return emit(ByteArray(count) { PtyInputDelta.DEL.toByte() })
+    private fun finishRaw(bytes: ByteArray): Boolean {
+        val accepted = emit(bytes)
+        if (accepted) composing = ""
+        return accepted
     }
+
+    private fun deletePtyText(beforeLength: Int, afterLength: Int, inCodePoints: Boolean): Boolean {
+        if (beforeLength < 0 || afterLength < 0) return false
+        val planned = PtyInputDelta.deletion(composing, beforeLength, afterLength, inCodePoints)
+        val accepted = emit(planned.bytes)
+        if (accepted) composing = planned.remainingComposition
+        return accepted
+    }
+
+    // Physical keys arrive at the View. Some IMEs send the same kind of key
+    // through InputConnection. Handle a key in exactly one place on either path.
+    private fun terminalEvent(event: KeyEvent): Boolean? {
+        val code = event.keyCode
+        if (event.action == KeyEvent.ACTION_UP) return if (handledKeyDowns.remove(code)) true else null
+        if (event.action != KeyEvent.ACTION_DOWN) return null
+        val pty = raw()
+        val enter = code == KeyEvent.KEYCODE_ENTER || code == KeyEvent.KEYCODE_NUMPAD_ENTER
+        val navigation = TerminalKey.navigation(code)
+        val result: Boolean = when {
+            enter && (pty || event.hasNoModifiers() && hostSubmit != null) ->
+                if (event.repeatCount == 0) submitLine() else true
+            pty && code == KeyEvent.KEYCODE_DEL -> deletePtyText(1, 0, true)
+            pty && event.isCtrlPressed && code in KeyEvent.KEYCODE_A..KeyEvent.KEYCODE_Z ->
+                finishRaw(byteArrayOf((code - KeyEvent.KEYCODE_A + 1).toByte()))
+            !pty && event.isCtrlPressed && !event.isAltPressed && !event.isShiftPressed &&
+                code == KeyEvent.KEYCODE_C && !hasSelection() && hostKey != null ->
+                pressTerminalKey(TerminalKey.INTERRUPT)
+            event.hasNoModifiers() && (pty || hostKey != null) && navigation != null ->
+                pressTerminalKey(navigation)
+            pty -> {
+                val unicode = if (event.isAltPressed) event.getUnicodeChar(
+                    event.metaState and KeyEvent.META_ALT_MASK.inv()
+                ) else event.unicodeChar
+                if (unicode == 0 || !Character.isValidCodePoint(unicode)) return null
+                val bytes = String(Character.toChars(unicode)).toByteArray(StandardCharsets.UTF_8)
+                finishRaw(if (event.isAltPressed) byteArrayOf(27) + bytes else bytes)
+            }
+            else -> return null
+        }
+        handledKeyDowns.add(code)
+        return result
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean = terminalEvent(event) ?: super.dispatchKeyEvent(event)
 
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val base = super.onCreateInputConnection(outAttrs) ?: return null
@@ -105,20 +170,6 @@ internal class PtyInputEditText @JvmOverloads constructor(
                 return true
             }
 
-            private fun deletePtyText(
-                beforeLength: Int, afterLength: Int, inCodePoints: Boolean
-            ): Boolean {
-                if (beforeLength < 0 || afterLength < 0) return false
-                val planned = PtyInputDelta.deletion(
-                    composing, beforeLength, afterLength, inCodePoints
-                )
-                val ok = emit(planned.bytes)
-                // Do not advance composition when the PTY session rejected
-                // this write: the next IME update must not lose input.
-                if (ok) composing = planned.remainingComposition
-                return ok
-            }
-
             override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
                 if (!raw()) {
                     composing = ""
@@ -148,33 +199,8 @@ internal class PtyInputEditText @JvmOverloads constructor(
                 return ok
             }
 
-            override fun sendKeyEvent(event: KeyEvent): Boolean {
-                if (!raw()) {
-                    composing = ""
-                    return super.sendKeyEvent(event)
-                }
-                if (event.action != KeyEvent.ACTION_DOWN) {
-                    return super.sendKeyEvent(event)
-                }
-                val accepted = when (event.keyCode) {
-                    KeyEvent.KEYCODE_DEL -> deletePtyText(1, 0, inCodePoints = true)
-                    KeyEvent.KEYCODE_ENTER -> emit(byteArrayOf('\n'.code.toByte()))
-                    KeyEvent.KEYCODE_TAB -> emit(byteArrayOf('\t'.code.toByte()))
-                    KeyEvent.KEYCODE_DPAD_UP -> emit("\u001B[A".toByteArray())
-                    KeyEvent.KEYCODE_DPAD_DOWN -> emit("\u001B[B".toByteArray())
-                    KeyEvent.KEYCODE_DPAD_RIGHT -> emit("\u001B[C".toByteArray())
-                    KeyEvent.KEYCODE_DPAD_LEFT -> emit("\u001B[D".toByteArray())
-                    else -> {
-                        val unicode = event.unicodeChar
-                        if (unicode == 0) super.sendKeyEvent(event)
-                        else emit(String(Character.toChars(unicode)).toByteArray(StandardCharsets.UTF_8))
-                    }
-                }
-                // Enter, navigation and hardware text terminate composing
-                // input. Backspace is the exception: its prefix survives.
-                if (accepted && event.keyCode != KeyEvent.KEYCODE_DEL) composing = ""
-                return accepted
-            }
+            override fun sendKeyEvent(event: KeyEvent): Boolean =
+                terminalEvent(event) ?: super.sendKeyEvent(event)
         }
     }
 
