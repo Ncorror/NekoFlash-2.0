@@ -63,6 +63,7 @@ jobs:
           python3 tests/check_i18n.py
           python3 tests/check_docs.py
           python3 tests/check_insiders_testbook.py
+          python3 tests/check_diagnostic_zip_verifier.py
 
       - name: Publish standalone offline Insiders testbook
         uses: actions/upload-artifact@v6
