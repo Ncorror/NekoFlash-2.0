@@ -265,14 +265,42 @@ class TerminalAndImportAndroidTest {
             WindowInsetsControllerCompat(activity.window, activity.findViewById(R.id.rootCoordinator))
                 .hide(WindowInsetsCompat.Type.ime())
         }
-        waitUi(scenario, "command result rendered below the terminal header") { activity ->
-            val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
-            ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
-                ?.isVisible(WindowInsetsCompat.Type.ime()) == false &&
-                output.adapter!!.itemCount == vm().terminalSnapshot().size &&
-                (0 until output.childCount).any { index ->
-                    (output.getChildAt(index) as? TextView)?.text?.contains(token) == true
+        try {
+            waitUi(scenario, "command result rendered below the terminal header") { activity ->
+                val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) == false &&
+                    output.adapter!!.itemCount == vm().terminalSnapshot().size &&
+                    (0 until output.childCount).any { index ->
+                        (output.getChildAt(index) as? TextView)?.text?.contains(token) == true
+                    }
+            }
+        } catch (failure: IllegalStateException) {
+            // Do not weaken the visible-render assertion. Preserve enough
+            // evidence to distinguish a stale adapter, off-screen row,
+            // still-visible IME, or an incorrectly restored Material sheet.
+            var diagnosis = "UI unavailable"
+            scenario.onActivity { activity ->
+                val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                val root = activity.findViewById<View>(R.id.rootCoordinator)
+                val panel = activity.findViewById<View>(R.id.consolePanel)
+                val transcript = vm().terminalSnapshot()
+                val visibleRows = (0 until output.childCount).mapNotNull { index ->
+                    (output.getChildAt(index) as? TextView)?.text?.toString()
                 }
+                diagnosis = "token=$token, " +
+                    "orientation=${activity.resources.configuration.orientation}, " +
+                    "ime=${ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime())}, " +
+                    "sheetState=${BottomSheetBehavior.from(panel).state}, " +
+                    "controllerExpanded=${(field(activity, "consoleDockController") as ConsoleDockController).isExpanded}, " +
+                    "rootHeight=${root.height}, bodyHeight=${activity.findViewById<View>(R.id.consoleBody).height}, " +
+                    "outputHeight=${output.height}, outputChildren=${output.childCount}, " +
+                    "adapterCount=${output.adapter?.itemCount}, transcriptCount=${transcript.size}, " +
+                    "transcriptContainsToken=${transcript.any { it.contains(token) }}, " +
+                    "visibleContainsToken=${visibleRows.any { it.contains(token) }}, " +
+                    "visibleTail=${visibleRows.takeLast(3)}, transcriptTail=${transcript.takeLast(3)}"
+            }
+            throw IllegalStateException("${failure.message}; ${diagnosis}", failure)
         }
         scenario.onActivity { activity ->
             assertTrue((field(activity, "consoleDockController") as ConsoleDockController).isExpanded)
