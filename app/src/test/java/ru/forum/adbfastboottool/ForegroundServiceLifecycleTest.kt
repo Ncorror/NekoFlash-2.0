@@ -48,10 +48,21 @@ class ForegroundServiceLifecycleTest {
     private val app: Application get() = RuntimeEnvironment.getApplication()
     private fun intent(task: ServiceOwnedOperation) = Intent(app, FlashOperationService::class.java)
         .putExtra("operation_id", task.id)
-    private fun operation(body: () -> Unit) = ServiceOwnedOperation(
-        UUID.randomUUID().toString(), "flash", "boot.img", true, {},
+    private fun operation(body: () -> Unit, id: String = UUID.randomUUID().toString()) = ServiceOwnedOperation(
+        id, "flash", "boot.img", true, {},
         { task, _ -> FlashOperationService.complete(task.id) }
     ) { body() }
+
+    /**
+     * Exercise service lifecycle independently of USB admission. Robolectric
+     * has no real USB device to authorize; injecting an admitted task into the
+     * real service is what the lifecycle tests have always intended to test.
+     */
+    private fun seededState(session: DeviceViewModel, record: PersistedOperation) {
+        val field = DeviceViewModel::class.java.getDeclaredField("persistedOperation")
+        field.isAccessible = true
+        field.set(session, record)
+    }
     private fun awaitFinished(task: ServiceOwnedOperation) = runBlocking {
         withTimeout(5000) { task.finished.await() }
         shadowOf(Looper.getMainLooper()).idle()
@@ -119,30 +130,19 @@ class ForegroundServiceLifecycleTest {
         }
     }
 
-    @Test fun realViewModelPersistsPromotionFailureBeforeCommandExecution() {
+    @Test fun realViewModelNoUsbFailsAdmissionWithoutStartingServiceOrPersistingOperation() {
         val session = DeviceSessionStore.get(app)
-        session.runFastbootCommand("getvar:product")
-        val start = requireNotNull(shadowOf(app).nextStartedService)
         val journal = OperationRecoveryStore(File(app.filesDir, "execution-state"))
-        val pending = requireNotNull(journal.readOperation())
-        assertEquals(PersistedOperationPhase.PREPARING, pending.phase)
-        val controller = Robolectric.buildService(FlashOperationService::class.java).create()
-        val service = controller.get()
-        shadowOf(service).setThrowInStartForeground(SecurityException("test promotion refusal"))
-        try {
-            service.onStartCommand(start, 0, 1)
-            shadowOf(Looper.getMainLooper()).idle()
-            assertFalse(session.operationActive.value!!)
-            val progress = requireNotNull(session.operationProgress.value)
-            assertEquals(DeviceViewModel.OperationOutcomeKind.FAILED, progress.outcome)
-            assertTrue(progress.detail.contains("test promotion refusal"))
-            val final = requireNotNull(journal.readOperation())
-            assertEquals(pending.id, final.id)
-            assertEquals(PersistedOperationPhase.FAILED, final.phase)
-            // Executing the command body would instead report a missing USB
-            // protocol. The admission failure must win before that body starts.
-            assertTrue(final.detail.contains("test promotion refusal"))
-        } finally { controller.destroy() }
+        val previous = journal.readOperation()
+        session.runFastbootCommand("getvar:product")
+        shadowOf(Looper.getMainLooper()).idle()
+
+        // No physical USB and no real Fastboot protocol: never start a
+        // connectedDevice FGS. No PREPARING checkpoint or fake result card.
+        assertNull(shadowOf(app).nextStartedService)
+        assertEquals(previous, journal.readOperation())
+        assertFalse(session.operationActive.value!!)
+        assertTrue(session.logSnapshot().any { it.contains("Command was not sent.") })
     }
 
     @Test fun realViewModelRecreationRestoresDraftWithoutSubmittingWork() {
@@ -158,23 +158,25 @@ class ForegroundServiceLifecycleTest {
         assertFalse(restored.operationActive.value!!)
     }
 
-    @Test fun realViewModelCompletionLeavesDismissibleResultNotification() {
+    @Test fun serviceCompletionLeavesDismissibleResultNotificationForAnAdmittedOperation() {
+        // A simulated *admitted* service task verifies the notification
+        // lifecycle. This does not pretend that Robolectric has a USB target.
+        val id = UUID.randomUUID().toString()
+        val journal = OperationRecoveryStore(File(app.filesDir, "execution-state"))
+        val final = PersistedOperation(id, "Fastboot operation", "Transport unavailable",
+            System.currentTimeMillis(), -1, PersistedOperationPhase.FAILED)
+        journal.writeOperation(final)
         val session = DeviceSessionStore.get(app)
-        session.runFastbootCommand("getvar:product")
+        assertEquals(final, session.lastPersistedOperation(id))
+        val task = operation(body = {}, id = id)
+        FlashOperationService.submit(app, task)
         val start = requireNotNull(shadowOf(app).nextStartedService)
         val controller = Robolectric.buildService(FlashOperationService::class.java).create()
         val service = controller.get()
         try {
             service.onStartCommand(start, 0, 1)
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            while (session.operationProgress.value?.finished != true) {
-                check(System.nanoTime() < deadline) { "Operation did not complete" }
-                shadowOf(Looper.getMainLooper()).idle()
-                Thread.sleep(10)
-            }
-            shadowOf(Looper.getMainLooper()).idle()
-            assertFalse(session.operationActive.value!!)
-            assertEquals(DeviceViewModel.OperationOutcomeKind.FAILED, session.operationProgress.value!!.outcome)
+            awaitFinished(task)
+            assertEquals(PersistedOperationPhase.FAILED, journal.readOperation()?.phase)
             val notification = requireNotNull(shadowOf(app.getSystemService(NotificationManager::class.java))
                 .getNotification(1401))
             assertEquals(0, notification.flags and Notification.FLAG_ONGOING_EVENT)
@@ -185,36 +187,50 @@ class ForegroundServiceLifecycleTest {
 
     @Test fun nextRequestTimeoutStopsCompletedPreviousService() {
         val session = DeviceSessionStore.get(app)
-        session.runFastbootCommand("getvar:product")
+        val first = operation(body = {})
+        FlashOperationService.submit(app, first)
         val firstStart = requireNotNull(shadowOf(app).nextStartedService)
         val controller = Robolectric.buildService(FlashOperationService::class.java).create()
         val service = controller.get()
         try {
             service.onStartCommand(firstStart, 0, 1)
-            val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5)
-            // Let the worker finish without draining its main-thread callback.
-            while (!session.runWorkspaceMaintenanceIfIdle {}) {
-                check(System.nanoTime() < deadline) { "First operation did not complete" }
-                Thread.sleep(10)
-            }
-            session.runFastbootCommand("getvar:serialno")
-            val pendingStart = requireNotNull(shadowOf(app).nextStartedService)
+            // Do not drain the main queue yet: preserve the real scenario in
+            // which an old task finished while a new FGS start was pending.
+            runBlocking { withTimeout(5000) { first.finished.await() } }
+
+            val id = UUID.randomUUID().toString()
+            val journal = OperationRecoveryStore(File(app.filesDir, "execution-state"))
+            val pending = PersistedOperation(id, "Next admitted operation", "Preparing",
+                System.currentTimeMillis(), -1, PersistedOperationPhase.PREPARING)
+            journal.writeOperation(pending)
+            seededState(session, pending)
+            val next = ServiceOwnedOperation(
+                id, "Next admitted operation", "Preparing", true, {},
+                { task, _ ->
+                    val result = pending.copy(phase = PersistedOperationPhase.FAILED,
+                        detail = task.startupFailure ?: "Service start failed")
+                    journal.writeOperation(result)
+                    seededState(session, result)
+                    FlashOperationService.complete(task.id)
+                }
+            ) { error("Unacknowledged FGS task must never execute") }
+            FlashOperationService.submit(app, next)
+            val nextStart = requireNotNull(shadowOf(app).nextStartedService)
+            assertEquals(next.id, nextStart.getStringExtra("operation_id"))
             shadowOf(Looper.getMainLooper()).idle()
             assertFalse(shadowOf(service).isStoppedBySelf)
-            // The second intent never arrives: old completion has deferred
-            // shutdown, so the second request's timeout must now finish it.
+            // The second start intent is intentionally never delivered.
             shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(11))
-            assertFalse(session.operationActive.value!!)
-            assertEquals(DeviceViewModel.OperationOutcomeKind.FAILED, session.operationProgress.value!!.outcome)
-            val record = requireNotNull(OperationRecoveryStore(File(app.filesDir, "execution-state")).readOperation())
-            assertEquals(pendingStart.getStringExtra("operation_id"), record.id)
-            assertEquals(PersistedOperationPhase.FAILED, record.phase)
-            assertTrue(shadowOf(service).isStoppedBySelf)
-            FlashOperationService.complete(requireNotNull(firstStart.getStringExtra("operation_id")))
+            runBlocking { withTimeout(5000) { next.finished.await() } }
             shadowOf(Looper.getMainLooper()).idle()
+            assertNotNull(next.startupFailure)
+            val result = requireNotNull(journal.readOperation())
+            assertEquals(next.id, result.id)
+            assertEquals(PersistedOperationPhase.FAILED, result.phase)
+            assertTrue(shadowOf(service).isStoppedBySelf)
             val notification = requireNotNull(shadowOf(app.getSystemService(NotificationManager::class.java))
                 .getNotification(1401))
-            assertEquals(record.detail, notification.extras.getString(Notification.EXTRA_TEXT))
+            assertEquals(result.detail, notification.extras.getString(Notification.EXTRA_TEXT))
         } finally { controller.destroy() }
     }
 
