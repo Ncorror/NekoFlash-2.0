@@ -82,6 +82,10 @@ object DiagnosticLogPolicy {
 
     fun uiProgressIntervalMs(): Long = 1_000L
 
-    /** Exact duplicate messages inside this window are coalesced in the compact log. */
+    /**
+     * Historical compatibility value only. REV51 does not suppress duplicate
+     * events in either the compact journal or the raw trace.
+     */
+    @Deprecated("Diagnostic evidence must never suppress repeated events")
     fun duplicateWindowMs(): Long = 1_500L
 }
