@@ -357,29 +357,35 @@ internal class ConsoleDockController(
         if (!isExpanded) return
         val keyboardShown = imeVisible ||
             ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
-        if (!keyboardShown) return
         val output = activity.findViewById<View>(R.id.rvConsoleOutput)
-        // Measured RecyclerView height alone is not enough: at 52 px the
-        // last TextView can be clipped down to 3 px by a wrapping transcript.
-        // Reserve room for actual legible rows, not just a non-zero viewport.
         val outputRoom = (output.height - output.paddingTop - output.paddingBottom).coerceAtLeast(0)
+        // After orientation changes the IME visibility inset can lag behind
+        // the actual 100px resized window. A focused editor is sufficient
+        // evidence to attempt release on an explicit HOST submission.
+        if (!keyboardShown && !commandInput.hasFocus()) return
         if (root.height >= dp(180) && outputRoom >= dp(72)) return
         hideCommandIme()
     }
 
     fun hideCommandIme() {
         focusCommandWhenExpanded = false
-        WindowInsetsControllerCompat(activity.window, root).hide(
-            WindowInsetsCompat.Type.ime(),
-        )
-        imeVisible = false
         behavior.isDraggable = false
-        // clearFocus() alone may immediately hand focus back to the only
-        // focusable EditText on Android 8 (observed in instrumented REV31 CI).
-        // Give it an explicit, non-editable destination before collapsing.
+        // Remove editor focus before asking the IME to hide. On some API 34
+        // layouts a hide request against the CoordinatorLayout is ignored
+        // while the keyboard still owns the focused EditText.
         root.isFocusableInTouchMode = true
         root.requestFocus()
         commandInput.clearFocus()
+        WindowInsetsControllerCompat(activity.window, commandInput).hide(
+            WindowInsetsCompat.Type.ime(),
+        )
+        // Use the focused editor's window token for the legacy IME path as
+        // well (not the bottom sheet's token). No new keyboard show is issued.
+        (activity.getSystemService(android.content.Context.INPUT_METHOD_SERVICE)
+            as android.view.inputmethod.InputMethodManager)
+            .hideSoftInputFromWindow(commandInput.windowToken, 0)
+        imeVisible = false
+        scheduleVisibleBodyHeightUpdate()
     }
 
     private companion object {
