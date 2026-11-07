@@ -7,6 +7,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
+import java.security.MessageDigest
 import java.util.zip.ZipInputStream
 
 class DiagnosticEvidenceArchiveTest {
@@ -31,7 +32,13 @@ class DiagnosticEvidenceArchiveTest {
             assertArrayEquals(bytes, exported["logs/1/${source.name}"])
             assertArrayEquals(summary.readBytes(), exported["logs/1/${summary.name}"])
             assertFalse(exported.keys.any { "firmware-system.img" in it })
-            assertEquals(2, exported.size)
+            assertEquals(3, exported.size)
+            val manifest = exported["EXPORT-MANIFEST.txt"]!!.toString(Charsets.UTF_8)
+            assertTrue(manifest.contains("status=CONSISTENT_SNAPSHOT"))
+            assertTrue(manifest.contains("file=logs/1/" + source.name))
+            val checksum = MessageDigest.getInstance("SHA-256").digest(bytes)
+                .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+            assertTrue(manifest.contains("sha256=" + checksum))
             assertArrayEquals(bytes, source.readBytes())
             assertTrue(summary.isFile)
         } finally {
@@ -78,7 +85,9 @@ class DiagnosticEvidenceArchiveTest {
             ZipInputStream(out.toByteArray().inputStream()).use { zip ->
                 while (true) {
                     val entry = zip.nextEntry ?: break
-                    exported[entry.name.substringAfterLast('/')] = zip.readBytes()
+                    if (entry.name != "EXPORT-MANIFEST.txt") {
+                        exported[entry.name.substringAfterLast('/')] = zip.readBytes()
+                    }
                     zip.closeEntry()
                 }
             }
@@ -86,6 +95,98 @@ class DiagnosticEvidenceArchiveTest {
             expected.forEach { assertArrayEquals(it.readBytes(), exported[it.name]) }
         } finally {
             folder.deleteRecursively()
+        }
+    }
+
+    @Test fun missingSessionPrologueIsReportedAndRawBytesRemainUntouched() {
+        val folder = Files.createTempDirectory("nekoflash-truncated-session-").toFile()
+        try {
+            val logs = folder.resolve("logs").apply { mkdirs() }
+            val missingStart = "[2026-11-07 13:53:45] ADB shell started\n".toByteArray(Charsets.UTF_8)
+            val raw = logs.resolve("log-2026-11-07-13-51-12.txt").apply { writeBytes(missingStart) }
+            val out = ByteArrayOutputStream()
+            val result = DiagnosticEvidenceArchive.writeDetailed(out, listOf(logs))
+            assertEquals(1, result.fileCount)
+            assertFalse(result.snapshotConsistent)
+            assertTrue(result.warnings.any { it.startsWith("MISSING_SESSION_PROLOGUE ") })
+            val entries = mutableMapOf<String, ByteArray>()
+            ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    entries[entry.name] = zip.readBytes()
+                    zip.closeEntry()
+                }
+            }
+            assertArrayEquals(missingStart, entries["logs/1/" + raw.name])
+            val manifest = entries["EXPORT-MANIFEST.txt"]!!.toString(Charsets.UTF_8)
+            assertTrue(manifest.contains("status=INCOMPLETE_OR_UNVERIFIED"))
+            assertTrue(manifest.contains("warning=MISSING_SESSION_PROLOGUE "))
+            assertArrayEquals(missingStart, raw.readBytes())
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+
+    @Test fun rotatedLogsAndRepeatedEventsHaveExactHashesAndNoFileLimit() {
+        val folder = Files.createTempDirectory("nekoflash-multisegment-export-").toFile()
+        try {
+            val logs = folder.resolve("logs").apply { mkdirs() }
+            val store = DiagnosticLogStore(logs, "stress-logs", 64L * 1024, 64L * 1024)
+            val event = "[event] same content, must never disappear " + "x".repeat(600) + "\n"
+            repeat(400) { store.appendCompact(event) }
+            repeat(400) { store.appendTrace("wire:" + "y".repeat(600) + "\n") }
+            val sources = store.compactFiles() + store.traceFiles()
+            assertTrue(sources.size >= 6)
+            val out = ByteArrayOutputStream()
+            val result = DiagnosticEvidenceArchive.writeDetailed(out, listOf(logs))
+            assertEquals(sources.size, result.fileCount)
+            assertTrue(result.warnings.toString(), result.snapshotConsistent)
+            val zipFiles = mutableMapOf<String, ByteArray>()
+            ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    zipFiles[entry.name] = zip.readBytes()
+                    zip.closeEntry()
+                }
+            }
+            val manifest = zipFiles["EXPORT-MANIFEST.txt"]!!.toString(Charsets.UTF_8)
+            for (source in sources) {
+                val bytes = source.readBytes()
+                val name = "logs/1/" + source.name
+                assertArrayEquals(bytes, zipFiles[name])
+                val hash = MessageDigest.getInstance("SHA-256").digest(bytes)
+                    .joinToString("") { "%02x".format(it.toInt() and 0xff) }
+                assertTrue(manifest.contains("file=" + name))
+                assertTrue(manifest.contains("sha256=" + hash))
+            }
+            assertEquals(event.repeat(400), store.compactFiles().joinToString("") { it.readText() })
+        } finally {
+            folder.deleteRecursively()
+        }
+    }
+    @Test fun exportIncludesAllCrashMarkersWithoutLeakingUnrelatedFiles() {
+        val root = Files.createTempDirectory("nekoflash-crash-export-").toFile()
+        try {
+            val crash = root.resolve("crash-2026-11-07-123.txt").apply { writeText("full crash stack") }
+            val legacy = root.resolve("last-crash-marker.txt").apply { writeText("old crash") }
+            root.resolve("firmware-system.img").writeText("not a diagnostic")
+            val out = ByteArrayOutputStream()
+            val result = DiagnosticEvidenceArchive.writeDetailed(out, listOf(root))
+            assertTrue(result.snapshotConsistent)
+            assertEquals(2, result.fileCount)
+            val entries = mutableMapOf<String, ByteArray>()
+            ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    entries[entry.name] = zip.readBytes()
+                    zip.closeEntry()
+                }
+            }
+            assertArrayEquals(crash.readBytes(), entries["logs/1/" + crash.name])
+            assertArrayEquals(legacy.readBytes(), entries["logs/1/" + legacy.name])
+            assertFalse(entries.keys.any { it.endsWith("firmware-system.img") })
+        } finally {
+            root.deleteRecursively()
         }
     }
 }

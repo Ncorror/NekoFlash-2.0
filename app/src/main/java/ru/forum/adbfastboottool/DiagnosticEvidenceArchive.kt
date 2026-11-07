@@ -2,48 +2,156 @@ package ru.forum.adbfastboottool
 
 import java.io.File
 import java.io.OutputStream
+import java.security.MessageDigest
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
 /**
- * Explicit raw diagnostic export for Insiders. No source files are modified or deleted.
- * The archive is streamed directly to the user-selected SAF destination.
+ * Explicit, lossless raw diagnostic export for Insiders.
+ *
+ * All known diagnostic files and all rotated segments are streamed unchanged.
+ * The manifest contains sizes, SHA-256 checksums, and evidence warnings; a
+ * successful ZIP write alone is not proof that earlier source events exist.
+ * Source files are never modified, compressed into summaries, or deleted.
  */
 object DiagnosticEvidenceArchive {
+    data class ExportResult(val fileCount: Int, val warnings: List<String>) {
+        val snapshotConsistent: Boolean get() = fileCount > 0 && warnings.isEmpty()
+    }
+
     internal fun directories(workspaces: List<File>): List<File> = workspaces.flatMap {
         listOf(File(it, "logs"), File(it, "reports/usb-sessions"))
     }.distinctBy { it.absolutePath }
 
+    // Only diagnostic artifacts: do not accidentally bundle firmware IMG/APK
+    // placed in the same folder. Extensions are not capped for known evidence.
     private val diagnosticName = Regex(
-        "^(?:log-|trace-|session-summary-|usb-|diagnostic-|session-).+\\.(?:txt|json|log|bin|gz|csv|zip)$",
+        "^(?:(?:log-|trace-|session-summary-|usb-|diagnostic-|session-|crash-).+|last-crash-marker\\.txt)$",
         RegexOption.IGNORE_CASE
     )
 
-    fun write(output: OutputStream, directories: List<File>): Int {
+    fun write(output: OutputStream, directories: List<File>): Int =
+        writeDetailed(output, directories).fileCount
+
+    fun writeDetailed(output: OutputStream, directories: List<File>): ExportResult {
         var count = 0
+        val warnings = mutableListOf<String>()
         val seenRoots = HashSet<String>()
         val seenEntries = HashSet<String>()
+        val manifest = StringBuilder()
+        val buffer = ByteArray(64 * 1024)
+
         ZipOutputStream(output.buffered()).use { zip ->
             directories.forEachIndexed { index, root ->
-                if (!root.isDirectory || !seenRoots.add(root.canonicalPath)) return@forEachIndexed
-                root.walkTopDown().filter { it.isFile && diagnosticName.matches(it.name) }
-                    .forEach { source ->
-                        val relative = source.relativeTo(root).invariantSeparatorsPath
-                        if (relative.split('/').any { it == "." || it == ".." }) return@forEach
-                        val name = "logs/${index + 1}/$relative"
-                        if (!seenEntries.add(name)) return@forEach
-                        zip.putNextEntry(ZipEntry(name))
-                        source.inputStream().buffered().use { it.copyTo(zip) }
-                        zip.closeEntry()
-                        count++
+                if (!root.exists()) return@forEachIndexed
+                if (!root.isDirectory) {
+                    warnings.add("NOT_A_DIRECTORY " + root.absolutePath)
+                    return@forEachIndexed
+                }
+                val canonicalRoot = root.canonicalPath
+                if (!seenRoots.add(canonicalRoot)) return@forEachIndexed
+                val rootPrefix = canonicalRoot + File.separator
+
+                root.walkTopDown().onFail { failed, error ->
+                    warnings.add("DIRECTORY_SCAN_FAILED " + failed.absolutePath + ": " + error.javaClass.simpleName)
+                }.filter { it.isFile && diagnosticName.matches(it.name) }.forEach { source ->
+                    // Do not follow symbolic links out of the diagnostic root.
+                    if (!source.canonicalPath.startsWith(rootPrefix)) {
+                        warnings.add("OUTSIDE_DIAGNOSTIC_ROOT " + source.absolutePath)
+                        return@forEach
                     }
+                    val relative = source.relativeTo(root).invariantSeparatorsPath
+                    if (relative.split('/').any { it == "." || it == ".." }) {
+                        warnings.add("INVALID_RELATIVE_PATH " + source.absolutePath)
+                        return@forEach
+                    }
+                    val name = "logs/" + (index + 1) + "/" + relative
+                    if (!seenEntries.add(name)) return@forEach
+
+                    val originalSize = source.length()
+                    val originalModified = source.lastModified()
+                    val digest = MessageDigest.getInstance("SHA-256")
+                    val leading = ByteArray(96)
+                    var leadingBytes = 0
+                    var copiedBytes = 0L
+
+                    zip.putNextEntry(ZipEntry(name))
+                    try {
+                        source.inputStream().buffered().use { input ->
+                            while (true) {
+                                val n = input.read(buffer)
+                                if (n < 0) break
+                                if (n == 0) continue
+                                if (leadingBytes < leading.size) {
+                                    val prefixSize = minOf(leading.size - leadingBytes, n)
+                                    buffer.copyInto(leading, leadingBytes, 0, prefixSize)
+                                    leadingBytes += prefixSize
+                                }
+                                zip.write(buffer, 0, n)
+                                digest.update(buffer, 0, n)
+                                copiedBytes += n
+                            }
+                        }
+                    } finally {
+                        zip.closeEntry()
+                    }
+                    count++
+
+                    // Main segment headers are mandatory in the current writer.
+                    // Older or externally modified files remain in the archive,
+                    // but are never silently described as a complete history.
+                    val namePart = source.name
+                    val isMainSegment = (namePart.startsWith("log-20") ||
+                        namePart.startsWith("trace-20")) &&
+                        namePart.endsWith(".txt") && !namePart.contains("-part")
+                    if (isMainSegment) {
+                        val expected = if (namePart.startsWith("log-")) {
+                            "# NekoFlash compact log"
+                        } else {
+                            "# NekoFlash protocol trace"
+                        }
+                        val actualPrefix = String(leading, 0, leadingBytes, Charsets.UTF_8)
+                        if (!actualPrefix.startsWith(expected)) {
+                            warnings.add("MISSING_SESSION_PROLOGUE " + name)
+                        }
+                    }
+                    if (source.length() != originalSize ||
+                        copiedBytes != originalSize ||
+                        source.lastModified() != originalModified
+                    ) {
+                        warnings.add("SOURCE_CHANGED_DURING_EXPORT " + name)
+                    }
+                    val checksum = digest.digest().joinToString("") { byte ->
+                        "%02x".format(byte.toInt() and 0xff)
+                    }
+                    manifest.append("file=").append(name.replace("\n", "\\n"))
+                        .append("\tbytes=").append(copiedBytes)
+                        .append("\tsha256=").append(checksum).append('\n')
+                }
             }
+
             if (count == 0) {
+                warnings.add("NO_DIAGNOSTIC_FILES_FOUND")
                 zip.putNextEntry(ZipEntry("NO_LOGS.txt"))
                 zip.write("No persisted diagnostic files were found for export.\n".toByteArray(Charsets.UTF_8))
                 zip.closeEntry()
             }
+
+            val status = if (warnings.isEmpty()) "CONSISTENT_SNAPSHOT" else "INCOMPLETE_OR_UNVERIFIED"
+            val header = buildString {
+                appendLine("NekoFlash diagnostic export manifest v1")
+                appendLine("status=" + status)
+                appendLine("file_count=" + count)
+                appendLine("note=Source-history completeness cannot be proven from a ZIP alone.")
+                appendLine("note=SHA-256 covers exactly the copied raw bytes; no source files were changed.")
+                append(manifest)
+                warnings.forEach { appendLine("warning=" + it.replace("\n", "\\n")) }
+            }
+            zip.putNextEntry(ZipEntry("EXPORT-MANIFEST.txt"))
+            zip.write(header.toByteArray(Charsets.UTF_8))
+            zip.closeEntry()
         }
-        return count
+
+        return ExportResult(count, warnings.toList())
     }
 }

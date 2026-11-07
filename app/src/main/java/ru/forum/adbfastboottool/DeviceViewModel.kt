@@ -290,10 +290,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private var sessionSummaryFile: File? = null
     private var logFileConfigured = false
     private var configuredWorkspacePath: String? = null
-    private var lastCompactMessage: String? = null
-    private var lastCompactDeclaredLevel: DiagnosticLogPolicy.Level? = null
-    private var lastCompactMessageAtMs: Long = 0L
-    private var suppressedDuplicateCount: Long = 0L
     private var lastSummaryPersistAtMs: Long = 0L
     private var workspaceRoot: File? = null
     private var lastUsbSessionSnapshot: UsbSessionSnapshot? = null
@@ -425,34 +421,18 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         synchronized(logLock) {
             TerminalTranscript.select(message, declaredLevel, terminalSubmission.get() == true,
                 protocol, isTerminalOperation)?.let(::appendTerminalLocked)
-            val now = System.currentTimeMillis()
-            val duplicate = message == lastCompactMessage &&
-                declaredLevel == lastCompactDeclaredLevel &&
-                now - lastCompactMessageAtMs <= DiagnosticLogPolicy.duplicateWindowMs()
-            if (duplicate) {
-                suppressedDuplicateCount += 1L
-                diagnosticSessionTracker.recordDuplicateSuppressed()
-                lastCompactMessageAtMs = now
-                return
-            }
-            flushSuppressedDuplicatesLocked()
+            // All emitted events, including identical consecutive messages, must
+            // reach the on-disk beta journal. Only the live UI is bounded.
             if (message.trim().startsWith("💡")) {
                 lines.removeAll { it.trim().startsWith("💡") }
             }
             appendCompactMessageLocked(message, declaredLevel)
-            lastCompactMessage = message
-            lastCompactDeclaredLevel = declaredLevel
-            lastCompactMessageAtMs = now
         }
     }
 
     fun clearLog() {
         synchronized(logLock) {
-            flushSuppressedDuplicatesLocked()
             lines.clear()
-            lastCompactMessage = null
-            lastCompactDeclaredLevel = null
-            suppressedDuplicateCount = 0L
         }
         log(text(R.string.log_cleared))
     }
@@ -485,13 +465,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             lastSummaryPersistAtMs = now
             persistSessionSummary()
         }
-    }
-
-    private fun flushSuppressedDuplicatesLocked() {
-        if (suppressedDuplicateCount <= 0L) return
-        val repeated = "↻ Previous line repeated $suppressedDuplicateCount time(s); duplicates collapsed."
-        suppressedDuplicateCount = 0L
-        appendCompactMessageLocked(repeated, DiagnosticLogPolicy.Level.INFO)
     }
 
     private fun appendRawToLogFile(text: String) {
@@ -537,7 +510,6 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun flushDiagnostics(reason: String, terminal: Boolean = false) {
         synchronized(logLock) {
-            flushSuppressedDuplicatesLocked()
             if (terminal) diagnosticSessionTracker.recordTermination(reason)
             appendRawToTraceFile(
                 formatLogLine(
@@ -977,15 +949,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     fun currentLogFiles(): List<File> = logStore?.compactFiles().orEmpty()
     fun currentTraceLogFiles(): List<File> = logStore?.traceFiles().orEmpty()
     fun currentSessionSummaryFile(): File? = synchronized(logLock) {
-        flushSuppressedDuplicatesLocked()
         persistSessionSummary()
     }
     fun currentDiagnosticSessionSummary(): DiagnosticSessionTracker.Snapshot = synchronized(logLock) {
-        flushSuppressedDuplicatesLocked()
         diagnosticSessionTracker.snapshot()
     }
     fun logSnapshot(): List<String> = synchronized(logLock) {
-        flushSuppressedDuplicatesLocked()
         lines.toList()
     }
     fun currentConnectionInfo(): String? = connectedDeviceInfo
