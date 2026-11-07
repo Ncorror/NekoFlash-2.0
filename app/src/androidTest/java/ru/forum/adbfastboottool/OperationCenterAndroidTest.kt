@@ -5,6 +5,7 @@ import android.app.LocaleManager
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.graphics.Rect
 import android.os.Build
 import android.os.LocaleList
@@ -185,6 +186,46 @@ class OperationCenterAndroidTest {
         ParcelFileDescriptor.AutoCloseInputStream(it).bufferedReader().use { reader -> reader.readText().trim() }
     }
 
+    /**
+     * Android 8 does not reliably propagate shell-written Settings.System.FONT_SCALE
+     * into an already running instrumentation process. The AndroidX system font
+     * test helper explicitly supports global changes only on API 29+.
+     *
+     * For API 26, install a process-local Resources configuration BEFORE the
+     * Activity is inflated, then restore it after the scenario closes. This
+     * exercises real 1.3x text metrics and layout, without mutating emulator
+     * system settings or weakening the landscape/cancellation assertions.
+     */
+    @Suppress("DEPRECATION")
+    private fun applyLegacyFontScale(resources: Resources, fontScale: Float) {
+        val updated = Configuration(resources.configuration).apply { this.fontScale = fontScale }
+        resources.updateConfiguration(updated, resources.displayMetrics)
+    }
+
+    private fun waitForLargeFontScale(scenario: ActivityScenario<MainActivity>) {
+        val deadline = System.nanoTime() + 10_000_000_000L
+        var actualScale = 0f
+        var actualRatio = 0f
+        while (true) {
+            scenario.onActivity { activity ->
+                actualScale = activity.resources.configuration.fontScale
+                val metrics = activity.resources.displayMetrics
+                actualRatio = metrics.scaledDensity / metrics.density
+            }
+            // On API 26, check actual scaled text metrics as well as the
+            // Configuration field: a fake fontScale would not pass this.
+            val resourcesMatch = actualScale >= 1.29f &&
+                (Build.VERSION.SDK_INT >= 29 || actualRatio >= 1.29f)
+            if (resourcesMatch) return
+            if (System.nanoTime() >= deadline) {
+                fail("Large-font fixture not active: SDK=${Build.VERSION.SDK_INT}, " +
+                    "config.fontScale=$actualScale, scaledDensity/density=$actualRatio, " +
+                    "system.font_scale=${shell("settings get system font_scale")}")
+            }
+            Thread.sleep(20)
+        }
+    }
+
     private fun swipeToBottom(scenario: ActivityScenario<MainActivity>) {
         var geometry = ""
         repeat(12) {
@@ -209,11 +250,20 @@ class OperationCenterAndroidTest {
     }
 
     @Test fun longDetailsScrollWithLargeTextInLandscapeAndCancellationStaysPending() {
-        val oldScale = shell("settings get system font_scale").toFloatOrNull() ?: 1f
+        val legacyResources = if (Build.VERSION.SDK_INT < 29) context.resources else null
+        val legacyOriginal = legacyResources?.let { Configuration(it.configuration) }
+        val oldSystemScale = if (legacyResources == null) {
+            shell("settings get system font_scale").toFloatOrNull() ?: 1f
+        } else null
         try {
-            shell("settings put system font_scale 1.3")
+            if (legacyResources != null) {
+                // Set scale before MainActivity inflates any labels or sheets.
+                applyLegacyFontScale(legacyResources, 1.3f)
+            } else {
+                shell("settings put system font_scale 1.3")
+            }
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                waitUi(scenario) { it.resources.configuration.fontScale >= 1.29f }
+                waitForLargeFontScale(scenario)
                 begin(scenario, (1..18).joinToString("\n") { "Шаг $it: подробности операции и выбранного раздела" })
                 open(scenario)
                 AndroidUiCapture.save(scenario, "operation-running.png")
@@ -255,7 +305,16 @@ class OperationCenterAndroidTest {
                 AndroidUiCapture.save(scenario, "operation-cancelling.png")
                 scenario.onActivity { active(false) }
             }
-        } finally { shell("settings put system font_scale $oldScale") }
+        } finally {
+            if (legacyResources != null && legacyOriginal != null) {
+                // Restore the exact target-process configuration even if a
+                // screenshot, orientation or scroll assertion fails.
+                @Suppress("DEPRECATION")
+                legacyResources.updateConfiguration(legacyOriginal, legacyResources.displayMetrics)
+            } else {
+                shell("settings put system font_scale $oldSystemScale")
+            }
+        }
     }
 
     @Test fun oldToolsSelectionFallsBackToQuickAndMassStillWorks() {
