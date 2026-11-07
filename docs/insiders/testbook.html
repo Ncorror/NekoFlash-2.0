@@ -1017,12 +1017,12 @@ const TESTS = [
     {ru:'Повтори через «Файлы Android» / DocumentsUI.',en:'Repeat with Android Files / DocumentsUI.'},
     {ru:'После выбора временно сделай тестовый источник недоступным и проверь статус.',en:'Make a disposable test source unavailable and check reported state.'}
   ],expect:{ru:'Нет ложного SUCCESS, автоматической прошивки или потери выбранного файла при отмене.',en:'No false SUCCESS, automatic flashing or lost selection on cancellation.'}},
-  {id:'SIDE-01',group:'ui',ru:'Sideload — только экран выбора',en:'Sideload — selection UI only',intro:{ru:'Никакой установки ZIP в Recovery в первом раунде.',en:'Do not install ZIP packages in Recovery in this round.'},steps:[
+  {id:'SIDE-01',group:'ui',ru:'Sideload — экран выбора без передачи',en:'Sideload — picker without transfer',intro:{ru:'ВНИМАНИЕ: выбор ZIP сейчас сразу запускает передачу Sideload. Для безопасного UI-теста НЕ выбирай файл.',en:'IMPORTANT: selecting a ZIP starts Sideload transfer immediately. Do NOT select a file for this UI-only test.'},steps:[
     {ru:'Открой вкладку Sideload.',en:'Open Sideload.'},
-    {ru:'Выбери тестовый ZIP, но не запускай передачу.',en:'Select a harmless test ZIP without starting transfer.'},
-    {ru:'Проверь имя файла, поворот и переключение вкладок.',en:'Check filename, rotation and tab switching.'},
+    {ru:'Открой системный выборщик ZIP, затем нажми «Назад», не выбирая файл.',en:'Open the system ZIP picker, then press Back without selecting a file.'},
+    {ru:'Проверь, что после отмены выбора, поворота и переключения вкладок передача не запустилась.',en:'Verify cancelling the picker, rotating and switching tabs does not start a transfer.'},
     {ru:'Проверь статус при отсутствии Recovery-устройства.',en:'Check behaviour without a connected Recovery device.'}
-  ],expect:{ru:'Корректное состояние. Передача 100% сама по себе не доказывает успешную установку.',en:'Accurate state. 100% transfer alone never proves successful installation.'}},
+  ],expect:{ru:'Передача не стартует при отмене выбора. Отдельный реальный Sideload-тест должен оценивать 100% как передачу, а не доказательство установки.',en:'Cancelling the picker does not start transfer. A separate real Sideload test must treat 100% as transfer progress, not installation proof.'}},
   {id:'UNLOCK-01',group:'ui',ru:'Unlock — только интерфейс',en:'Unlock — interface only',intro:{ru:'Не вводи в отчёт данные Mi Account и не запускай разблокировку.',en:'Do not include Mi Account credentials or execute unlocking.'},steps:[
     {ru:'Открой вкладку Unlock.',en:'Open Unlock.'},
     {ru:'Проверь подписи и состояние кнопок без устройства.',en:'Check labels and button states without a device.'},
