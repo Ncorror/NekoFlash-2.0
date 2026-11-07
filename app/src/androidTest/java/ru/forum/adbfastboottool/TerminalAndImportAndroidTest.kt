@@ -566,6 +566,33 @@ class TerminalAndImportAndroidTest {
         }
     }
 
+    private fun checkInlineResponseWithIme(scenario: ActivityScenario<MainActivity>, token: String) {
+        scenario.onActivity { command(it, "fastboot $token") }
+        var geometry = ""
+        try {
+            waitUi(scenario, "visible $token result with the keyboard open") { activity ->
+                val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                val prompt = activity.findViewById<View>(R.id.consoleInputBar)
+                val root = activity.findViewById<View>(R.id.rootCoordinator)
+                val panel = activity.findViewById<View>(R.id.consolePanel)
+                val visibleRow = (0 until output.childCount).any { index ->
+                    val row = output.getChildAt(index) as TextView
+                    val rect = Rect()
+                    row.text.startsWith("❌") && row.text.contains(token) &&
+                        row.getGlobalVisibleRect(rect) && rect.height() >= row.lineHeight
+                }
+                geometry = "root=${root.height}, sheetTop=${panel.top}, " +
+                    "offset=${BottomSheetBehavior.from(panel).expandedOffset}, " +
+                    "output=${output.height}/${output.childCount}, prompt=${prompt.top}/${prompt.height}"
+                visibleRow && output.bottom == prompt.top &&
+                    ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            }
+        } catch (failure: IllegalStateException) {
+            AndroidUiCapture.save(scenario, "terminal-lab-compact.png")
+            throw AssertionError("Compact terminal: $geometry", failure)
+        }
+    }
+
     @Test fun terminalAccessoryKeysRoutePtyBytesAndStayReachableInLandscape() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
@@ -622,27 +649,7 @@ class TerminalAndImportAndroidTest {
                 expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             }
             showCommandIme(scenario)
-            var geometry = ""
-            try {
-                waitUi(scenario, "command output above the compact editor and keyboard") { activity ->
-                    val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
-                    val prompt = activity.findViewById<View>(R.id.consoleInputBar)
-                    val root = activity.findViewById<View>(R.id.rootCoordinator)
-                    val panel = activity.findViewById<View>(R.id.consolePanel)
-                    val visibleRow = (0 until output.childCount).any { index ->
-                        val row = output.getChildAt(index) as TextView
-                        val rect = Rect()
-                        row.getGlobalVisibleRect(rect) && rect.height() >= row.lineHeight
-                    }
-                    geometry = "root=${root.height}, sheetTop=${panel.top}, " +
-                        "offset=${BottomSheetBehavior.from(panel).expandedOffset}, " +
-                        "output=${output.height}/${output.childCount}, prompt=${prompt.top}/${prompt.height}"
-                    visibleRow && output.bottom == prompt.top
-                }
-            } catch (failure: IllegalStateException) {
-                AndroidUiCapture.save(scenario, "terminal-lab-compact.png")
-                throw AssertionError("Compact terminal: $geometry", failure)
-            }
+            checkInlineResponseWithIme(scenario, "горизонталь-lab")
             scenario.onActivity { activity ->
                 visible(activity.findViewById(R.id.etCommand))
                 visible(activity.findViewById(R.id.btnConsoleClose))
@@ -652,6 +659,12 @@ class TerminalAndImportAndroidTest {
                 visible(if (strip.isShown) strip else menu)
             }
             AndroidUiCapture.save(scenario, "terminal-lab-compact.png")
+            scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT }
+            waitUi(scenario, "portrait terminal restored") {
+                expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_PORTRAIT
+            }
+            showCommandIme(scenario)
+            checkInlineResponseWithIme(scenario, "портрет-lab")
         }
     }
 

@@ -963,7 +963,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun handleCommandInput() = viewModel.withTerminalCommand { handleTerminalCommandInput() }
+    private fun handleCommandInput() {
+        if (etCommand.text.isNullOrBlank()) return
+        viewModel.withTerminalCommand { handleTerminalCommandInput() }
+        // After an IME resize the old last row can be outside the viewport.
+        // Explicit submission follows its reply. An active text selection wins.
+        if (!hasSelectedConsoleText()) flushConsoleRender(pinToBottom = true)
+    }
 
     private fun handleTerminalCommandInput() {
         val raw = etCommand.text.toString().trim()
