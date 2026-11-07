@@ -568,13 +568,21 @@ class TerminalAndImportAndroidTest {
     }
 
     private fun checkInlineResponseWithIme(scenario: ActivityScenario<MainActivity>, token: String) {
-        scenario.onActivity { command(it, "fastboot $token") }
+        var compactWithIme = false
+        scenario.onActivity { activity ->
+            val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+            val root = activity.findViewById<View>(R.id.rootCoordinator)
+            val minRowPx = (48 * activity.resources.displayMetrics.density + 0.5f).toInt()
+            compactWithIme = output.height < minRowPx &&
+                ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            command(activity, "fastboot $token")
+        }
         waitUntil("terminal accepted $token") {
             vm().terminalSnapshot().any { it.startsWith("❌") && it.contains(token) }
         }
         var geometry = ""
         try {
-            waitUi(scenario, "visible $token result with the keyboard open") { activity ->
+            waitUi(scenario, "visible $token result after keyboard resize") { activity ->
                 val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
                 val prompt = activity.findViewById<View>(R.id.consoleInputBar)
                 val root = activity.findViewById<View>(R.id.rootCoordinator)
@@ -588,10 +596,16 @@ class TerminalAndImportAndroidTest {
                         row.getGlobalVisibleRect(rect) && rect.height() >= row.lineHeight && rect.bottom <= promptRect.top
                 }
                 val ime = ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime())
-                geometry = "root=${root.height}, sheetTop=${panel.top}, ime=$ime, rows=${visibleRows.map { it.text }}, " +
-                    "offset=${BottomSheetBehavior.from(panel).expandedOffset}, " +
+                val minRowPx = (48 * activity.resources.displayMetrics.density + 0.5f).toInt()
+                // No screen can show a 48 dp editor and a legible reply in a
+                // 100 px IME-shrunken root. On such devices the HOST submit
+                // must reveal the response by releasing the keyboard, rather
+                // than pretending an invisible 3 px RecyclerView is usable.
+                val validViewport = if (compactWithIme) output.height >= minRowPx else ime == true
+                geometry = "compactBefore=$compactWithIme, root=${root.height}, sheetTop=${panel.top}, ime=$ime, " +
+                    "rows=${visibleRows.map { it.text }}, offset=${BottomSheetBehavior.from(panel).expandedOffset}, " +
                     "output=${output.height}/${output.childCount}, prompt=${prompt.top}/${prompt.height}"
-                visibleRow && ime == true
+                visibleRow && validViewport
             }
         } catch (failure: IllegalStateException) {
             AndroidUiCapture.save(scenario, "terminal-lab-compact.png")
