@@ -202,14 +202,22 @@ class TerminalAndImportAndroidTest {
                 command(it, "adb shell id")
             }
             waitUntil { vm().terminalSnapshot().any { it.startsWith("ERROR:") } }
-            // Real service completion path, without sending anything to USB.
+            // REV52 rejects an ADB shell with no USB *before* creating a
+            // service operation, PREPARING checkpoint, or completion card.
+            // The old fixture waited for a service completion which cannot
+            // happen by design. Keep the UI regression and verify rejection.
             scenario.onActivity { vm().withTerminalCommand { vm().runAdbShell("id") } }
-            waitUntil { vm().operationProgress.value?.finished == true && vm().operationActive.value == false }
+            waitUntil("REV52 no-USB Shell admission") {
+                vm().terminalSnapshot().any { it.contains("Command was not sent.") }
+            }
             scenario.onActivity {
-                assertTrue("Command completion collapsed terminal", expanded(it))
+                assertTrue("Rejected command collapsed terminal", expanded(it))
                 assertFalse((field(it, "operationCenterDialog") as BottomSheetDialog).isShowing)
+                assertFalse("Rejected command left an operation active", vm().operationActive.value == true)
+                assertFalse("No-USB rejection created an operation result", vm().operationProgress.value?.finished == true)
+                assertFalse("No-USB rejection persisted PREPARING", File(context.filesDir, "execution-state/last-operation.properties").exists())
                 assertTrue(vm().terminalSnapshot().any { line -> line == "> adb shell id" })
-                assertTrue(vm().terminalSnapshot().any { line -> line.startsWith("❌") })
+                assertTrue(vm().terminalSnapshot().any { line -> line.contains("Command was not sent.") })
                 vm().log("Routine connection inventory fixture")
                 DeviceViewModel::class.java.getDeclaredMethod("notifyLogStorageFailure", Exception::class.java)
                     .apply { isAccessible = true }.invoke(vm(), java.io.IOException("fixture full disk"))

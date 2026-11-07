@@ -242,6 +242,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="logs_export_continue">Выбрать место для ZIP</string>
     <string name="logs_export_done">ZIP журналов сохранён. Файлов в архиве: %1$d. Приложи его к отчёту TestBook.</string>
     <string name="logs_export_failed">Не удалось экспортировать журналы: %1$s</string>
+    <string name="logs_export_incomplete">ZIP создан, но история диагностики неполная или менялась при экспорте. Файлов: %1$d. Предупреждений: %2$d. Проверь EXPORT-MANIFEST.txt; не считай архив полным отчётом.</string>
     <string name="logs_sheet_title">ЛОГИ И СЕССИИ</string>
     <string name="logs_current_summary">Текущая сессия</string>
     <string name="logs_current_compact">Компактный лог</string>

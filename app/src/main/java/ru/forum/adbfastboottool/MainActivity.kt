@@ -2261,14 +2261,16 @@ class MainActivity : AppCompatActivity() {
         viewModel.currentLogFile()?.parentFile
             ?: File(getExternalFilesDir(null) ?: filesDir, "NekoFlash/logs")
 
-    private fun diagnosticEvidenceDirectories(): List<File> = DiagnosticEvidenceArchive.directories(
-        listOfNotNull(
-            activeDiagnosticLogsDirectory().parentFile,
-            File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"),
-            File(filesDir, "NekoFlash"),
-            if (::workspacePath.isInitialized) workspacePath else null
-        )
-    )
+    private fun diagnosticEvidenceDirectories(): List<File> = (
+        DiagnosticEvidenceArchive.directories(
+            listOfNotNull(
+                activeDiagnosticLogsDirectory().parentFile,
+                File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"),
+                File(filesDir, "NekoFlash"),
+                if (::workspacePath.isInitialized) workspacePath else null
+            )
+        ) + File(filesDir, "diagnostics") // Preserve app-private crash evidence.
+    ).distinctBy { it.absolutePath }
 
     private fun requestDiagnosticArchive() {
         MaterialAlertDialogBuilder(this)
@@ -2290,14 +2292,31 @@ class MainActivity : AppCompatActivity() {
     private fun exportDiagnosticArchive(uri: Uri) {
         lifecycleScope.launch {
             try {
+                // Include the latest operation counters and an explicit export
+                // boundary in the evidence before enumerating diagnostic files.
+                viewModel.flushDiagnostics("manual-zip-export")
                 val exported = withContext(Dispatchers.IO) {
                     val directories = diagnosticEvidenceDirectories()
                     val output = contentResolver.openOutputStream(uri, "w")
                         ?: error("Android did not open the selected ZIP destination")
-                    DiagnosticEvidenceArchive.write(output, directories)
+                    DiagnosticEvidenceArchive.writeDetailed(output, directories)
                 }
-                viewModel.log("Diagnostic ZIP exported: $exported files")
-                Toast.makeText(this@MainActivity, getString(R.string.logs_export_done, exported), Toast.LENGTH_LONG).show()
+                if (exported.snapshotConsistent) {
+                    viewModel.log("Diagnostic ZIP snapshot exported: ${exported.fileCount} files, SHA-256 manifest included")
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.logs_export_done, exported.fileCount),
+                        Toast.LENGTH_LONG
+                    ).show()
+                } else {
+                    val detail = exported.warnings.joinToString("; ")
+                    viewModel.log(DiagnosticLogPolicy.Level.WARNING, "⚠️ Diagnostic ZIP has unverified evidence: $detail")
+                    Toast.makeText(
+                        this@MainActivity,
+                        getString(R.string.logs_export_incomplete, exported.fileCount, exported.warnings.size),
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
             } catch (error: Exception) {
                 viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: diagnostic ZIP export failed: ${error.message}")
                 Toast.makeText(this@MainActivity, getString(R.string.logs_export_failed, error.message ?: error.javaClass.simpleName), Toast.LENGTH_LONG).show()
