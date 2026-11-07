@@ -2253,14 +2253,16 @@ class MainActivity : AppCompatActivity() {
         viewModel.currentLogFile()?.parentFile
             ?: File(getExternalFilesDir(null) ?: filesDir, "NekoFlash/logs")
 
-    private fun diagnosticEvidenceDirectories(): List<File> = DiagnosticEvidenceArchive.directories(
-        listOfNotNull(
-            activeDiagnosticLogsDirectory().parentFile,
-            File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"),
-            File(filesDir, "NekoFlash"),
-            if (::workspacePath.isInitialized) workspacePath else null
-        )
-    )
+    private fun diagnosticEvidenceDirectories(): List<File> = (
+        DiagnosticEvidenceArchive.directories(
+            listOfNotNull(
+                activeDiagnosticLogsDirectory().parentFile,
+                File(getExternalFilesDir(null) ?: filesDir, "NekoFlash"),
+                File(filesDir, "NekoFlash"),
+                if (::workspacePath.isInitialized) workspacePath else null
+            )
+        ) + File(filesDir, "diagnostics") // Preserve app-private crash evidence.
+    ).distinctBy { it.absolutePath }
 
     private fun requestDiagnosticArchive() {
         MaterialAlertDialogBuilder(this)
