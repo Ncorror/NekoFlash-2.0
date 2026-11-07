@@ -2119,13 +2119,14 @@ class AdbProtocol(
                         acknowledgeRemoteClose(header.arg1, header.arg0)
                         continue
                     }
+                    val expectedRemote = stream.remoteId
                     stream.remoteId = header.arg0
                     closeAdbStream(stream)
                     // This may be a legitimately early remote close, or a
                     // misrouted/stale packet. Never infer command execution or
                     // automatically replay an arbitrary shell command.
                     onLog("❌ ADB stream closed during write local=${stream.localId}, " +
-                        "expectedRemote=${stream.remoteId}, receivedRemote=${header.arg0}, " +
+                        "expectedRemote=$expectedRemote, receivedRemote=${header.arg0}, " +
                         "payloadBytes=${payload.size}, bufferedResponseBytes=${pendingByteCount(stream)}, " +
                         "dispatcherGeneration=${dispatcherGeneration.get()}, transportConnected=$isConnected")
                     return false
