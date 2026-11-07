@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.isVisible
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.bottomsheet.BottomSheetBehavior
 
@@ -249,7 +250,7 @@ internal class ConsoleDockController(
         if (root.height <= 0) return
         // Use the expanded budget, not the transient sheet top during a slide.
         // A tall landscape IME may leave room for just a prompt and a few rows.
-        val statusHeight = if (status.visibility == View.VISIBLE) maxOf(status.measuredHeight, status.minimumHeight) else 0
+        val statusHeight = if (status.isVisible) maxOf(status.measuredHeight, status.minimumHeight) else 0
         val budget = root.height - behavior.expandedOffset - statusHeight
         val inlineActions = isExpanded && budget < dp(152)
         val stripVisible = isExpanded && budget >= dp(208)
@@ -270,8 +271,8 @@ internal class ConsoleDockController(
         keyStrip.visibility = if (stripVisible) View.VISIBLE else View.GONE
         keysMenu.visibility = if (isExpanded && !stripVisible) View.VISIBLE else View.GONE
 
-        val chrome = (if (header.visibility == View.VISIBLE) header.height else 0) +
-            (if (handle.visibility == View.VISIBLE) handle.height else 0)
+        val chrome = (if (header.isVisible) header.height else 0) +
+            (if (handle.isVisible) handle.height else 0)
 
         val targetHeight = ConsoleSheetPolicy.visibleBodyHeight(
             rootHeightPx = root.height,
