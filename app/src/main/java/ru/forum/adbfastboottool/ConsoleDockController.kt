@@ -96,13 +96,7 @@ internal class ConsoleDockController(
         }
         header.addOnLayoutChangeListener(updateHeight)
         status.addOnLayoutChangeListener(updateHeight)
-        root.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
-            val headerHeight = activity.findViewById<View>(R.id.usbHeader).height
-            if (headerHeight > 0 && behavior.expandedOffset != headerHeight) {
-                behavior.expandedOffset = headerHeight
-            }
-            scheduleVisibleBodyHeightUpdate()
-        }
+        root.addOnLayoutChangeListener(updateHeight)
 
         renderState(behavior.state)
         scheduleVisibleBodyHeightUpdate()
@@ -250,6 +244,16 @@ internal class ConsoleDockController(
         if (root.height <= 0) return
         // Use the expanded budget, not the transient sheet top during a slide.
         // A tall landscape IME may leave room for just a prompt and a few rows.
+        // In a very short window the USB header can leave room for the editor
+        // alone. Temporarily let the open terminal use that space for output.
+        val usbHeight = activity.findViewById<View>(R.id.usbHeader).height
+        if (usbHeight > 0) {
+            val desiredOffset = if (isExpanded && root.height - usbHeight < dp(128)) 0 else usbHeight
+            if (behavior.expandedOffset != desiredOffset) {
+                behavior.expandedOffset = desiredOffset
+                panel.requestLayout()
+            }
+        }
         val statusHeight = if (status.isVisible) maxOf(status.measuredHeight, status.minimumHeight) else 0
         val budget = root.height - behavior.expandedOffset - statusHeight
         val inlineActions = isExpanded && budget < dp(152)

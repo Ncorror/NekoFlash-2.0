@@ -48,7 +48,7 @@ class TerminalAndImportAndroidTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val resolver get() = context.contentResolver
-    private val uri = Uri.parse("content://ru.forum.adbfastboottool.dev.test.images/import")
+    private val uri = Uri.parse("content://${instrumentation.context.packageName}.images/import")
     private val workspace get() = File(context.filesDir, "rev26-import-fixture")
     private val prefs get() = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
     private var previousLanguage: String? = null
@@ -622,11 +622,26 @@ class TerminalAndImportAndroidTest {
                 expanded(it) && it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
             }
             showCommandIme(scenario)
-            waitUi(scenario, "command output above the compact editor and keyboard") { activity ->
-                val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
-                val rect = Rect()
-                output.getGlobalVisibleRect(rect) && rect.height() > 0 && output.childCount > 0 &&
-                    output.bottom == activity.findViewById<View>(R.id.consoleInputBar).top
+            var geometry = ""
+            try {
+                waitUi(scenario, "command output above the compact editor and keyboard") { activity ->
+                    val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
+                    val prompt = activity.findViewById<View>(R.id.consoleInputBar)
+                    val root = activity.findViewById<View>(R.id.rootCoordinator)
+                    val panel = activity.findViewById<View>(R.id.consolePanel)
+                    val visibleRow = (0 until output.childCount).any { index ->
+                        val row = output.getChildAt(index) as TextView
+                        val rect = Rect()
+                        row.getGlobalVisibleRect(rect) && rect.height() >= row.lineHeight
+                    }
+                    geometry = "root=${root.height}, sheetTop=${panel.top}, " +
+                        "offset=${BottomSheetBehavior.from(panel).expandedOffset}, " +
+                        "output=${output.height}/${output.childCount}, prompt=${prompt.top}/${prompt.height}"
+                    visibleRow && output.bottom == prompt.top
+                }
+            } catch (failure: IllegalStateException) {
+                AndroidUiCapture.save(scenario, "terminal-lab-compact.png")
+                throw AssertionError("Compact terminal: $geometry", failure)
             }
             scenario.onActivity { activity ->
                 visible(activity.findViewById(R.id.etCommand))

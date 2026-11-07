@@ -3,6 +3,8 @@ plugins {
     id('org.jetbrains.kotlin.android')
 }
 
+def terminalLab = providers.gradleProperty("terminalLab").orNull?.toBoolean() ?: false
+
 def releaseKeystorePath = System.getenv("NEKOFLASH_RELEASE_STORE_FILE") ?: System.getenv("NEKOFLASH_KEYSTORE_PATH")
 def releaseStorePassword = System.getenv("NEKOFLASH_RELEASE_STORE_PASSWORD") ?: System.getenv("NEKOFLASH_STORE_PASSWORD")
 def releaseKeyAlias = System.getenv("NEKOFLASH_RELEASE_KEY_ALIAS") ?: System.getenv("NEKOFLASH_KEY_ALIAS")
@@ -20,6 +22,10 @@ android {
     compileSdk = 36
     ndkVersion = '27.2.12479018'
 
+    if (terminalLab) {
+        sourceSets.debug.manifest.srcFile("src/terminalLab/AndroidManifest.xml")
+        sourceSets.debug.res.srcDir("src/terminalLab/res")
+    }
     sourceSets.main.jniLibs.srcDir(rootProject.file('build/filesystem-tools/jniLibs'))
     sourceSets.main.assets.srcDir(rootProject.file('build/filesystem-tools/assets'))
     packaging {
@@ -98,6 +104,10 @@ android {
             // Never require uninstalling the user's proven release version for UI smoke tests.
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
+            if (terminalLab) {
+                applicationIdSuffix = ".dev.terminal"
+                versionNameSuffix = "-terminal-lab"
+            }
             minifyEnabled = false
         }
     }

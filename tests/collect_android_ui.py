@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Collect every required installed-app UI screenshot; a missing capture fails CI."""
 import argparse
+import os
 from pathlib import Path
 import subprocess
 
@@ -21,7 +22,7 @@ names += ['terminal-lab-inline', 'terminal-lab-compact']
 missing = []
 for name in names:
     result = subprocess.run([
-        'adb', 'exec-out', 'run-as', 'ru.forum.adbfastboottool.dev',
+        'adb', 'exec-out', 'run-as', os.environ.get('NEKOFLASH_TEST_APP_ID', 'ru.forum.adbfastboottool.dev'),
         'cat', f'files/ui-test-output/{name}.png'
     ], timeout=30, capture_output=True)
     data = result.stdout

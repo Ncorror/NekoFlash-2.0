@@ -2,6 +2,7 @@
 """Pull private test images from an emulator and independently decode/fsck them."""
 from pathlib import Path
 import argparse
+import os
 import hashlib
 import json
 import re
@@ -60,7 +61,7 @@ def expand(source, target, overlay=False):
 def pull(name):
     target = args.output / name
     with target.open('wb') as stream:
-        subprocess.run(['adb', 'exec-out', 'run-as', 'ru.forum.adbfastboottool.dev', 'cat',
+        subprocess.run(['adb', 'exec-out', 'run-as', os.environ.get('NEKOFLASH_TEST_APP_ID', 'ru.forum.adbfastboottool.dev'), 'cat',
                         f'files/mkfs-test-output/{name}'], stdout=stream, check=True)
     return target
 

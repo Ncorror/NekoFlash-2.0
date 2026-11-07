@@ -23,7 +23,7 @@ class FirmwareSourcesAndroidTest {
     private val instrumentation get() = InstrumentationRegistry.getInstrumentation()
     private val context get() = instrumentation.targetContext
     private val resolver get() = context.contentResolver
-    private val uri = Uri.parse("content://ru.forum.adbfastboottool.dev.test.images/image")
+    private val uri = Uri.parse("content://${InstrumentationRegistry.getInstrumentation().context.packageName}.images/image")
     private fun source() = FirmwareSource.SafDocument(uri, "provider image.img", 1)
     @Before fun resetProvider() { resolver.call(uri, "reset", null, null) }
 
