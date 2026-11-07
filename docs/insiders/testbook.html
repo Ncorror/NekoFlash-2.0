@@ -440,6 +440,13 @@ h3 { font-size: 15px; margin: 0 0 8px; }
   font-weight: 800;
 }
 .copy:hover { background: var(--orange); color: #050505; }
+.manual-copy-overlay { position:fixed; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center; background:rgba(0,0,0,.85); padding:14px; }
+.manual-copy-overlay[hidden] { display:none; }
+.manual-copy-card { background:#15171e; border:1px solid #5e6270; border-radius:16px; padding:18px; width:min(100%,680px); max-height:90vh; overflow:auto; }
+.manual-copy-card textarea { display:block; width:100%; min-height:190px; max-height:52vh; resize:vertical; margin:12px 0; font:13px/1.5 monospace; background:#05080d; color:#f5f5f5; border:1px solid #6f7480; border-radius:8px; padding:12px; user-select:text; }
+.manual-copy-card .actions { justify-content:flex-start; }
+.file-export-note { margin-top:10px; padding:10px; border:1px solid #80522d; border-radius:8px; color:#ffcb9a; font-size:13px; line-height:1.5; }
+.file-export-note[hidden] { display:none; }
 
 .expected {
   background: rgba(255, 107, 0, 0.07);
@@ -667,12 +674,19 @@ h3 { font-size: 15px; margin: 0 0 8px; }
     <div class="actions">
       <button class="btn primary" id="makeZip" type="button">📦 Подготовить ZIP-отчёт</button>
       <a id="readyZipLink" class="btn primary" href="#" style="display:none">⬇ Скачать ZIP-отчёт</a>
+      <button class="btn" id="shareZip" type="button" style="display:none">Поделиться ZIP</button>
+      <button class="btn" id="saveZipFile" type="button" style="display:none">Сохранить ZIP через проводник</button>
       <button class="btn" id="copyReportBtn" type="button">📋 Скопировать report.txt</button>
-      <button class="btn" id="exportJson" type="button">Сохранить прогресс JSON</button>
+      <button class="btn" id="exportJson" type="button">Подготовить прогресс JSON</button>
+      <a id="readyJsonLink" class="btn" href="#" style="display:none">Скачать JSON</a>
+      <button class="btn" id="shareJson" type="button" style="display:none">Поделиться JSON</button>
+      <button class="btn" id="saveJsonFile" type="button" style="display:none">Сохранить JSON через проводник</button>
+      <button class="btn ghost" id="manualJson" type="button" style="display:none">Открыть JSON для копирования</button>
       <button class="btn ghost" id="importJson" type="button">Загрузить прогресс</button>
       <input type="file" id="importFile" accept=".json,application/json" hidden>
     </div>
     <p class="small-help" id="reportHint"></p>
+    <p class="file-export-note" id="restrictedBrowserHint" hidden role="status"></p>
     <div class="linkbar">
       <a id="apkLink" target="_blank" rel="noopener noreferrer">APK · GitHub Actions artifacts</a>
     </div>
@@ -681,6 +695,17 @@ h3 { font-size: 15px; margin: 0 0 8px; }
   <footer class="footer" id="footer"></footer>
 </main>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="manualCopyDialog" class="manual-copy-overlay" role="dialog" aria-modal="true" aria-labelledby="manualCopyTitle" hidden>
+  <div class="manual-copy-card">
+    <h2 id="manualCopyTitle">Текст для копирования</h2>
+    <p id="manualCopyHelp" class="small-help">Нажми «Выделить всё», затем скопируй текст через меню Android.</p>
+    <textarea id="manualCopyText" readonly aria-label="Текст команды или отчёта" spellcheck="false"></textarea>
+    <div class="actions">
+      <button class="btn primary" type="button" id="selectManualText">Выделить всё</button>
+      <button class="btn" type="button" id="closeManualCopy">Закрыть</button>
+    </div>
+  </div>
+</div>
 
 <script>
 'use strict';
@@ -692,7 +717,7 @@ const T = {
     showQuick: 'Вернуться к 6 заданиям',
     quickHint: 'Основной раунд: только 6 заданий. Отмечай то, что реально проверила или проверил.',
     advancedHint: 'Расширенный раунд: сохранены все 43 проверки, включая лабораторные.',
-    zipReady: 'ZIP готов. Нажми кнопку скачивания.',
+    zipReady: 'ZIP собран в памяти браузера. Нажми «Скачать» или «Поделиться» и проверь, что файл действительно сохранился.',
     zipDownload: '⬇ Скачать ZIP-отчёт',
     rounds: {today:'Сегодня — диагностика без записи разделов',extended:'Расширенный тест на запасном TARGET',lab:'Лаборатория — отдельное разрешение',all:'Все проверки'},
     sub: 'Полевые тесты DEV REV49 · HOST → TARGET · исходные логи в ZIP · офлайн.',
@@ -736,7 +761,21 @@ const T = {
     expected: 'Что должно получиться',
     copy: 'Копировать',
     copied: 'Скопировано в буфер обмена',
-    copymanual: 'Не удалось скопировать автоматически. Выдели текст вручную.',
+    copymanual: 'Chrome запретил копирование: текст открыт для ручного выделения.',
+    manualTitle: 'Текст для копирования',
+    manualHelp: 'Нажми «Выделить всё» и используй системное меню Android «Копировать». Можно удерживать палец на тексте. Этот способ не требует разрешения браузера.',
+    selectAll: 'Выделить всё',
+    closeManual: 'Закрыть',
+    shareZip: 'Поделиться ZIP',
+    shareJson: 'Поделиться JSON',
+    saveZipFile: 'Сохранить ZIP через проводник',
+    saveJsonFile: 'Сохранить JSON через проводник',
+    jsonDownload: '⬇ Скачать JSON',
+    manualJson: 'Открыть JSON для копирования',
+    preparedJson: 'JSON подготовлен, но ещё не сохранён. Выбери способ экспорта.',
+    restrictedBrowser: 'Chrome открыл локальный HTML через content://. В этом режиме копирование и скачивание файлов могут блокироваться. Используй кнопки «Поделиться» или «Сохранить через проводник», если они доступны. Нажатие «Скачать» не гарантирует сохранение: проверь загрузки Chrome.',
+    shareError: 'Не удалось передать файл через Android: ',
+    saveError: 'Не удалось сохранить файл: ',
     report: 'Собрать ZIP-отчёт',
     reportIntro: 'Отметки и комментарии попадут в ZIP. В новой APK открой «Логи / Отчёты → Экспорт всех логов в ZIP» и прикрепи архив ниже. Папку вручную создавать не требуется. Скриншоты тоже можно добавить.',
     suggestions: 'Общие замечания и предложения',
@@ -771,9 +810,9 @@ const T = {
     footer: 'Офлайн-тестбук REV49 · без аналитики, сервера и автоматической отправки · профессиональные логи без потерь · Black & Orange 2.0.',
     filesSelected: n => `Ручных вложений: ${n}. После перезагрузки потребуется выбрать их заново.`,
     zipCreating: 'Собираю ZIP-отчёт…',
-    zipDone: 'ZIP создан. Проверь папку загрузок.',
+    zipDone: 'ZIP подготовлен; проверь результат скачивания в Chrome.',
     zipErr: 'Ошибка при создании ZIP: ',
-    saved: 'JSON-прогресс сохранён',
+    saved: 'JSON подготовлен, но сохранение нужно подтвердить',
     loaded: 'Прогресс импортирован',
     badImport: 'Не удалось импортировать: неверный файл',
     storageWarn: '⚠️ Этот браузер не сохраняет прогресс между открытиями. Регулярно выгружай JSON.',
@@ -786,7 +825,7 @@ const T = {
     showQuick: 'Back to 6 tasks',
     quickHint: 'Quick round: only 6 tasks. Mark only what you have actually tested.',
     advancedHint: 'Expert round: all 43 scenarios remain available, including lab checks.',
-    zipReady: 'ZIP is ready. Tap the download button.',
+    zipReady: 'ZIP was prepared in browser memory. Tap Download or Share and confirm the file was actually saved.',
     zipDownload: '⬇ Download report ZIP',
     rounds: {today:'Today — read-only / disposable data',extended:'Extended tests on spare TARGET',lab:'Lab — separate authorization required',all:'All checks'},
     sub: 'REV49 DEV hardware checks, original binary logs and offline ZIP reporting.',
@@ -830,7 +869,21 @@ const T = {
     expected: 'Expected result',
     copy: 'Copy',
     copied: 'Copied to clipboard',
-    copymanual: 'Automatic copy failed. Select the text manually.',
+    copymanual: 'Chrome blocked clipboard access; text is open for manual selection.',
+    manualTitle: 'Text ready to copy',
+    manualHelp: 'Tap Select all and use Android’s Copy selection menu, or long-press the text. This does not require browser clipboard permission.',
+    selectAll: 'Select all',
+    closeManual: 'Close',
+    shareZip: 'Share ZIP',
+    shareJson: 'Share JSON',
+    saveZipFile: 'Save ZIP with file picker',
+    saveJsonFile: 'Save JSON with file picker',
+    jsonDownload: '⬇ Download JSON',
+    manualJson: 'Open JSON for manual copy',
+    preparedJson: 'JSON is ready but not yet saved. Choose an export option.',
+    restrictedBrowser: 'Chrome opened this HTML through content://. Clipboard and file downloads may be blocked here. Use Share or Save with file picker if available. Download is not confirmation: check Chrome downloads.',
+    shareError: 'Android could not share this file: ',
+    saveError: 'Could not save this file: ',
     report: 'Create ZIP report',
     reportIntro: 'Checkmarks and notes are saved to ZIP. In the updated APK open Logs / Reports → Export raw diagnostics ZIP, then attach it below. No need to create a folder manually; screenshots can also be attached.',
     suggestions: 'General feedback and improvements',
@@ -865,9 +918,9 @@ const T = {
     footer: 'Offline REV49 checklist · no analytics, backend or automatic upload · full professional diagnostics · Black & Orange 2.0.',
     filesSelected: n => `${n} manual file(s). Reselect them after reopening the page.`,
     zipCreating: 'Creating ZIP report…',
-    zipDone: 'ZIP created. Check your Downloads folder.',
+    zipDone: 'ZIP is ready; check whether Chrome saved it.',
     zipErr: 'ZIP generation failed: ',
-    saved: 'JSON progress exported',
+    saved: 'JSON is ready; verify that it was saved',
     loaded: 'Progress imported',
     badImport: 'Could not import this file',
     storageWarn: '⚠️ This browser does not persist progress. Export JSON backups regularly.',
@@ -1028,6 +1081,11 @@ const visibleTests = () => state.quickMode
   ? TESTS.filter(o => QUICK_IDS.includes(o.id))
   : TESTS.filter(o => state.round === 'all' || (o.stage || 'today') === state.round);
 let readyZipUrl = null;
+let readyZipBlob = null;
+let readyZipName = '';
+let readyJsonUrl = null;
+let readyJsonBlob = null;
+let readyJsonName = '';
 const CATS = ['all', 'basic', 'adb', 'fastboot', 'ui'];
 let storageWorks = true;
 const openTests = new Set();
@@ -1340,6 +1398,11 @@ function renderStatic() {
     offlineText: 'offline',
     makeZip: 'zip',
     copyReportBtn: 'copyReport',
+    shareZip: 'shareZip',
+    shareJson: 'shareJson',
+    saveZipFile: 'saveZipFile',
+    saveJsonFile: 'saveJsonFile',
+    manualJson: 'manualJson',
     exportJson: 'save',
     importJson: 'load'
   };
@@ -1359,6 +1422,14 @@ function renderStatic() {
   [...$('roundSelect').options].forEach(opt => {opt.textContent = x.rounds[opt.value];});
   $('suggestions').placeholder = x.suggestionsPlaceholder;
   $('localHint').textContent = storageWorks ? x.localHint : x.storageWarn;
+  const restricted = location.protocol === 'content:';
+  $('restrictedBrowserHint').hidden = !restricted;
+  if (restricted) $('restrictedBrowserHint').textContent = x.restrictedBrowser;
+  $('manualCopyTitle').textContent = x.manualTitle;
+  $('manualCopyHelp').textContent = x.manualHelp;
+  $('selectManualText').textContent = x.selectAll;
+  $('closeManualCopy').textContent = x.closeManual;
+  if (readyJsonBlob) $('readyJsonLink').textContent = x.jsonDownload;
   $('ru').classList.toggle('active', state.lang === 'ru');
   $('en').classList.toggle('active', state.lang === 'en');
 
@@ -1481,37 +1552,78 @@ function updateCard(card) {
   updateProgress();
 }
 
+function openManualCopy(value) {
+  $('manualCopyText').value = value;
+  $('manualCopyDialog').hidden = false;
+  $('manualCopyText').focus();
+  $('manualCopyText').select();
+  toast(t().copymanual);
+}
+
 async function copyText(value, customMsg) {
-  try {
-    if (navigator.clipboard && window.isSecureContext) {
-      await navigator.clipboard.writeText(value);
-      toast(customMsg || t().copied);
-      return;
-    }
-    const area = document.createElement('textarea');
-    area.value = value;
-    area.style.position = 'fixed';
-    area.style.left = '-10000px';
-    document.body.appendChild(area);
-    area.select();
-    const ok = document.execCommand('copy');
-    area.remove();
-    toast(ok ? (customMsg || t().copied) : t().copymanual);
-  } catch (err) {
-    toast(t().copymanual);
+  // Legacy copy is synchronous: it must run inside the original tap gesture.
+  // A failed async clipboard Promise must not bypass this fallback on content://.
+  const area = document.createElement('textarea');
+  area.value = value;
+  area.setAttribute('readonly', '');
+  area.style.cssText = 'position:fixed;top:0;left:0;width:1px;height:1px;opacity:0';
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  let copied = false;
+  try { copied = !!document.execCommand('copy'); } catch (_) { /* blocked */ }
+  area.remove();
+  if (!copied && window.isSecureContext && navigator.clipboard?.writeText) {
+    try { await navigator.clipboard.writeText(value); copied = true; } catch (_) { /* blocked */ }
   }
+  if (copied) toast(customMsg || t().copied);
+  else openManualCopy(value);
 }
 
 function downloadBlob(blob, filename) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 20000);
+  // Prepare an explicit, persistent user-click link. Do not auto-click it,
+  // report success or revoke its blob URL before the user can retry.
+  if (readyJsonUrl) URL.revokeObjectURL(readyJsonUrl);
+  readyJsonBlob = blob;
+  readyJsonName = filename;
+  readyJsonUrl = URL.createObjectURL(blob);
+  const link = $('readyJsonLink');
+  link.href = readyJsonUrl;
+  link.download = filename;
+  link.textContent = t().jsonDownload;
+  link.style.display = 'inline-flex';
+  $('manualJson').style.display = 'inline-flex';
+  $('shareJson').style.display = canShareFile(blob, filename) ? 'inline-flex' : 'none';
+  $('saveJsonFile').style.display = typeof window.showSaveFilePicker === 'function' ? 'inline-flex' : 'none';
+}
+function canShareFile(blob, filename) {
+  if (typeof File === 'undefined' || !navigator.share || !navigator.canShare) return false;
+  try {
+    return navigator.canShare({files: [new File([blob], filename, {type: blob.type || 'application/octet-stream'})]});
+  } catch (_) { return false; }
+}
+async function shareFile(blob, filename) {
+  if (!blob || !canShareFile(blob, filename)) return;
+  try {
+    await navigator.share({files: [new File([blob], filename, {type: blob.type || 'application/octet-stream'})], title: filename});
+  } catch (err) {
+    if (err?.name !== 'AbortError') toast(t().shareError + (err?.message || String(err)));
+  }
+}
+async function saveFileWithPicker(blob, filename) {
+  if (!blob || typeof window.showSaveFilePicker !== 'function') return;
+  try {
+    // Picker must open in the direct click handler; then write the finished blob.
+    const ext = filename.endsWith('.zip') ? '.zip' : '.json';
+    const mime = ext === '.zip' ? 'application/zip' : 'application/json';
+    const handle = await window.showSaveFilePicker({suggestedName: filename,
+      types: [{description: ext === '.zip' ? 'ZIP archive' : 'JSON backup', accept: {[mime]: [ext]}}]});
+    const writable = await handle.createWritable();
+    try { await writable.write(blob); await writable.close(); }
+    catch (err) { await writable.abort().catch(() => {}); throw err; }
+  } catch (err) {
+    if (err?.name !== 'AbortError') toast(t().saveError + (err?.message || String(err)));
+  }
 }
 
 function snapshot() {
@@ -1745,12 +1857,16 @@ async function generateZip() {
     // Deliberate user tap: Android Chrome can block delayed programmatic downloads
     // after asynchronous ZIP generation has consumed transient user activation.
     if (readyZipUrl) URL.revokeObjectURL(readyZipUrl);
+    readyZipBlob = zip;
     readyZipUrl = URL.createObjectURL(zip);
     const link = $('readyZipLink');
     link.href = readyZipUrl;
-    link.download = `NekoFlash_Insiders_Report_${device}_${new Date().toISOString().slice(0, 10)}.zip`;
+    readyZipName = `NekoFlash_Insiders_Report_${device}_${new Date().toISOString().slice(0, 10)}.zip`;
+    link.download = readyZipName;
     link.textContent = t().zipDownload;
     link.style.display = 'inline-flex';
+    $('shareZip').style.display = canShareFile(zip, readyZipName) ? 'inline-flex' : 'none';
+    $('saveZipFile').style.display = typeof window.showSaveFilePicker === 'function' ? 'inline-flex' : 'none';
     toast(t().zipReady);
   } catch (err) {
     toast(t().zipErr + (err?.message || String(err)));
@@ -1909,7 +2025,10 @@ $('fileList').addEventListener('click', ev => {
 
 $('makeZip').addEventListener('click', () => {
   if (readyZipUrl) { URL.revokeObjectURL(readyZipUrl); readyZipUrl = null; }
+  readyZipBlob = null; readyZipName = '';
   $('readyZipLink').style.display = 'none';
+  $('shareZip').style.display = 'none';
+  $('saveZipFile').style.display = 'none';
   generateZip();
 });
 
@@ -1919,9 +2038,18 @@ $('copyReportBtn').addEventListener('click', () => {
 });
 
 $('exportJson').addEventListener('click', () => {
-  downloadBlob(new Blob([JSON.stringify(snapshot(), null, 2)], { type: 'application/json' }), 'NekoFlash_REV49_progress.json');
-  toast(t().saved);
+  const json = JSON.stringify(snapshot(), null, 2);
+  downloadBlob(new Blob([json], { type: 'application/json' }), 'NekoFlash_REV49_progress.json');
+  toast(t().preparedJson);
 });
+$('shareZip').addEventListener('click', () => { void shareFile(readyZipBlob, readyZipName); });
+$('shareJson').addEventListener('click', () => { void shareFile(readyJsonBlob, readyJsonName); });
+$('saveZipFile').addEventListener('click', () => { void saveFileWithPicker(readyZipBlob, readyZipName); });
+$('saveJsonFile').addEventListener('click', () => { void saveFileWithPicker(readyJsonBlob, readyJsonName); });
+$('manualJson').addEventListener('click', () => { if (readyJsonBlob) openManualCopy(JSON.stringify(snapshot(), null, 2)); });
+$('selectManualText').addEventListener('click', () => { $('manualCopyText').focus(); $('manualCopyText').select(); });
+$('closeManualCopy').addEventListener('click', () => { $('manualCopyDialog').hidden = true; });
+$('manualCopyDialog').addEventListener('click', ev => { if (ev.target === $('manualCopyDialog')) $('manualCopyDialog').hidden = true; });
 
 $('importJson').addEventListener('click', () => $('importFile').click());
 
