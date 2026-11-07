@@ -24,6 +24,24 @@ data = adb_file.read_bytes()
 def source_git_sha(data):
     return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
 rev52_adb_hash = '5a4f9c9640e13b404ab1706a0b07dcfc40ee30ea'
+# REV54: audit ONLY the reviewed host-to-adbd USB ZLP framing change.
+# Before any older checksum/invariant checks, reverse the exact diff into
+# the byte-for-byte accepted REV53 ADB source. Never waive USB review.
+rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
+if source_git_sha(data) == rev54_adb_hash:
+    rev54_reviewed_hunks = [
+        ("        if (!bulkWriteFully(header)) throw Exception(\"ADB header transfer error\")\n        if (!finishAdbUsbOutTransfer(header.size)) {\n            throw Exception(\"ADB header USB ZLP transfer error (bytes=${header.size})\")\n        }\n", "        if (!bulkWriteFully(header)) throw Exception(\"ADB header transfer error\")\n"),
+        ("            }\n            if (!finishAdbUsbOutTransfer(data.size)) {\n                throw Exception(\"ADB payload USB ZLP transfer error (bytes=${data.size})\")\n            }\n        }", "            }\n        }"),
+        ("\n    /**\n     * AOSP adb requires a USB zero-length packet at the end of any host OUT\n     * header/payload whose byte length is an exact multiple of wMaxPacketSize.\n     * Call under adbWriteLock, *after* writing all data bytes and *before*\n     * waiting for the stream's A_OKAY. An empty transfer is not an ADB byte.\n     * A ZLP failure is a real transport error, never silently retried.\n     */\n    private fun finishAdbUsbOutTransfer(transferBytes: Int): Boolean {\n        val conn = connection ?: return false\n        val ep = endpointOut ?: return false\n        return AdbUsbBulkOutPolicy.finishTransfer(transferBytes, ep.maxPacketSize) {\n            conn.bulkTransfer(ep, EMPTY_PAYLOAD, 0, 0, 5_000)\n        }\n    }\n\n    private fun bulkWriteFully(data: ByteArray, offset: Int = 0, length: Int = data.size, timeout: Int = 5000): Boolean {", "\n    private fun bulkWriteFully(data: ByteArray, offset: Int = 0, length: Int = data.size, timeout: Int = 5000): Boolean {"),
+    ]
+    for revised, previous in rev54_reviewed_hunks:
+        assert data.count(revised.encode('utf-8')) == 1, 'Unreviewed REV54 USB change'
+        data = data.replace(revised.encode('utf-8'), previous.encode('utf-8'), 1)
+    assert source_git_sha(data) == '9479737a5cc25bbfc08a0880148f2ce8fddee09c', 'REV54 modified unrelated ADB code'
+    policy = (base/'AdbUsbBulkOutPolicy.kt').read_text()
+    assert 'transferBytes % maxPacketSize == 0' in policy
+    assert 'sendZlp() == 0' in policy
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbUsbBulkOutPolicyTest.kt').is_file()
 # REV53: normalize only the seven audited changes to the one-shot
 # shell-v2 CLOSE_STDIN race, then run every existing strict ADB guard.
 # Do not permit arbitrary transport edits or silently skip source integrity.
