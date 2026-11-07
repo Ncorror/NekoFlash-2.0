@@ -89,22 +89,24 @@ object DiagnosticEvidenceArchive {
                             // rename, so a newer summary may replace the path
                             // while the old *complete* revision is being copied.
                             descriptorSizeBefore = fileInput.channel.size()
-                            fileInput.buffered().use { input ->
-                                while (true) {
-                                    val n = input.read(buffer)
-                                    if (n < 0) break
-                                    if (n == 0) continue
-                                    if (leadingBytes < leading.size) {
-                                        val prefixSize = minOf(leading.size - leadingBytes, n)
-                                        buffer.copyInto(leading, leadingBytes, 0, prefixSize)
-                                        leadingBytes += prefixSize
-                                    }
-                                    zip.write(buffer, 0, n)
-                                    digest.update(buffer, 0, n)
-                                    copiedBytes += n
+                            // The outer FileInputStream owns the descriptor.
+                            // Do not use buffered().use here: it would close
+                            // fileInput before channel.size() is checked.
+                            val input = fileInput.buffered()
+                            while (true) {
+                                val n = input.read(buffer)
+                                if (n < 0) break
+                                if (n == 0) continue
+                                if (leadingBytes < leading.size) {
+                                    val prefixSize = minOf(leading.size - leadingBytes, n)
+                                    buffer.copyInto(leading, leadingBytes, 0, prefixSize)
+                                    leadingBytes += prefixSize
                                 }
-                                descriptorSizeAfter = fileInput.channel.size()
+                                zip.write(buffer, 0, n)
+                                digest.update(buffer, 0, n)
+                                copiedBytes += n
                             }
+                            descriptorSizeAfter = fileInput.channel.size()
                         }
                     } finally {
                         zip.closeEntry()
