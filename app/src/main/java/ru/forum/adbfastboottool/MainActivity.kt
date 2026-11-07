@@ -47,11 +47,9 @@ import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
-import androidx.core.view.doOnPreDraw
 import androidx.core.view.WindowCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
-import androidx.core.widget.NestedScrollView
 import androidx.core.os.LocaleListCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -92,7 +90,9 @@ class MainActivity : AppCompatActivity() {
     private var tvOtgStatus: TextView? = null
     private lateinit var cardOperationCenter: MaterialCardView
     private var operationCenterDialog: BottomSheetDialog? = null
-    private var operationCenterRestoredScrollY = 0
+    private var operationCenterRestoredPosition = 0
+    private var pausedOperationCenterPosition: Int? = null
+    private lateinit var operationCenterScroll: OperationCenterScrollView
     private var autoShowGuiOperation: Boolean = false
     private lateinit var operationCenterDetails: View
     private lateinit var tvOperationCenterStatus: TextView
@@ -289,6 +289,7 @@ class MainActivity : AppCompatActivity() {
         updateOtgStatus()
         cardOperationCenter = findViewById(R.id.cardOperationCenter)
         operationCenterDetails = findViewById(R.id.operationCenterDetails)
+        operationCenterScroll = findViewById(R.id.operationCenterScroll)
         tvOperationCenterStatus = findViewById(R.id.tvOperationCenterStatus)
         tvOperationCenterLastEvent = findViewById(R.id.tvOperationCenterLastEvent)
         operationCenterProgressBar = findViewById(R.id.operationCenterProgressBar)
@@ -330,7 +331,7 @@ class MainActivity : AppCompatActivity() {
         if (!hideRestoredTerminalResultOnColdLaunch) {
             operationStripDeadlineSignature = savedInstanceState?.getString(STATE_OPERATION_STRIP_DEADLINE_SIGNATURE)
             operationStripDeadlineMs = savedInstanceState?.getLong(STATE_OPERATION_STRIP_DEADLINE_MS) ?: 0L
-            operationCenterRestoredScrollY = savedInstanceState?.getInt(STATE_OPERATION_CENTER_SCROLL) ?: 0
+            operationCenterRestoredPosition = savedInstanceState?.getInt(STATE_OPERATION_CENTER_SCROLL) ?: 0
             operationStepsVisibleForCurrentRun = savedInstanceState?.getBoolean(STATE_OPERATION_STEPS_VISIBLE) ?: false
         }
         enableOverlayProtection()
@@ -518,12 +519,10 @@ class MainActivity : AppCompatActivity() {
         outState.putString(STATE_OPERATION_STRIP_DISMISSED_SIGNATURE, operationStripDismissedSignature)
         outState.putString(STATE_OPERATION_STRIP_DEADLINE_SIGNATURE, operationStripDeadlineSignature)
         outState.putLong(STATE_OPERATION_STRIP_DEADLINE_MS, operationStripDeadlineMs)
-        outState.putBoolean(STATE_OPERATION_CENTER_OPEN, operationCenterDialog?.isShowing == true)
+        val centerPosition = pausedOperationCenterPosition ?: visibleOperationCenterPosition()
+        outState.putBoolean(STATE_OPERATION_CENTER_OPEN, centerPosition != null)
         outState.putBoolean(STATE_OPERATION_STEPS_VISIBLE, operationStepsVisibleForCurrentRun)
-        if (operationCenterDialog?.isShowing == true) {
-            outState.putInt(STATE_OPERATION_CENTER_SCROLL,
-                cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll).scrollY)
-        }
+        if (centerPosition != null) outState.putInt(STATE_OPERATION_CENTER_SCROLL, centerPosition)
         if (::consoleDockController.isInitialized) outState.putBoolean("rev26.terminal.open", consoleDockController.isExpanded)
         outState.putStringArrayList("rev26.terminal.history", ArrayList(commandHistory))
         outState.putInt("rev26.terminal.historyIndex", historyIndex)
@@ -2099,8 +2098,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun visibleOperationCenterPosition(): Int? =
+        if (operationCenterDialog?.isShowing == true) operationCenterScroll.readingPosition() else null
+
+    override fun onPause() {
+        pausedOperationCenterPosition = visibleOperationCenterPosition()
+        super.onPause()
+    }
+
     override fun onResume() {
         super.onResume()
+        pausedOperationCenterPosition = null
         if (!OnboardingGate.canEnterMain()) {
             redirectToWelcome(intent)
             return
@@ -4008,11 +4016,8 @@ class MainActivity : AppCompatActivity() {
             behavior.isDraggable = false
             behavior.state = BottomSheetBehavior.STATE_EXPANDED
             setOnShowListener {
-                val scroll = cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll)
-                val restoredY = operationCenterRestoredScrollY
-                operationCenterRestoredScrollY = 0
-                // Scroll bounds are valid only after the new window is laid out.
-                scroll.doOnPreDraw { scroll.scrollTo(0, restoredY) }
+                operationCenterScroll.restoreReadingPosition(operationCenterRestoredPosition)
+                operationCenterRestoredPosition = 0
             }
         }
     }
@@ -4026,6 +4031,7 @@ class MainActivity : AppCompatActivity() {
     private fun requestOperationCancelFromUi() {
         if (viewModel.operationActive.value != true || operationCancelRequested) return
         operationCancelRequested = true
+        operationCenterScroll.restoreReadingPosition(0)
         updateOperationCenter(viewModel.logSnapshot())
         renderOperationProgressUi(viewModel.operationProgress.value)
         viewModel.cancelActiveOperation()

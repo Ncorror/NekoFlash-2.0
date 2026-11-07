@@ -73,7 +73,18 @@ class OperationCenterAndroidTest {
             var ready = false
             scenario.onActivity { ready = condition(it) }
             if (ready) return
-            check(System.nanoTime() < deadline) { "Operation Center did not reach the expected UI state" }
+            if (System.nanoTime() >= deadline) {
+                var details = ""
+                scenario.onActivity { activity ->
+                    val sheet = dialog(activity)
+                    val scroll = sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!
+                    val report = sheet.findViewById<View>(R.id.btnReportsMenu)!!
+                    details = "sheet=${sheet.isShowing}, viewport=${scroll.width}x${scroll.height}, " +
+                        "content=${scroll.getChildAt(0).height}, y=${scroll.scrollY}, " +
+                        "more=${scroll.canScrollVertically(1)}, reportsVisible=${fullyVisible(report)}"
+                }
+                fail("Operation Center did not reach the expected UI state: $details")
+            }
             Thread.sleep(20)
         }
     }
@@ -148,12 +159,12 @@ class OperationCenterAndroidTest {
                         success = outcome == DeviceViewModel.OperationOutcomeKind.SUCCESS, outcome = outcome))
                 }
                 waitUi(scenario) { vm().operationProgress.value?.finished == true }
-                val normalEntry = "Bootloader UNLOCKED (fixture)"
                 scenario.onActivity {
                     active(false)
-                    vm().log(normalEntry)
+                    // Feed the presentation fixture directly; compact log files
+                    // coalesce equal entries and publish them asynchronously.
+                    (vm().logLines as MutableLiveData<List<String>>).value = listOf("Bootloader UNLOCKED")
                 }
-                waitUi(scenario) { vm().logLines.value?.lastOrNull()?.contains(normalEntry) == true }
                 open(scenario)
                 scenario.onActivity {
                     val sheet = dialog(it)
@@ -239,7 +250,7 @@ class OperationCenterAndroidTest {
                     assertFalse(it.findViewById<View>(R.id.btnCancel).isEnabled)
                     assertTrue("Cancel request must not fabricate a terminal result", vm().operationActive.value!!)
                     assertEquals(View.GONE, sheet.findViewById<View>(R.id.tvOperationCenterPercent)!!.visibility)
-                    sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.scrollTo(0, 0)
+                    assertEquals(0, sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.scrollY)
                 }
                 AndroidUiCapture.save(scenario, "operation-cancelling.png")
                 scenario.onActivity { active(false) }
