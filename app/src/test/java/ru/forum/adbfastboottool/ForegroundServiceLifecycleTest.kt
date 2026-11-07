@@ -48,7 +48,7 @@ class ForegroundServiceLifecycleTest {
     private val app: Application get() = RuntimeEnvironment.getApplication()
     private fun intent(task: ServiceOwnedOperation) = Intent(app, FlashOperationService::class.java)
         .putExtra("operation_id", task.id)
-    private fun operation(body: () -> Unit, id: String = UUID.randomUUID().toString()) = ServiceOwnedOperation(
+    private fun operation(id: String = UUID.randomUUID().toString(), body: () -> Unit) = ServiceOwnedOperation(
         id, "flash", "boot.img", true, {},
         { task, _ -> FlashOperationService.complete(task.id) }
     ) { body() }
