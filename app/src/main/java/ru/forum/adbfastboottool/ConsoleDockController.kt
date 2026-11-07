@@ -359,7 +359,11 @@ internal class ConsoleDockController(
             ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
         if (!keyboardShown) return
         val output = activity.findViewById<View>(R.id.rvConsoleOutput)
-        if (output.height >= dp(48)) return
+        // Measured RecyclerView height alone is not enough: at 52 px the
+        // last TextView can be clipped down to 3 px by a wrapping transcript.
+        // Reserve room for actual legible rows, not just a non-zero viewport.
+        val outputRoom = (output.height - output.paddingTop - output.paddingBottom).coerceAtLeast(0)
+        if (root.height >= dp(180) && outputRoom >= dp(72)) return
         hideCommandIme()
     }
 
