@@ -5,7 +5,6 @@ import android.app.LocaleManager
 import android.content.Context
 import android.content.pm.ActivityInfo
 import android.content.res.Configuration
-import android.content.res.Resources
 import android.graphics.Rect
 import android.os.Build
 import android.os.LocaleList
@@ -187,21 +186,11 @@ class OperationCenterAndroidTest {
     }
 
     /**
-     * Android 8 does not reliably propagate shell-written Settings.System.FONT_SCALE
-     * into an already running instrumentation process. The AndroidX system font
-     * test helper explicitly supports global changes only on API 29+.
-     *
-     * For API 26, install a process-local Resources configuration BEFORE the
-     * Activity is inflated, then restore it after the scenario closes. This
-     * exercises real 1.3x text metrics and layout, without mutating emulator
-     * system settings or weakening the landscape/cancellation assertions.
+     * The NekoFlashAndroidTestRunner sets the Activity's local Resources before
+     * onCreate() inflates its controls on API26. Merely changing targetContext
+     * Resources is insufficient: the Activity has a separate ResourcesImpl.
+     * The precondition checks the real font configuration and metrics.
      */
-    @Suppress("DEPRECATION")
-    private fun applyLegacyFontScale(resources: Resources, fontScale: Float) {
-        val updated = Configuration(resources.configuration).apply { this.fontScale = fontScale }
-        resources.updateConfiguration(updated, resources.displayMetrics)
-    }
-
     private fun waitForLargeFontScale(scenario: ActivityScenario<MainActivity>) {
         val deadline = System.nanoTime() + 10_000_000_000L
         var actualScale = 0f
@@ -250,15 +239,16 @@ class OperationCenterAndroidTest {
     }
 
     @Test fun longDetailsScrollWithLargeTextInLandscapeAndCancellationStaysPending() {
-        val legacyResources = if (Build.VERSION.SDK_INT < 29) context.resources else null
-        val legacyOriginal = legacyResources?.let { Configuration(it.configuration) }
-        val oldSystemScale = if (legacyResources == null) {
+        val legacyRunner = if (Build.VERSION.SDK_INT < 29) {
+            instrumentation as NekoFlashAndroidTestRunner
+        } else null
+        val oldSystemScale = if (legacyRunner == null) {
             shell("settings get system font_scale").toFloatOrNull() ?: 1f
         } else null
         try {
-            if (legacyResources != null) {
-                // Set scale before MainActivity inflates any labels or sheets.
-                applyLegacyFontScale(legacyResources, 1.3f)
+            if (legacyRunner != null) {
+                // Intercept each Activity onCreate, including after rotations.
+                legacyRunner.enableLegacyFontScale(1.3f)
             } else {
                 shell("settings put system font_scale 1.3")
             }
@@ -269,6 +259,7 @@ class OperationCenterAndroidTest {
                 AndroidUiCapture.save(scenario, "operation-running.png")
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
                 waitUi(scenario) { it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && dialog(it).isShowing }
+                waitForLargeFontScale(scenario)
                 // Rotation can report the new configuration before the dialog's
                 // first measured frame on API 26. Swipe only a visible viewport.
                 waitUi(scenario) {
@@ -285,6 +276,7 @@ class OperationCenterAndroidTest {
                     assertTrue(sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.scrollY > 0)
                 }
                 scenario.recreate()
+                waitForLargeFontScale(scenario)
                 waitUi(scenario) {
                     val sheet = dialog(it)
                     val scroll = sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!
@@ -306,11 +298,10 @@ class OperationCenterAndroidTest {
                 scenario.onActivity { active(false) }
             }
         } finally {
-            if (legacyResources != null && legacyOriginal != null) {
-                // Restore the exact target-process configuration even if a
-                // screenshot, orientation or scroll assertion fails.
-                @Suppress("DEPRECATION")
-                legacyResources.updateConfiguration(legacyOriginal, legacyResources.displayMetrics)
+            if (legacyRunner != null) {
+                // Restores every Activity Resources overridden during rotation,
+                // including when a UI assertion threw.
+                legacyRunner.restoreLegacyFontScale()
             } else {
                 shell("settings put system font_scale $oldSystemScale")
             }
