@@ -243,7 +243,7 @@ class InterfacePolishAndroidTest {
                     assertEquals("Navigation label wraps: ${label.text}", 1, label.lineCount)
                 }
                 if (page == R.id.containerFastboot) {
-                    listOf(R.id.btnFastbootSectionQuick, R.id.btnFastbootSectionMass, R.id.btnFastbootSectionTools).forEach { id ->
+                    listOf(R.id.btnFastbootSectionQuick, R.id.btnFastbootSectionMass).forEach { id ->
                         val label = it.findViewById<TextView>(id)
                         assertEquals("Section label wraps: ${label.text}", 1, label.lineCount)
                     }
@@ -263,9 +263,9 @@ class InterfacePolishAndroidTest {
                 fullyVisible(it.findViewById(R.id.spinMassPartition))
                 fullyVisible(it.findViewById(R.id.btnMassSelectImage))
             }
-            it.findViewById<View>(R.id.btnFastbootSectionTools).performClick()
+            assertEquals(View.GONE, it.findViewById<View>(R.id.btnFastbootSectionTools).visibility)
+            assertEquals(View.GONE, it.findViewById<View>(R.id.fastbootToolsSection).visibility)
         }
-        AndroidUiCapture.save(scenario, "$prefix-tools.png")
     }
 
     @Test fun allFiveTabsAndFastbootSectionsRenderInRussian() {

@@ -1,6 +1,7 @@
 package ru.forum.adbfastboottool
 
 import java.io.File
+import java.io.IOException
 import java.nio.charset.StandardCharsets
 
 /**
@@ -20,7 +21,8 @@ class DiagnosticLogStore(
     private data class State(
         val stream: Stream,
         val files: MutableList<File> = mutableListOf(),
-        var nextPart: Int = 1
+        var nextPart: Int = 1,
+        var expectedLength: Long = 0L
     )
 
     private val compact = State(Stream.COMPACT)
@@ -73,10 +75,19 @@ class DiagnosticLogStore(
         if (text.isEmpty()) return
         val bytes = text.toByteArray(StandardCharsets.UTF_8)
         var file = state.files.lastOrNull()
-        if (file == null || (file.length() > 0L && file.length() + bytes.size > limit)) {
+        if (file != null && (!file.isFile || file.length() != state.expectedLength)) {
+            // File.appendBytes() would silently recreate a deleted active log and
+            // produce the exact symptom of a timestamped log without its header.
+            // Never hide external removal or truncation with a new partial file.
+            throw IOException("Diagnostic segment disappeared or changed size: " + file.absolutePath +
+                " (expected=" + state.expectedLength + ", actual=" +
+                (if (file.exists()) file.length() else "missing") + ")")
+        }
+        if (file == null || (state.expectedLength > 0L && state.expectedLength + bytes.size > limit)) {
             file = createSegment(state)
         }
         file.appendBytes(bytes)
+        state.expectedLength += bytes.size.toLong()
     }
 
     private fun createSegment(state: State): File {
@@ -91,6 +102,7 @@ class DiagnosticLogStore(
             throw IllegalStateException("Cannot create log segment: ${file.absolutePath}")
         }
         state.files.add(file)
+        state.expectedLength = 0L
         // All segments remain on disk until an explicit user action removes them.
         return file
     }
