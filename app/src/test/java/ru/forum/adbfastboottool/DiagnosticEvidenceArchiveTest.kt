@@ -164,4 +164,29 @@ class DiagnosticEvidenceArchiveTest {
             folder.deleteRecursively()
         }
     }
+    @Test fun exportIncludesAllCrashMarkersWithoutLeakingUnrelatedFiles() {
+        val root = Files.createTempDirectory("nekoflash-crash-export-").toFile()
+        try {
+            val crash = root.resolve("crash-2026-11-07-123.txt").apply { writeText("full crash stack") }
+            val legacy = root.resolve("last-crash-marker.txt").apply { writeText("old crash") }
+            root.resolve("firmware-system.img").writeText("not a diagnostic")
+            val out = ByteArrayOutputStream()
+            val result = DiagnosticEvidenceArchive.writeDetailed(out, listOf(root))
+            assertTrue(result.snapshotConsistent)
+            assertEquals(2, result.fileCount)
+            val entries = mutableMapOf<String, ByteArray>()
+            ZipInputStream(out.toByteArray().inputStream()).use { zip ->
+                while (true) {
+                    val entry = zip.nextEntry ?: break
+                    entries[entry.name] = zip.readBytes()
+                    zip.closeEntry()
+                }
+            }
+            assertArrayEquals(crash.readBytes(), entries["logs/1/" + crash.name])
+            assertArrayEquals(legacy.readBytes(), entries["logs/1/" + legacy.name])
+            assertFalse(entries.keys.any { it.endsWith("firmware-system.img") })
+        } finally {
+            root.deleteRecursively()
+        }
+    }
 }
