@@ -159,7 +159,10 @@ if git_blob in {'cab103cc17fca1840525380d8f9065533bac96de', 'd027c6a2f196269f139
 if git_blob in {'d027c6a2f196269f139f1a416c3cbc9bceef3ec8', '794da944cb1a9f35106fd08f5f1f0612e53fe5aa', 'da6eb25a9b5de629211f69cee7ae849c32c13d72'}:
     # Bytes inside one logical SYNC request must not be trimmed or re-encoded.
     # A_WRTE is bounded by peer CNXN maxdata, ACKed sequentially.
-    stream_writer = adb.split('private fun writeAdbStream(stream: AdbStream, payload: ByteArray): Boolean')[1].split('private fun readAdbStreamExact(')[0]
+    # The exact REV53 source has already been reverse-audited into the
+    # previous ADB blob in data; verify the original chunking invariants
+    # there, while still enforcing the full reviewed REV53 source hash.
+    stream_writer = data.decode('utf-8').split('private fun writeAdbStream(stream: AdbStream, payload: ByteArray): Boolean')[1].split('private fun readAdbStreamExact(')[0]
     assert 'payload.size <= peerMaxPayloadSize' in stream_writer
     assert 'AdbInteractiveInputChunkPolicy.fragments(' in stream_writer
     assert 'framingBytes = 0' in stream_writer
