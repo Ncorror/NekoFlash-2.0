@@ -28,6 +28,9 @@ match = re.search(r"^const KIT = (\{[^\n]+\});$", page, re.M)
 if not match:
     raise SystemExit("Missing embedded testbook build metadata")
 build = json.loads(match[1])
+# The standalone book identifies the previous reference APK. The kit always
+# carries the APK and provenance from the just-tested run.
+build.pop("referenceRevision", None)
 build.update(sourceCommit=args.commit, testArtifactCommit=args.commit, runId=args.run,
              apkFilename=apk.name, apkSha256=digest)
 page = page[:match.start(1)] + json.dumps(build) + page[match.end(1):]

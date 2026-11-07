@@ -577,8 +577,8 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 
   <section class="card" id="buildStatus" style="border-color:#82430d">
     <h2>REV48 · Hardware testing / Аппаратные испытания</h2>
-    <p>Проверки сборки и эмуляторов пройдены. Здесь записываются результаты с твоего HOST и TARGET.</p>
-    <p>Build and emulator checks passed. Record what you observe on your own host and target.</p>
+    <p>Сверь сборку и SHA-256 APK ниже. Запиши результаты с твоего HOST и TARGET.</p>
+    <p>Check the build and APK SHA-256 below. Record what you observe on your host and target.</p>
     <p><a id="ciLink">GitHub Actions</a> · <code id="buildRef"></code></p>
     <p class="small-help" style="overflow-wrap:anywhere">APK SHA-256 · <code id="kitSha"></code></p>
   </section>
@@ -875,8 +875,8 @@ const T = {
   }
 };
 
-const KIT = {"revision": "REV48", "sourceCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "testArtifactCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "runId": "41438797886", "apkFilename": "NekoFlash-6.0.0-alpha11-debug.apk", "apkSha256": "74de7c2751cfa3d37c2490888f09788414c4e6b6c97a5940a7c4b72fd5ef1078"};
-const BUILD_LABEL = KIT.revision + " / " + KIT.sourceCommit.slice(0, 12) + " / CI " + KIT.runId;
+const KIT = {"revision": "REV48", "referenceRevision": "REV45", "sourceCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "testArtifactCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "runId": "41438797886", "apkFilename": "NekoFlash-6.0.0-alpha11-debug.apk", "apkSha256": "74de7c2751cfa3d37c2490888f09788414c4e6b6c97a5940a7c4b72fd5ef1078"};
+const BUILD_LABEL = (KIT.referenceRevision || KIT.revision) + " / " + KIT.sourceCommit.slice(0, 12) + " / CI " + KIT.runId;
 const TESTS = [
   {id:'SETUP-01',group:'basic',ru:'Установка и проверка APK',en:'Installation and APK verification',intro:{ru:'На HOST. Нужен Debug APK из этого комплекта, versionCode 234. Устанавливай без удаления оригинального NekoFlash.',en:'On HOST. Install the checked Debug APK from this kit, versionCode 234, without removing original NekoFlash.'},steps:[
     {ru:'Распакуй набор REV48 и найди APK рядом с этим HTML; либо скачай официальный GitHub Actions artifact.',en:'Unpack the REV48 kit and find the APK next to this HTML; alternatively use the GitHub Actions artifact.'},

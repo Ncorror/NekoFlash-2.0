@@ -47,6 +47,7 @@ import androidx.core.content.FileProvider
 import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
+import androidx.core.view.doOnPreDraw
 import androidx.core.view.WindowCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
@@ -519,7 +520,7 @@ class MainActivity : AppCompatActivity() {
         outState.putLong(STATE_OPERATION_STRIP_DEADLINE_MS, operationStripDeadlineMs)
         outState.putBoolean(STATE_OPERATION_CENTER_OPEN, operationCenterDialog?.isShowing == true)
         outState.putBoolean(STATE_OPERATION_STEPS_VISIBLE, operationStepsVisibleForCurrentRun)
-        if (::cardOperationCenter.isInitialized) {
+        if (operationCenterDialog?.isShowing == true) {
             outState.putInt(STATE_OPERATION_CENTER_SCROLL,
                 cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll).scrollY)
         }
@@ -4005,15 +4006,13 @@ class MainActivity : AppCompatActivity() {
             setContentView(cardOperationCenter)
             behavior.skipCollapsed = true
             behavior.isDraggable = false
+            behavior.state = BottomSheetBehavior.STATE_EXPANDED
             setOnShowListener {
-                behavior.state = BottomSheetBehavior.STATE_EXPANDED
-                cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll).post {
-                    if (operationCenterRestoredScrollY > 0) {
-                        cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll)
-                            .scrollTo(0, operationCenterRestoredScrollY)
-                        operationCenterRestoredScrollY = 0
-                    }
-                }
+                val scroll = cardOperationCenter.findViewById<NestedScrollView>(R.id.operationCenterScroll)
+                val restoredY = operationCenterRestoredScrollY
+                operationCenterRestoredScrollY = 0
+                // Scroll bounds are valid only after the new window is laid out.
+                scroll.doOnPreDraw { scroll.scrollTo(0, restoredY) }
             }
         }
     }
@@ -4365,7 +4364,7 @@ class MainActivity : AppCompatActivity() {
         val recentText = recent?.let { if (it.length > 260) it.take(257) + "…" else it }
         val recentIsError = recentText != null && (
             recentText.contains("❌") || recentText.contains("ERROR", ignoreCase = true) ||
-                recentText.contains("FAILED", ignoreCase = true) || recentText.contains("LOCKED", ignoreCase = true)
+                recentText.contains("FAILED", ignoreCase = true)
             )
         val recentIsWarning = recentText != null && (
             recentText.contains("⚠") || recentText.contains("WARN", ignoreCase = true)
@@ -4434,8 +4433,8 @@ class MainActivity : AppCompatActivity() {
         tvOperationCenterStepSummary.text = stepSummary.orEmpty()
         tvOperationCenterStepSummary.visibility = if (stepSummary != null) View.VISIBLE else View.GONE
 
-        val showLastEvent = recentText != null && when {
-            operationRunning -> recentIsError || recentIsWarning
+        val showLastEvent = (recentIsError || recentIsWarning) && when {
+            operationRunning -> true
             progress?.finished == true -> progress.outcome == DeviceViewModel.OperationOutcomeKind.FAILED ||
                 progress.outcome == DeviceViewModel.OperationOutcomeKind.VERIFY_PENDING ||
                 progress.outcome == DeviceViewModel.OperationOutcomeKind.INTERRUPTED

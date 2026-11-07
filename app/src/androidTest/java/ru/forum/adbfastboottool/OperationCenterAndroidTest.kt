@@ -148,7 +148,12 @@ class OperationCenterAndroidTest {
                         success = outcome == DeviceViewModel.OperationOutcomeKind.SUCCESS, outcome = outcome))
                 }
                 waitUi(scenario) { vm().operationProgress.value?.finished == true }
-                scenario.onActivity { active(false) }
+                val normalEntry = "Bootloader UNLOCKED (fixture)"
+                scenario.onActivity {
+                    active(false)
+                    vm().log(normalEntry)
+                }
+                waitUi(scenario) { vm().logLines.value?.lastOrNull()?.contains(normalEntry) == true }
                 open(scenario)
                 scenario.onActivity {
                     val sheet = dialog(it)
@@ -156,6 +161,7 @@ class OperationCenterAndroidTest {
                     assertEquals(View.GONE, sheet.findViewById<View>(R.id.tvOperationCenterPercent)!!.visibility)
                     assertEquals(View.GONE, sheet.findViewById<View>(R.id.operationCenterProgressBar)!!.visibility)
                     assertEquals(View.GONE, it.findViewById<View>(R.id.tvOperationStripPercent).visibility)
+                    assertEquals(View.GONE, sheet.findViewById<View>(R.id.tvOperationCenterLastEvent)!!.visibility)
                     assertEquals(outcome, vm().operationProgress.value!!.outcome)
                 }
                 AndroidUiCapture.save(scenario, "operation-${outcome.name.lowercase(Locale.ROOT)}.png")
@@ -166,6 +172,29 @@ class OperationCenterAndroidTest {
 
     private fun shell(command: String) = instrumentation.uiAutomation.executeShellCommand(command).use {
         ParcelFileDescriptor.AutoCloseInputStream(it).bufferedReader().use { reader -> reader.readText().trim() }
+    }
+
+    private fun swipeToBottom(scenario: ActivityScenario<MainActivity>) {
+        var geometry = ""
+        repeat(12) {
+            var swipe: String? = null
+            scenario.onActivity { activity ->
+                val sheet = dialog(activity)
+                val scroll = sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!
+                val location = IntArray(2).also { scroll.getLocationOnScreen(it) }
+                geometry = "viewport=${scroll.height}, content=${scroll.getChildAt(0).height}, y=${scroll.scrollY}"
+                if (scroll.canScrollVertically(1) || !fullyVisible(sheet.findViewById(R.id.btnReportsMenu)!!)) {
+                    val x = location[0] + scroll.width / 2
+                    val from = location[1] + scroll.height * 4 / 5
+                    val to = location[1] + scroll.height / 5
+                    swipe = "input swipe $x $from $x $to 180"
+                }
+            }
+            val command = swipe ?: return
+            shell(command)
+            instrumentation.uiAutomation.waitForIdle(100, 2000)
+        }
+        fail("Could not reach the report action with touch swipes: $geometry")
     }
 
     @Test fun longDetailsScrollWithLargeTextInLandscapeAndCancellationStaysPending() {
@@ -179,16 +208,29 @@ class OperationCenterAndroidTest {
                 AndroidUiCapture.save(scenario, "operation-running.png")
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
                 waitUi(scenario) { it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && dialog(it).isShowing }
-                scenario.onActivity {
-                    dialog(it).findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.fullScroll(View.FOCUS_DOWN)
+                // Rotation can report the new configuration before the dialog's
+                // first measured frame on API 26. Swipe only a visible viewport.
+                waitUi(scenario) {
+                    val sheet = dialog(it)
+                    val scroll = sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!
+                    scroll.isLaidOut && scroll.canScrollVertically(1) &&
+                        fullyVisible(sheet.findViewById(R.id.btnOperationCenterCancel)!!)
                 }
-                waitUi(scenario) { fullyVisible(dialog(it).findViewById(R.id.btnOperationCenterCancel)!!) }
+                swipeToBottom(scenario)
                 scenario.onActivity {
-                    assertTrue(fullyVisible(dialog(it).findViewById(R.id.btnOperationCenterMinimize)!!))
-                    assertTrue(dialog(it).findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.scrollY > 0)
+                    val sheet = dialog(it)
+                    assertTrue(fullyVisible(sheet.findViewById(R.id.btnOperationCenterMinimize)!!))
+                    assertTrue(fullyVisible(sheet.findViewById(R.id.btnOperationCenterCancel)!!))
+                    assertTrue(sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.scrollY > 0)
                 }
                 scenario.recreate()
-                waitUi(scenario) { dialog(it).isShowing && fullyVisible(dialog(it).findViewById(R.id.btnOperationCenterCancel)!!) }
+                waitUi(scenario) {
+                    val sheet = dialog(it)
+                    val scroll = sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!
+                    sheet.isShowing && scroll.scrollY > 0 && !scroll.canScrollVertically(1) &&
+                        fullyVisible(sheet.findViewById(R.id.btnReportsMenu)!!) &&
+                        fullyVisible(sheet.findViewById(R.id.btnOperationCenterCancel)!!)
+                }
                 AndroidUiCapture.save(scenario, "operation-landscape-large.png")
                 scenario.onActivity {
                     val sheet = dialog(it)
