@@ -1852,7 +1852,8 @@ class AdbProtocol(
             // ACKing CLOSE_STDIN. Drain *only* bytes received for this local
             // stream. A truncated/malformed EXIT never counts as success.
             while (!cancelled && (!stream.closed || pendingByteCount(stream) > 0)) {
-                val header = readShellPacketHeader(stream) ?: run {
+                val header = readShellPacketHeader(stream)
+                if (header == null) {
                     if (stream.closed && pendingByteCount(stream) > 0) {
                         onLog("❌ shell_v2: incomplete buffered frame after peer close")
                         return result(false)
