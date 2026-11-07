@@ -2155,7 +2155,7 @@ class AdbProtocol(
                     // other writes still fail; no command is ever retried.
                     val buffered = pendingByteCount(stream)
                     val canInspect = allowBufferedEarlyClose && buffered > 0
-                    val symbol = if (canInspect) "⚠️" else "❌"
+                    val symbol = if (canInspect) "ℹ️" else "❌"
                     onLog("$symbol ADB stream closed during write local=${stream.localId}, " +
                         "expectedRemote=$expectedRemote, receivedRemote=${header.arg0}, " +
                         "payloadBytes=${payload.size}, bufferedResponseBytes=$buffered, " +
