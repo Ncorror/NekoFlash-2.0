@@ -347,6 +347,22 @@ internal class ConsoleDockController(
         ViewCompat.requestApplyInsets(root)
     }
 
+    /**
+     * After submitting a HOST command, prefer a readable answer over keeping
+     * an IME that leaves less than one transcript row in landscape. Never
+     * dismiss the keyboard merely for rotating, typing or PTY output: this
+     * fallback belongs exclusively to an explicit HOST submission.
+     */
+    fun revealSubmittedHostReply() {
+        if (!isExpanded) return
+        val keyboardShown = imeVisible ||
+            ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
+        if (!keyboardShown) return
+        val output = activity.findViewById<View>(R.id.rvConsoleOutput)
+        if (output.height >= dp(48)) return
+        hideCommandIme()
+    }
+
     fun hideCommandIme() {
         focusCommandWhenExpanded = false
         WindowInsetsControllerCompat(activity.window, root).hide(
