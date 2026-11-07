@@ -265,6 +265,28 @@ class MainActivity : AppCompatActivity() {
             }
             adapter = consoleLogAdapter
             itemAnimator = null
+            // RecyclerView may restore an old scroll offset while the IME
+            // and landscape body are being remeasured. Replay an explicit
+            // command-follow request after the actual viewport changes.
+            addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+                if (terminalReplyFollowPending) {
+                    terminalReplyFollowAttempts = 0
+                    scheduleTerminalReplyFollow()
+                }
+            }
+            addOnScrollListener(object : RecyclerView.OnScrollListener() {
+                override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+                    if (newState == RecyclerView.SCROLL_STATE_DRAGGING) {
+                        terminalReplyFollowPending = false
+                    }
+                }
+            })
+        }
+        findViewById<View>(R.id.rootCoordinator).addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ ->
+            if (terminalReplyFollowPending) {
+                terminalReplyFollowAttempts = 0
+                scheduleTerminalReplyFollow()
+            }
         }
         etCommand = findViewById(R.id.etCommand)
         etCommand.configurePty(
@@ -965,13 +987,16 @@ class MainActivity : AppCompatActivity() {
     private fun handleCommandInput() {
         if (etCommand.text.isNullOrBlank()) return
         viewModel.withTerminalCommand { handleTerminalCommandInput() }
-        // In a tiny landscape viewport the IME can leave only 3 px for output.
-        // This HOST-only fallback releases the keyboard after submission so the
-        // answer is actually readable; explicit PTY input never takes this path.
+        // An explicit HOST submission follows its own reply even if the
+        // RecyclerView remeasures after a keyboard/rotation transition.
+        // Never override a user selecting diagnostic text.
+        val followReply = !hasSelectedConsoleText()
+        terminalReplyFollowPending = followReply
+        terminalReplyFollowAttempts = 0
+        // On a tiny landscape viewport an IME can leave only a few visible
+        // pixels of the last row. A HOST submit may release it, PTY never does.
         consoleDockController.revealSubmittedHostReply()
-        // After an IME resize the old last row can be outside the viewport.
-        // Explicit submission follows its reply. An active text selection wins.
-        if (!hasSelectedConsoleText()) flushConsoleRender(pinToBottom = true)
+        if (followReply) flushConsoleRender(pinToBottom = true)
     }
 
     private fun handleTerminalCommandInput() {
@@ -4688,6 +4713,9 @@ class MainActivity : AppCompatActivity() {
     private val consoleRenderHandler = Handler(Looper.getMainLooper())
     private var pendingConsoleSnapshot: List<String>? = null
     private var consoleRenderScheduled: Boolean = false
+    private var terminalReplyFollowPending: Boolean = false
+    private var terminalReplyFollowPosted: Boolean = false
+    private var terminalReplyFollowAttempts: Int = 0
     private val flushConsoleRenderRunnable = Runnable { flushConsoleRender() }
 
     private fun renderLog(lines: List<String>) {
@@ -4734,7 +4762,7 @@ class MainActivity : AppCompatActivity() {
 
         val layoutManager = rvConsoleOutput.layoutManager as? LinearLayoutManager
         val keepPinnedToBottom = ConsoleAutoFollowPolicy.followOutput(
-            explicitlyRequested = pinToBottom,
+            explicitlyRequested = pinToBottom || terminalReplyFollowPending,
             currentlyAtBottom = !rvConsoleOutput.canScrollVertically(1),
             selectingText = hasSelectedConsoleText(),
         )
@@ -4783,7 +4811,55 @@ class MainActivity : AppCompatActivity() {
             ) {
                 val manager = rvConsoleOutput.layoutManager as LinearLayoutManager
                 manager.scrollToPositionWithOffset(lastPosition, 0)
+                if (terminalReplyFollowPending) scheduleTerminalReplyFollow()
             }
+        }
+    }
+
+    /**
+     * A pending command reply is not considered displayed until its latest
+     * row occupies at least one full line above the inline editor. Retry for
+     * a few frames after async layout; subsequent IME/root resize or a new
+     * transcript publication can re-arm the attempt. Dragging or selecting
+     * diagnostic rows always cancels the forced follow.
+     */
+    private fun scheduleTerminalReplyFollow() {
+        if (terminalReplyFollowPosted || !terminalReplyFollowPending ||
+            terminalReplyFollowAttempts >= 5) return
+        terminalReplyFollowPosted = true
+        rvConsoleOutput.postOnAnimation {
+            terminalReplyFollowPosted = false
+            if (!terminalReplyFollowPending || !consoleDockController.isExpanded ||
+                isFinishing || isDestroyed || hasSelectedConsoleText()) {
+                terminalReplyFollowPending = false
+                return@postOnAnimation
+            }
+            val last = consoleLogAdapter.itemCount - 1
+            if (last < 0) return@postOnAnimation
+            val manager = rvConsoleOutput.layoutManager as? LinearLayoutManager
+                ?: return@postOnAnimation
+            val row = manager.findViewByPosition(last) as? TextView
+            val rect = android.graphics.Rect()
+            val editorRect = android.graphics.Rect()
+            val editorVisible = findViewById<View>(R.id.consoleInputBar)
+                .getGlobalVisibleRect(editorRect)
+            val visible = row != null && row.getGlobalVisibleRect(rect) &&
+                rect.height() >= row.lineHeight &&
+                (!editorVisible || rect.bottom <= editorRect.top)
+            if (visible) {
+                terminalReplyFollowPending = false
+                terminalReplyFollowAttempts = 0
+                return@postOnAnimation
+            }
+            terminalReplyFollowAttempts++
+            if (rvConsoleOutput.height > 0) {
+                manager.scrollToPositionWithOffset(last, 0)
+                rvConsoleOutput.requestLayout()
+                // Prefer a real viewport scroll to a postponed adapter offset:
+                // on Android 8 a pending layout may otherwise restore old rows.
+                rvConsoleOutput.scrollBy(0, rvConsoleOutput.height + 100_000)
+            }
+            scheduleTerminalReplyFollow()
         }
     }
 
@@ -4860,6 +4936,7 @@ class MainActivity : AppCompatActivity() {
         consoleRenderHandler.removeCallbacks(flushConsoleRenderRunnable)
         consoleRenderScheduled = false
         pendingConsoleSnapshot = null
+        terminalReplyFollowPending = false
         runCatching { unregisterReceiver(usbReceiver) }
             .onFailure { error ->
                 if (error !is IllegalArgumentException) {
