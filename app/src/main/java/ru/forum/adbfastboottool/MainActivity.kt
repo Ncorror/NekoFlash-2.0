@@ -965,6 +965,10 @@ class MainActivity : AppCompatActivity() {
     private fun handleCommandInput() {
         if (etCommand.text.isNullOrBlank()) return
         viewModel.withTerminalCommand { handleTerminalCommandInput() }
+        // In a tiny landscape viewport the IME can leave only 3 px for output.
+        // This HOST-only fallback releases the keyboard after submission so the
+        // answer is actually readable; explicit PTY input never takes this path.
+        consoleDockController.revealSubmittedHostReply()
         // After an IME resize the old last row can be outside the viewport.
         // Explicit submission follows its reply. An active text selection wins.
         if (!hasSelectedConsoleText()) flushConsoleRender(pinToBottom = true)
