@@ -2663,6 +2663,9 @@ class AdbProtocol(
         putIntLe(header, 20, command.inv().toInt())
 
         if (!bulkWriteFully(header)) throw Exception("ADB header transfer error")
+        if (!finishAdbUsbOutTransfer(header.size)) {
+            throw Exception("ADB header USB ZLP transfer error (bytes=${header.size})")
+        }
 
         if (data.isNotEmpty()) {
             var offset = 0
@@ -2670,6 +2673,9 @@ class AdbProtocol(
                 val len = minOf(USB_BULK_CHUNK_BYTES, data.size - offset)
                 if (!bulkWriteFully(data, offset, len)) throw Exception("ADB data transfer error")
                 offset += len
+            }
+            if (!finishAdbUsbOutTransfer(data.size)) {
+                throw Exception("ADB payload USB ZLP transfer error (bytes=${data.size})")
             }
         }
     }
@@ -2686,6 +2692,21 @@ class AdbProtocol(
             ((source[offset + 1].toInt() and 0xFF) shl 8) or
             ((source[offset + 2].toInt() and 0xFF) shl 16) or
             ((source[offset + 3].toInt() and 0xFF) shl 24)
+
+    /**
+     * AOSP adb requires a USB zero-length packet at the end of any host OUT
+     * header/payload whose byte length is an exact multiple of wMaxPacketSize.
+     * Call under adbWriteLock, *after* writing all data bytes and *before*
+     * waiting for the stream's A_OKAY. An empty transfer is not an ADB byte.
+     * A ZLP failure is a real transport error, never silently retried.
+     */
+    private fun finishAdbUsbOutTransfer(transferBytes: Int): Boolean {
+        val conn = connection ?: return false
+        val ep = endpointOut ?: return false
+        return AdbUsbBulkOutPolicy.finishTransfer(transferBytes, ep.maxPacketSize) {
+            conn.bulkTransfer(ep, EMPTY_PAYLOAD, 0, 0, 5_000)
+        }
+    }
 
     private fun bulkWriteFully(data: ByteArray, offset: Int = 0, length: Int = data.size, timeout: Int = 5000): Boolean {
         val conn = connection ?: return false
