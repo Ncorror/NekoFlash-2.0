@@ -524,7 +524,7 @@ jobs:
             adb install emulator-apk/NekoFlash-*-debug.apk
             adb install emulator-test-apk/app-debug-androidTest.apk
             adb logcat -c || true
-            adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/androidx.test.runner.AndroidJUnitRunner | tee android-mkfs-tests.txt
+            adb shell am instrument -w -r ru.forum.adbfastboottool.dev.test/ru.forum.adbfastboottool.NekoFlashAndroidTestRunner | tee android-mkfs-tests.txt
             adb logcat -d > android-instrumentation-logcat.txt 2>&1 || true
             mkdir -p android-source-ui
             adb exec-out run-as ru.forum.adbfastboottool.dev cat files/source-test-output/quick-restored.png > android-source-ui/quick-restored.png

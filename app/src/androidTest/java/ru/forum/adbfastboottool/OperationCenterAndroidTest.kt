@@ -185,6 +185,36 @@ class OperationCenterAndroidTest {
         ParcelFileDescriptor.AutoCloseInputStream(it).bufferedReader().use { reader -> reader.readText().trim() }
     }
 
+    /**
+     * The NekoFlashAndroidTestRunner sets the Activity's local Resources before
+     * onCreate() inflates its controls on API26. Merely changing targetContext
+     * Resources is insufficient: the Activity has a separate ResourcesImpl.
+     * The precondition checks the real font configuration and metrics.
+     */
+    private fun waitForLargeFontScale(scenario: ActivityScenario<MainActivity>) {
+        val deadline = System.nanoTime() + 10_000_000_000L
+        var actualScale = 0f
+        var actualRatio = 0f
+        while (true) {
+            scenario.onActivity { activity ->
+                actualScale = activity.resources.configuration.fontScale
+                val metrics = activity.resources.displayMetrics
+                actualRatio = metrics.scaledDensity / metrics.density
+            }
+            // On API 26, check actual scaled text metrics as well as the
+            // Configuration field: a fake fontScale would not pass this.
+            val resourcesMatch = actualScale >= 1.29f &&
+                (Build.VERSION.SDK_INT >= 29 || actualRatio >= 1.29f)
+            if (resourcesMatch) return
+            if (System.nanoTime() >= deadline) {
+                fail("Large-font fixture not active: SDK=${Build.VERSION.SDK_INT}, " +
+                    "config.fontScale=$actualScale, scaledDensity/density=$actualRatio, " +
+                    "system.font_scale=${shell("settings get system font_scale")}")
+            }
+            Thread.sleep(20)
+        }
+    }
+
     private fun swipeToBottom(scenario: ActivityScenario<MainActivity>) {
         var geometry = ""
         repeat(12) {
@@ -209,16 +239,27 @@ class OperationCenterAndroidTest {
     }
 
     @Test fun longDetailsScrollWithLargeTextInLandscapeAndCancellationStaysPending() {
-        val oldScale = shell("settings get system font_scale").toFloatOrNull() ?: 1f
+        val legacyRunner = if (Build.VERSION.SDK_INT < 29) {
+            instrumentation as NekoFlashAndroidTestRunner
+        } else null
+        val oldSystemScale = if (legacyRunner == null) {
+            shell("settings get system font_scale").toFloatOrNull() ?: 1f
+        } else null
         try {
-            shell("settings put system font_scale 1.3")
+            if (legacyRunner != null) {
+                // Intercept each Activity onCreate, including after rotations.
+                legacyRunner.enableLegacyFontScale(1.3f)
+            } else {
+                shell("settings put system font_scale 1.3")
+            }
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                waitUi(scenario) { it.resources.configuration.fontScale >= 1.29f }
+                waitForLargeFontScale(scenario)
                 begin(scenario, (1..18).joinToString("\n") { "Шаг $it: подробности операции и выбранного раздела" })
                 open(scenario)
                 AndroidUiCapture.save(scenario, "operation-running.png")
                 scenario.onActivity { it.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE }
                 waitUi(scenario) { it.resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE && dialog(it).isShowing }
+                waitForLargeFontScale(scenario)
                 // Rotation can report the new configuration before the dialog's
                 // first measured frame on API 26. Swipe only a visible viewport.
                 waitUi(scenario) {
@@ -235,6 +276,7 @@ class OperationCenterAndroidTest {
                     assertTrue(sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!.scrollY > 0)
                 }
                 scenario.recreate()
+                waitForLargeFontScale(scenario)
                 waitUi(scenario) {
                     val sheet = dialog(it)
                     val scroll = sheet.findViewById<NestedScrollView>(R.id.operationCenterScroll)!!
@@ -255,7 +297,15 @@ class OperationCenterAndroidTest {
                 AndroidUiCapture.save(scenario, "operation-cancelling.png")
                 scenario.onActivity { active(false) }
             }
-        } finally { shell("settings put system font_scale $oldScale") }
+        } finally {
+            if (legacyRunner != null) {
+                // Restores every Activity Resources overridden during rotation,
+                // including when a UI assertion threw.
+                legacyRunner.restoreLegacyFontScale()
+            } else {
+                shell("settings put system font_scale $oldSystemScale")
+            }
+        }
     }
 
     @Test fun oldToolsSelectionFallsBackToQuickAndMassStillWorks() {
