@@ -2020,7 +2020,7 @@ class AdbProtocol(
                     if (header.dataLength > 0) readData(header.dataLength)
                     if (!packetTargetsLocalStream(header, localId)) {
                         acknowledgeRemoteClose(header.arg1, header.arg0)
-                        onLog("ℹ️ ADB open: ignored stale CLSE for local=${header.arg1}, expected local=$localId")
+                        onLog("ℹ️ ADB open: ignored stale CLSE local=${header.arg1}, remote=${header.arg0}, expected local=$localId, generation=${dispatcherGeneration.get()}")
                         continue
                     }
                     acknowledgeRemoteClose(localId, header.arg0)
@@ -2094,7 +2094,7 @@ class AdbProtocol(
         sendMessageInternal(A_WRTE, stream.localId, stream.remoteId, payload)
         while (!cancelled) {
             val header = readHeader(timeoutMs = 10_000) ?: run {
-                onLog("❌ ADB stream: no ACK for WRTE")
+                onLog("❌ ADB stream: no ACK for WRTE local=${stream.localId}, remote=${stream.remoteId}, bytes=${payload.size}, pending=${pendingByteCount(stream)}, generation=${dispatcherGeneration.get()}")
                 return false
             }
             when (header.command) {
@@ -2119,9 +2119,16 @@ class AdbProtocol(
                         acknowledgeRemoteClose(header.arg1, header.arg0)
                         continue
                     }
+                    val expectedRemote = stream.remoteId
                     stream.remoteId = header.arg0
                     closeAdbStream(stream)
-                    onLog("❌ ADB stream closed during write")
+                    // This may be a legitimately early remote close, or a
+                    // misrouted/stale packet. Never infer command execution or
+                    // automatically replay an arbitrary shell command.
+                    onLog("❌ ADB stream closed during write local=${stream.localId}, " +
+                        "expectedRemote=$expectedRemote, receivedRemote=${header.arg0}, " +
+                        "payloadBytes=${payload.size}, bufferedResponseBytes=${pendingByteCount(stream)}, " +
+                        "dispatcherGeneration=${dispatcherGeneration.get()}, transportConnected=$isConnected")
                     return false
                 }
                 else -> {

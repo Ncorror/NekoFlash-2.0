@@ -1,6 +1,7 @@
 package ru.forum.adbfastboottool
 
 import java.io.File
+import java.io.FileInputStream
 import java.io.OutputStream
 import java.security.MessageDigest
 import java.util.zip.ZipEntry
@@ -36,6 +37,7 @@ object DiagnosticEvidenceArchive {
     fun writeDetailed(output: OutputStream, directories: List<File>): ExportResult {
         var count = 0
         val warnings = mutableListOf<String>()
+        val notes = mutableListOf<String>()
         val seenRoots = HashSet<String>()
         val seenEntries = HashSet<String>()
         val manifest = StringBuilder()
@@ -70,14 +72,27 @@ object DiagnosticEvidenceArchive {
 
                     val originalSize = source.length()
                     val originalModified = source.lastModified()
+                    val isAtomicallyPublishedSummary = source.name.startsWith("session-summary-") &&
+                        source.name.endsWith(".json")
                     val digest = MessageDigest.getInstance("SHA-256")
                     val leading = ByteArray(96)
                     var leadingBytes = 0
                     var copiedBytes = 0L
+                    var descriptorSizeBefore = -1L
+                    var descriptorSizeAfter = -1L
 
                     zip.putNextEntry(ZipEntry(name))
                     try {
-                        source.inputStream().buffered().use { input ->
+                        FileInputStream(source).use { fileInput ->
+                            // Keep the actual opened inode, not a new pathname
+                            // lookup. writeSessionSummary publishes via atomic
+                            // rename, so a newer summary may replace the path
+                            // while the old *complete* revision is being copied.
+                            descriptorSizeBefore = fileInput.channel.size()
+                            // The outer FileInputStream owns the descriptor.
+                            // Do not use buffered().use here: it would close
+                            // fileInput before channel.size() is checked.
+                            val input = fileInput.buffered()
                             while (true) {
                                 val n = input.read(buffer)
                                 if (n < 0) break
@@ -91,6 +106,7 @@ object DiagnosticEvidenceArchive {
                                 digest.update(buffer, 0, n)
                                 copiedBytes += n
                             }
+                            descriptorSizeAfter = fileInput.channel.size()
                         }
                     } finally {
                         zip.closeEntry()
@@ -115,10 +131,20 @@ object DiagnosticEvidenceArchive {
                             warnings.add("MISSING_SESSION_PROLOGUE " + name)
                         }
                     }
-                    if (source.length() != originalSize ||
-                        copiedBytes != originalSize ||
+                    val sourcePathChanged = source.length() != originalSize ||
                         source.lastModified() != originalModified
-                    ) {
+                    if (isAtomicallyPublishedSummary) {
+                        // An atomically replaced JSON summary is a valid frozen
+                        // revision on the open FileDescriptor. Do not mistake
+                        // later publication under the same path for corrupted
+                        // or missing evidence. Detect mutation of the open file.
+                        if (descriptorSizeBefore != descriptorSizeAfter ||
+                            copiedBytes != descriptorSizeBefore) {
+                            warnings.add("SOURCE_CHANGED_DURING_EXPORT " + name)
+                        } else if (sourcePathChanged || originalSize != descriptorSizeBefore) {
+                            notes.add("ATOMIC_SUMMARY_REPUBLISHED " + name)
+                        }
+                    } else if (sourcePathChanged || copiedBytes != originalSize) {
                         warnings.add("SOURCE_CHANGED_DURING_EXPORT " + name)
                     }
                     val checksum = digest.digest().joinToString("") { byte ->
@@ -145,6 +171,7 @@ object DiagnosticEvidenceArchive {
                 appendLine("note=Source-history completeness cannot be proven from a ZIP alone.")
                 appendLine("note=SHA-256 covers exactly the copied raw bytes; no source files were changed.")
                 append(manifest)
+                notes.forEach { appendLine("note=" + it.replace("\n", "\\n")) }
                 warnings.forEach { appendLine("warning=" + it.replace("\n", "\\n")) }
             }
             zip.putNextEntry(ZipEntry("EXPORT-MANIFEST.txt"))

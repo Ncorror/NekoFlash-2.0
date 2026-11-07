@@ -17,6 +17,41 @@ main = (base/'MainActivity.kt').read_text()
 # REV18 reviewed receive-file, listing and unique-block progress fixes.
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
+# REV52 audits the exact diagnostic-only ADB revision. Convert only those
+# three reviewed log enhancements back to the REV51 binary source and
+# assert full original hash before legacy protocol-protection checks.
+# Do NOT relax or disable the transport integrity guard.
+def source_git_sha(data):
+    return hashlib.sha1(b'blob ' + str(len(data)).encode() + b'\0' + data).hexdigest()
+rev52_adb_hash = '5a4f9c9640e13b404ab1706a0b07dcfc40ee30ea'
+if source_git_sha(data) == rev52_adb_hash:
+    original_stale = 'onLog("ℹ️ ADB open: ignored stale CLSE for local=${header.arg1}, expected local=$localId")'
+    rev52_stale = 'onLog("ℹ️ ADB open: ignored stale CLSE local=${header.arg1}, remote=${header.arg0}, expected local=$localId, generation=${dispatcherGeneration.get()}")'
+    original_timeout = 'onLog("❌ ADB stream: no ACK for WRTE")'
+    rev52_timeout = 'onLog("❌ ADB stream: no ACK for WRTE local=${stream.localId}, remote=${stream.remoteId}, bytes=${payload.size}, pending=${pendingByteCount(stream)}, generation=${dispatcherGeneration.get()}")'
+    original_close = (
+        '                    stream.remoteId = header.arg0\n'
+        '                    closeAdbStream(stream)\n'
+        '                    onLog("❌ ADB stream closed during write")'
+    )
+    rev52_close = (
+        '                    val expectedRemote = stream.remoteId\n'
+        '                    stream.remoteId = header.arg0\n'
+        '                    closeAdbStream(stream)\n'
+        '                    // This may be a legitimately early remote close, or a\n'
+        '                    // misrouted/stale packet. Never infer command execution or\n'
+        '                    // automatically replay an arbitrary shell command.\n'
+        '                    onLog("❌ ADB stream closed during write local=${stream.localId}, " +\n'
+        '                        "expectedRemote=$expectedRemote, receivedRemote=${header.arg0}, " +\n'
+        '                        "payloadBytes=${payload.size}, bufferedResponseBytes=${pendingByteCount(stream)}, " +\n'
+        '                        "dispatcherGeneration=${dispatcherGeneration.get()}, transportConnected=$isConnected")'
+    )
+    for reviewed, original in ((rev52_stale, original_stale),
+                               (rev52_timeout, original_timeout),
+                               (rev52_close, original_close)):
+        assert data.count(reviewed.encode('utf-8')) == 1, 'Unreviewed REV52 ADB change'
+        data = data.replace(reviewed.encode('utf-8'), original.encode('utf-8'), 1)
+    assert source_git_sha(data) == '0362bbb3acb6516684f9dfca8dea8abd98b4a430', 'REV52 changed USB protocol code'
 # REV45: lint mistook a path on the *remote ADB target* for one on the
 # Android host. Normalize only this narrowly reviewed helper extraction back
 # to REV43 before applying the original whole-file integrity checks.
