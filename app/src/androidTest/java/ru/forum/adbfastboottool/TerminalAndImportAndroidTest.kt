@@ -580,8 +580,14 @@ class TerminalAndImportAndroidTest {
         scenario.onActivity { activity ->
             val output = activity.findViewById<RecyclerView>(R.id.rvConsoleOutput)
             val root = activity.findViewById<View>(R.id.rootCoordinator)
-            val minRowPx = (48 * activity.resources.displayMetrics.density + 0.5f).toInt()
-            compactWithIme = output.height < minRowPx &&
+            val density = activity.resources.displayMetrics.density
+            val minRootPx = (180 * density + 0.5f).toInt()
+            val minOutputPx = (72 * density + 0.5f).toInt()
+            // A 52 px viewport may contain three RecyclerView children, but
+            // expose just 3 px of the final row. Check legibility budget,
+            // not simply whether the list has non-zero measured height.
+            compactWithIme = (root.height < minRootPx ||
+                output.height - output.paddingTop - output.paddingBottom < minOutputPx) &&
                 ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) == true
             command(activity, "fastboot $token")
         }
