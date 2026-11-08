@@ -12,7 +12,7 @@
 - **H2, REV51–53:** ZIP SHA 55/55, 103/103, 35/35, 46/46 для **сохранённых данных**; в REV52 короткий shell падал, затем в REV53 10/10 и 2/2 физически PASS. Старые пропущенные заголовки REV48 не восстановлены.
 - **H3** POCO F7 Android16 → **другой заблокированный** POCO X3 Pro vayu Android12: исходный ZLP баг 223/512, 1016-байтный файл FAIL 3/3; после REV54 1023/1024/1025, 512-file push+pull SHA и 16 МиБ round-trip **FIELD PASS**. [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57) закрыта только для этой связки. **На H3 разделы не прошивались.**
 
-**Полный [реестр свидетельств](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md)** / [EN](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) и [акт документального аудита](testing/DOCUMENTATION-AUDIT-2026-11-08-RU.md) — приоритетные источники. Исторические разделы ниже сохраняются как датированные снимки, а не текущий план.
+**Полный [реестр свидетельств](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md)** / [EN](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md), [сверка 43 карточек TestBook](testing/TESTBOOK-43-EVIDENCE-MAP-2026-11-08-RU.md) и [акт документального аудита](testing/DOCUMENTATION-AUDIT-2026-11-08-RU.md) — приоритетные источники. Исторические разделы ниже сохраняются как датированные снимки, а не текущий план.
 
 ### Неподтверждённые и открытые пункты
 
