@@ -53,7 +53,7 @@
 
 - REV55 candidate [CI #501](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42426015449): 336 JVM, lint 0, Android API26 28/28 plus independent same-SHA rerun, API34 28/28, tester kit PASS. Merged [CI #502](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42427111327) passed. This also closed the specific H3 ZLP regression [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57). Broader intermittent tests [#16](https://github.com/Ncorror/NekoFlash-2.0/issues/16) remain open.
 - PR #60/#61 documentation and source-inventory checks merged; their CI passed.
-- PR #62 updated **43 TestBook cases including six LAB-01..06 plans**, and [candidate CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42515445165) passed; merged at [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). Post-merge [main CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929) requires a separate result check. **No LAB destructive operation was executed by creating those six cards.**
+- PR #62 updated **43 TestBook cases including six LAB-01..06 plans**, and [candidate CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42515445165) passed; merged at [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). Independent post-merge [main CI #42517047929](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929) finished **SUCCESS**: build, Android API26/34, tester-kit packaging and pinning. This does not certify LAB hardware operations. **No LAB destructive operation was executed by creating those six cards.**
 
 ## How to decide the next tests
 
