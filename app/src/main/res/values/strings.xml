@@ -380,7 +380,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_sideload_start">Start Sideload</string>
     <string name="layout_sideload_confirm_title">Send ZIP to Recovery?</string>
     <string name="layout_sideload_confirm_message">File: %1$s\nSize: %2$s\n\nRecovery will process this ZIP. This may overwrite installed partitions or user data. Start only when the target device is ready.</string>
-    <string name="layout_sideload_zip_required">Select a .zip file for Sideload.</string>
+    <string name="layout_sideload_zip_required">Note: this file has no .zip extension. Recovery will decide whether it is a valid package.</string>
     <string name="layout_sideload_empty_zip">This ZIP is empty. Nothing was sent.</string>
     <string name="layout_sideload_verdict_note">Install runs only in confirmed Sideload mode. The final result is determined by Recovery, not merely by file transfer.</string>
     <string name="shell_usb_panel_desc">USB connection details</string>
