@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import os
 import posixpath
 import re
 import sys
@@ -18,6 +19,13 @@ from zipfile import BadZipFile, ZipFile
 ENTRY_RE = re.compile(r"^file=(logs/([1-9][0-9]*)/(.+))\tbytes=([0-9]+)\tsha256=([0-9a-f]{64})$")
 MANIFEST_NAME = "EXPORT-MANIFEST.txt"
 CHUNK = 128 * 1024
+
+# Mirror DiagnosticEvidenceArchive.diagnosticName. Do not include arbitrary IMG/APK
+# files sharing the diagnostics workspace with raw evidence.
+DIAGNOSTIC_NAME_RE = re.compile(
+    r"^(?:(?:log-|trace-|session-summary-|usb-|diagnostic-|session-|crash-).+|last-crash-marker\.txt)$",
+    re.IGNORECASE,
+)
 
 
 def digest_stream(stream):
@@ -35,6 +43,35 @@ def digest_stream(stream):
 def digest_file(path: Path):
     with path.open("rb") as inp:
         return digest_stream(inp)
+
+
+def source_inventory(root: Path):
+    """Enumerate known diagnostic originals without changing the workspace."""
+    found = set()
+    errors = []
+    if not root.is_dir():
+        return found, ["source root is not a directory: " + str(root)]
+
+    def onerror(error):
+        errors.append("source inventory scan failed: " + str(error))
+
+    for current_dir, _dirs, filenames in os.walk(root, followlinks=False, onerror=onerror):
+        directory = Path(current_dir)
+        for filename in filenames:
+            if not DIAGNOSTIC_NAME_RE.fullmatch(filename):
+                continue
+            candidate = directory / filename
+            try:
+                real_path = candidate.resolve(strict=True)
+                if not real_path.is_relative_to(root):
+                    errors.append("diagnostic source escapes mapped root: " + str(candidate))
+                elif candidate.is_file():
+                    found.add(candidate.relative_to(root).as_posix())
+                else:
+                    errors.append("diagnostic source is not a regular file: " + str(candidate))
+            except OSError as error:
+                errors.append("diagnostic source cannot be inspected: " + str(candidate) + ": " + str(error))
+    return found, errors
 
 
 def parse_roots(values):
@@ -63,7 +100,7 @@ def safe_source(root: Path, relative: str) -> Path:
     return candidate
 
 
-def verify(path: Path, roots) -> int:
+def verify(path: Path, roots, check_source_inventory=False) -> int:
     errors = []
     warnings = []
     verified = 0
@@ -138,6 +175,25 @@ def verify(path: Path, roots) -> int:
                     else:
                         originals += 1
 
+        if check_source_inventory:
+            if not roots:
+                errors.append("source inventory requires at least one --source-root ID=PATH")
+            for ident, root in roots.items():
+                found, scan_errors = source_inventory(root)
+                errors.extend(scan_errors)
+                listed = {
+                    relative
+                    for source_ident, relative, _size, _hash in manifest_entries.values()
+                    if source_ident == ident
+                }
+                unarchived = sorted(found - listed)
+                if unarchived:
+                    sample = ", ".join(unarchived[:5])
+                    errors.append(
+                        "UNARCHIVED_DIAGNOSTIC_SOURCE root=" + ident +
+                        " count=" + str(len(unarchived)) + " sample=" + sample
+                    )
+
     print(f"ZIP: {verified} files passed SHA-256/size checks; source files matched: {originals}.")
     for warning in warnings:
         print("WARNING (export): " + warning)
@@ -159,10 +215,12 @@ def main():
     ap.add_argument("zip_file", type=Path, help="NekoFlash-diagnostics-*.zip")
     ap.add_argument("--source-root", action="append", default=[], metavar="ID=/absolute/dir",
                     help="Compare originals matching ZIP logs/ID/... against this directory (repeatable)")
+    ap.add_argument("--check-source-inventory", action="store_true",
+                    help="Also detect known diagnostic source files missing entirely from ZIP; use only with quiescent source folders")
     args = ap.parse_args()
     try:
         roots = parse_roots(args.source_root)
-        return verify(args.zip_file, roots)
+        return verify(args.zip_file, roots, check_source_inventory=args.check_source_inventory)
     except (OSError, BadZipFile, UnicodeError, ValueError, KeyError) as error:
         print("VERIFICATION ERROR: " + str(error), file=sys.stderr)
         return 1
