@@ -1869,11 +1869,13 @@ class MainActivity : AppCompatActivity() {
         val detail = if (source == null) {
             getString(R.string.layout_sideload_no_file)
         } else {
-            getString(
-                R.string.layout_sideload_selected_details, source.displayName,
-                source.sizeHint?.takeIf { it > 0L }?.let(::formatFileSize)
-                    ?: getString(R.string.layout_sideload_size_unknown)
-            )
+            val formattedSize = source.sizeHint?.takeIf { it > 0L }?.let(::formatFileSize)
+            if (formattedSize == null) {
+                // Keep the original name-only label for SAF providers without a size.
+                getString(R.string.layout_sideload_selected_file, source.displayName)
+            } else {
+                getString(R.string.layout_sideload_selected_details, source.displayName, formattedSize)
+            }
         }
         findViewById<TextView>(R.id.tvSideloadSelectedZip).text = detail
         val canStart = source != null && viewModel.operationActive.value != true &&
