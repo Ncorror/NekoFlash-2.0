@@ -1,3 +1,10 @@
+HISTORICAL REV45 KIT NOTICE / УВЕДОМЛЕНИЕ ОБ АРХИВНОМ НАБОРЕ
+This is the original pinned REV45 guide, NOT the current DEV test plan.
+Это архивная инструкция REV45, не текущий план. Не переписывай старые QA-файлы.
+Read docs/insiders/README.md and the real hardware evidence ledger before assigning retests.
+Актуальные результаты: docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md
+New APK+HTML must come from the same verified green main CI artifact.
+
 NekoFlash 2.0 Insiders • REV45 • Android hardware beta
 Telegram: https://t.me/+NR_FiUmvXlViOTUy
 
