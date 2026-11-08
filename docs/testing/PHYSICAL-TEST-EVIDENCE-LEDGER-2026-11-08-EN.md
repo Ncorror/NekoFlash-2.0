@@ -55,6 +55,21 @@
 - PR #60/#61 documentation and source-inventory checks merged; their CI passed.
 - PR #62 updated **43 TestBook cases including six LAB-01..06 plans**, and [candidate CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42515445165) passed; merged at [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). Independent post-merge [main CI #42517047929](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929) finished **SUCCESS**: build, Android API26/34, tester-kit packaging and pinning. This does not certify LAB hardware operations. **No LAB destructive operation was executed by creating those six cards.**
 
+## Original private ZIP checks, 8 November
+
+The first draft of this audit relied excessively on existing GitHub comments and overlooked the tester's **original uploaded archives**. We recovered and examined them locally. **No private log/trace bytes were committed to GitHub.** Full per-archive mapping with builds, session outcomes and limitations is in the [RU source-evidence appendix](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md).
+
+- REV48: `1794047242102.zip`, 49 entries and `1794048915556.zip`, 23 entries, both CRC PASS but without a modern export manifest. The first includes a physical terminal failure on the earlier `79c8c0a9d7ac` build (6 operations, 4 succeeded, 2 failed). The second has the historically **missing** first log/trace lines (8/6/2); ZIP CRC alone did not restore evidence.
+- REV51 `1794056370360.zip`: CRC PASS, **55/55** manifest SHA-256 and sizes, but status **INCOMPLETE_OR_UNVERIFIED**; 14 operations, 8 succeeded / 6 failed on build `18afb2c45cf6`.
+- REV52 `1794064372351.zip`: CRC PASS, **103/103** SHA-256, **INCOMPLETE_OR_UNVERIFIED**; 17 operations, 8 succeeded / 9 failed on build `cbe6cc87942f`.
+- REV53 `1794079211850.zip`: CRC PASS, **46/46** SHA-256, **CONSISTENT_SNAPSHOT**; two sessions: **10/10** on `b44792605c98` and **2/2** on `c48f8eae8009`.
+- REV54 `1794090330941.zip`, `1794090783149.zip`, `1794091135463.zip`, `1794091500167.zip`: CRC PASS; manifest checks respectively **31/31, 23/23, 65/65, 11/11**; all have **CONSISTENT_SNAPSHOT**. Their session outcomes include intermediate 7/8, later 4/4 and 4/4; preserve the intermediate failure without denying later successful evidence.
+- `NekoFlash_Hardware_QA_20261107.zip`: CRC PASS, 519 original QA corpus entries. This proves source test files were supplied, not by itself that any device transfer succeeded.
+
+The terminal output/header rotation bug has an independent physical acceptance note with screenshot on [Nov 7, PR #45](https://github.com/Ncorror/NekoFlash-2.0/pull/45#issuecomment-6707179253). **Do not reassign that same test.** The operator reports three submissions, but one public note alone is insufficient to fabricate three separate exact-build outcomes.
+
+File integrity **does not equal** complete original event history or full app-private source-directory inventory. Continue tracking [#50](https://github.com/Ncorror/NekoFlash-2.0/issues/50).
+
 ## How to decide the next tests
 
 Do not treat historic TestBook checkboxes as an inventory of missing coverage. Keep evidence and original logs intact. Only prepare a new test when the code or hardware actually changed, or when an existing result is ambiguous/missing; state that difference explicitly. The next focused campaign will be agreed **in chat**, using this ledger. No new destructive commands should be blindly copied from generic historic templates; only unlocked expendable hardware with verified off-device backups and recovery is eligible. Do not delete historical TestBook reports or publish raw device traces.
