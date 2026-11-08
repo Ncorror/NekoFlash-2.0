@@ -11,6 +11,27 @@ English
 </div>
 
 
+## Current evidence index — 8 November 2026 (post-REV54)
+
+**Authoritative detailed ledger:** [English](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) · [Russian](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). This section reconciles recent physical acceptance with the older alpha10/REV45 snapshots below. **Do not confuse build-specific PASS with all-devices approval.**
+
+| Pair | APK scope | Real result | Limits |
+| --- | --- | --- | --- |
+| POCO F7 HOST → **unlocked** POCO X7 Pro rodin | historical alpha10 | ADB, Quick Flash active/all slots; two **real 64 MiB `vendor_boot_a/b`** writes, Recovery/Sideload classification, final Android boot and post-fix five shell commands **PASS** | Sideload's standalone transfer status was **VERIFY_PENDING**, the subsequent system boot is separate evidence; not current DEV |
+| POCO F7 HOST → **unlocked** POCO X3 Pro vayu Android 14 | alpha10.1 | ADB/reconnect, Fastboot, **128 MiB real recovery flash**, Recovery, **three Sideload packages Recovery-verified SUCCESS**, Fastbootd and final Android boot **PASS** | Summary retained `verificationPending=3` despite later Recovery evidence; not three install failures |
+| POCO F7 HOST → **unlocked** POCO X3 Pro vayu Android 14 | **REV48**, 7 Nov | Another **128 MiB recovery flash** (`flash:recovery OKAY`), Recovery boot, Sideload detection and Fastbootd mode **PASS** | Separate **OrangeFox-R11.3-vayu.zip 73,757,208 bytes stayed `VERIFY_PENDING`**; no proven installation result and no independent recovery readback |
+| POCO F7 HOST → a **different locked** POCO X3 Pro vayu Android 12 | **REV54**, 7–8 Nov | 1023/1024/1025-byte WRTE boundaries with SHA; fresh **512/512 recursive push+pull**, 16 MiB byte-exact roundtrip **PASS** | Initial pre-fix push failed at 223 files (1024-byte boundary); fixed only this tested USB pairing. **No flash, format, wipe or unlock on the locked TARGET** |
+
+Additional **REV53** hardware checks on unlocked vayu Android14 completed 10/10 short shell-v2 commands (8 early-CLSE buffered replies) and a separate post-polish 2/2; ZIP byte-level manifests passed. REV51/52 ZIP byte integrity checks passed for the files captured, **but the inherited REV48 missing log/trace prologue remains unrecovered** ([#50](https://github.com/Ncorror/NekoFlash-2.0/issues/50)). Chrome TestBook `content://` export had a physical FAIL ([#49](https://github.com/Ncorror/NekoFlash-2.0/issues/49)); APK SAF ZIP export was a different path.
+
+**Integrated source vs physical acceptance:** REV54 ZLP issue [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57) was closed only after hardware evidence and green REV55 merge CI [#502](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42427111327). The later scenario-only PR #62 merged into [`main=6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e); [post-merge CI #42517047929](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929) **SUCCESS**, but merging a TestBook does not execute 43 physical tests or establish new destructive acceptance.
+
+**Remaining:** on-device physical verification of Chrome JSON/ZIP export and progress restore, previous log-history loss, stale Sideload result after force-stop, terminal rotation/IME, intermittent DocumentsUI and targeted memory stress; keep these open and avoid blanket re-running the already accepted H3 USB corpus. **Operation Center visual redesign is deferred by project decision**.
+
+---
+
+## Historical release and REV45 snapshots (dated evidence, not the current source)
+
 ## REV45 hardware beta · 2 November 2026
 
 The reference APK is from [main CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886), commit `a31dedadd4ad`. Both emulator jobs passed. A verified physical HOST → TARGET report for REV45 is still pending.
