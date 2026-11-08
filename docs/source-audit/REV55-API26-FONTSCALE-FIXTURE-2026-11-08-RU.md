@@ -43,3 +43,12 @@ AndroidX `AndroidFontScaleHelper` (https://android.googlesource.com/platform/fra
 Приёмка усилена: `waitForLargeFontScale()` теперь вызывается до начала операции, после поворота и после явного recreation; на API26 проверяются и `Configuration.fontScale`, и `scaledDensity/density`. Все проверки прокрутки, доступности кнопки отчётов, pending cancel, снимки и остальные 27 тестов сохранены. Никаких пустых обходов, skip, изменения таймаута либо подмены результатов.
 
 **Этот механизм пока лишь кандидат.** Его действительное действие необходимо подтвердить полным CI (включая эмуляторный API26). Не менять `main` и не закрывать #16/#57 при красных результатах.
+
+
+## Итог приёмки и интеграции (обновлено 8 ноября 2026)
+
+- REV55b на SHA `8dd250407bdc328201f5aebbf2778d44c5a091c1`: [CI #501](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42426015449) полностью **PASS** — 336/336 JVM, lint без замечаний, Android API26 28/28, Android API34 28/28, комплект тестировщика. **Независимый повтор API26 на том же SHA тоже 28/28 PASS** (вторая попытка CI #501).
+- [PR #59](https://github.com/Ncorror/NekoFlash-2.0/pull/59) **слит** в `main` обычным merge-коммитом [`efdc4a96e479`](https://github.com/Ncorror/NekoFlash-2.0/commit/efdc4a96e479d360a57a8b7dbba49d2ff905af13). Предыдущий `main` сохранён в `backup/main-before-rev55-ci-20261108`. Ни один production Kotlin/ADB/USB/Fastboot файл этим PR не изменён.
+- [Послемержевый CI #502](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42427111327) — **PASS** по точному merge SHA: build, Android API26, Android API34, пакет Insiders и pinning завершились успешно. Это независимая от PR CI контрольная точка. Issue #16 также содержит независимую историческую нестабильность других UI-тестов; не закрывать её целиком только по одному исправленному предусловию.
+
+Предыдущие формулировки «кандидат» выше оставлены как хронология первоначального исследования и ошибок первых попыток; текущий статус указан в этом разделе.

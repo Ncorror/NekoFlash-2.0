@@ -2,15 +2,19 @@
 
 # NekoFlash 2.0
 
-**Development snapshot REV49:** [PR #45](https://github.com/Ncorror/NekoFlash-2.0/pull/45) updates the Operation Center and temporarily hides Flash → Tools. The published REV45 kit and gallery below remain the previous reference; use the successful PR tester-kit artifact for these changes.
+**Current development source: REV55** — `main` at [`efdc4a96e`](https://github.com/Ncorror/NekoFlash-2.0/commit/efdc4a96e479d360a57a8b7dbba49d2ff905af13) (8 Nov 2026). REV49/51/52/53/54/55 are merged; [PR #59](https://github.com/Ncorror/NekoFlash-2.0/pull/59) fixes the Android 8 **test fixture only**. Candidate CI [#501](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42426015449) passed 336 JVM tests, lint, 28/28 installed tests on each API 26 and 34, plus tester-kit packaging; API26 also passed an independent same-SHA rerun. The **post-merge `main` CI #502** is also **fully SUCCESS** ([verified run](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42427111327)): build, Android API 26, API 34 and tester-kit jobs passed. The original ZLP regression [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57) is closed for the tested hardware pairing; further device compatibility remains a separate task.
+
+**Physical OTG acceptance (specific device pair):** REV54's candidate APK passed 1023/1024/1025-byte USB WRTE boundaries, recursive 512-file push/pull with SHA-256 checks and a 16 MiB round trip on POCO F7 host → locked POCO X3 Pro / Android 12 target; [evidence discussion](https://github.com/Ncorror/NekoFlash-2.0/issues/57). This does **not** certify other devices or destructive flashing. The experimental terminal PR #56 was closed unmerged and its branch deleted; the regular terminal remains. [Development status](docs/DEVELOPMENT_STATUS.md).
+
+The downloadable REV45 kit and screenshots below remain **historical reference material**, not the newest REV55 APK. For an up-to-date test build use a **successful `main` workflow artifact**, check its recorded commit and SHA-256, and retain older diagnostics before replacing any DEV installation.
 
 English · [Русский](README_ru.md)
 
 Run ADB and Fastboot from one Android phone to service a second phone over USB OTG. The host needs Android 8.0+ and USB Host support. Use a data-capable cable. Root is optional on the host.
 
-**Hardware beta testing · REV45**
+**Published reference kit · REV45 (historical)**
 
-We are collecting HOST → TARGET reports for the REV45 development build. The debug app installs alongside the original NekoFlash. Physical OTG, reconnect and partition-write results are still pending for this build.
+The release-linked download below is the older REV45 development build, not the current REV55 source. The debug app installs alongside the original NekoFlash. Physical OTG, reconnect and partition-write results are still pending for this build.
 
 **[Download the Insiders tester kit (ZIP)](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [Official GitHub Actions downloads](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
 
