@@ -64,6 +64,17 @@ with tempfile.TemporaryDirectory(prefix="nekoflash-verifier-") as td:
     (source / "trace-2026-11-07-13-51-12.txt").unlink()
     status, output = run_quiet(zpath, {"1": source}, check_source_inventory=True)
     assert status == 0 and "CONSISTENT SNAPSHOT" in output, output
+
+    # Never treat a diagnostic-named symlink outside its mapped source root
+    # as acceptable evidence. The verifier must only inspect safe local paths.
+    outside = root / "external-diagnostic.txt"
+    outside.write_bytes(b"private external file")
+    escaped = source / "trace-escaped.txt"
+    escaped.symlink_to(outside)
+    status, output = run_quiet(zpath, {"1": source}, check_source_inventory=True)
+    assert status == 1 and "diagnostic source escapes mapped root" in output, output
+    escaped.unlink()
+
     status, output = run_quiet(zpath, check_source_inventory=True)
     assert status == 1 and "requires at least one --source-root" in output, output
 
