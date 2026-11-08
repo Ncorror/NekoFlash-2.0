@@ -12,7 +12,7 @@ English&nbsp;&nbsp;|&nbsp;&nbsp;[Русский](#русская-версия--r
 
 ## Approved Design Decisions
 
-**Current REV44 status:** The approved designs have progressed through DEV REV43; physical HOST→TARGET beta testing is now being prepared. See [current status](../DEVELOPMENT_STATUS.md) and [Insiders testbook](../insiders/testbook.html). **Historical REV5 status:** at that checkpoint only Sideload REV3 had been ported.
+**Historical design index (REV2–REV4).** The previous REV44 statement below is obsolete: development has advanced to merged DEV [baseline 6a8accd8](../DEVELOPMENT_STATUS.md) and real H1/H2/H3 physical testing is documented in the [evidence ledger](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). This index records approved mockups and decisions, not the current Android screen layout or a new test plan. At historical REV5 only Sideload REV3 had been ported.
 
 - **REV2:** `NekoFlash-2.0-MASTER-DECISIONS-2026-10-09-RU-REV2.md`, decision register CSV, and static audits. Five tabs, unified shell, USB status strip, and terminal.
 - **REV3 (Approved):** `NekoFlash-2.0-SIDELOAD-REV3-APPROVED-2026-10-10.md` — third tab is dedicated Sideload only, without extra miscellaneous ADB functions.
