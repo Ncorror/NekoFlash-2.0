@@ -1801,9 +1801,10 @@ class MainActivity : AppCompatActivity() {
             val display = WorkspaceImportNaming.sanitizeImportedFileName(
                 queryDisplayName(uri) ?: getString(R.string.rev12_sideload_unnamed)
             )
+            // Extension is advisory only: professional ADB Sideload accepts arbitrary
+            // user-selected package names; Recovery decides whether bytes are valid.
             if (!display.endsWith(".zip", ignoreCase = true)) {
-                Toast.makeText(this, R.string.layout_sideload_zip_required, Toast.LENGTH_LONG).show()
-                return@registerForActivityResult
+                viewModel.log(getString(R.string.layout_sideload_zip_required))
             }
             val size = queryFileSize(uri)
             if (size != null && size <= 0L) {
@@ -1853,7 +1854,7 @@ class MainActivity : AppCompatActivity() {
         }
         val display = (savedInstanceState?.getString(STATE_SIDELOAD_NAME)
             ?: prefs.getString(SIDELOAD_SELECTED_NAME, null))
-            ?.takeIf { it.endsWith(".zip", ignoreCase = true) } ?: return null
+            ?.takeIf { it.isNotBlank() } ?: return null
         val size = when {
             savedInstanceState?.containsKey(STATE_SIDELOAD_SIZE) == true ->
                 savedInstanceState.getLong(STATE_SIDELOAD_SIZE)
