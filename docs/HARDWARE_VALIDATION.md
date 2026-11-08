@@ -26,7 +26,7 @@ Additional **REV53** hardware checks on unlocked vayu Android14 completed 10/10 
 
 **Integrated source vs physical acceptance:** REV54 ZLP issue [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57) was closed only after hardware evidence and green REV55 merge CI [#502](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42427111327). The later scenario-only PR #62 merged into [`main=6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e); [post-merge CI #42517047929](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929) **SUCCESS**, but merging a TestBook does not execute 43 physical tests or establish new destructive acceptance.
 
-**Remaining:** on-device physical verification of Chrome JSON/ZIP export and progress restore, previous log-history loss, stale Sideload result after force-stop, terminal rotation/IME, intermittent DocumentsUI and targeted memory stress; keep these open and avoid blanket re-running the already accepted H3 USB corpus. **Operation Center visual redesign is deferred by project decision**.
+**Remaining:** on-device physical verification of Chrome JSON/ZIP export and progress restore, previous log-history loss, stale Sideload result after force-stop, remaining separate collapse-animation/rare landscape IME viewport (the **physical terminal output/header rotation regression already PASSED on Nov 7**, [PR #45](https://github.com/Ncorror/NekoFlash-2.0/pull/45)), intermittent DocumentsUI and targeted memory stress; keep these open and avoid blanket re-running the already accepted H3 USB corpus. **Operation Center visual redesign is deferred by project decision**.
 
 ---
 
