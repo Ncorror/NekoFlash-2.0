@@ -73,6 +73,23 @@ assert len(ids) == len(set(ids)), f"Duplicate test IDs: {len(ids) - len(set(ids)
 for id_ in ("TERM-06", "TERM-05", "ADB-07", "ADB-08", "ADB-09", "USB-03", "FB-04", "CI-02", "LOG-03"):
     assert id_ in ids, f"Missing REV43 field test: {id_}"
 
+# Field campaign 2026-11-08 updates only TESTS data, not TestBook storage,
+# layout, export handlers or build provenance. Exactly six independent LAB
+# IDs prevent earlier statuses from being silently reused for destructive work.
+lab_lines = [line.strip().rstrip(",") for line in scenarios.splitlines()
+             if line.strip().startswith('{"id":"LAB-')]
+lab_objects = [json.loads(line) for line in lab_lines]
+expected_labs = [f"LAB-{number:02d}" for number in range(1, 7)]
+assert [case["id"] for case in lab_objects] == expected_labs, "LAB cases must be ordered 01..06"
+assert len(ids) == 43, f"Changed legacy 43-case TestBook count: {len(ids)}"
+assert all(case["stage"] == "lab" and case["intro"]["ru"] and
+           case["intro"]["en"] and case["steps"] and case["expect"]["ru"] and
+           case["expect"]["en"] for case in lab_objects)
+assert "разблокирован" in lab_objects[0]["intro"]["ru"].lower()
+assert any("backup" in step["en"].lower() or "recovery" in step["en"].lower()
+           for step in lab_objects[0]["steps"]), "LAB-01 needs backup/recovery gates"
+assert "NekoFlashQA-REV56" in scenarios, "Missing isolated device test corpus"
+
 node = shutil.which("node")
 assert node, "Node.js is required on GitHub Actions runner to validate inline JavaScript syntax"
 script = source.split("<script>", 1)[1].split("</script>", 1)[0]
