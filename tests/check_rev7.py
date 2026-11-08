@@ -29,21 +29,37 @@ rev51_lossless_vm_blob = '1c31cf4e1b024e3a602aa2445f8d8ebfc82ad9f3'
 # were added to this exact orchestrator blob. Unknown changes still fail.
 rev52_admission_vm_blob = 'a0e2f3c6ef4271a124bcf80a7280d55edbb9de3b'
 rev52_explicit_transport_vm_blob = '25c0302750d40cf713833339dc492289bbec3aae'
-if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
+# REV55 reviews a narrow Sideload Recovery-transition postcondition with
+# strict same-device and same-attempt binding. Pin the COMPLETE source blob.
+rev55_recovery_transition_vm_blob = '34c22e904c731594084ccd725ffeb6516f235aa7'
+if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob):
     journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
     assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body
     assert 'if (duplicate)' not in journal_body
     assert 'recordDuplicateSuppressed()' not in journal_body
-    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob):
+    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob):
         admission = vm.split('private fun startOperation(')[1].split('val gen = operationGeneration.incrementAndGet()')[0]
         assert 'UsbOperationAdmission.allowed(' in admission
         assert 'FlashOperationService.submit' not in admission
         assert 'No connected ADB/Fastboot device' in admission
         assert 'requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT' in vm
-        if git_blob_sha(raw_vm) == rev52_explicit_transport_vm_blob:
+        if git_blob_sha(raw_vm) in (rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob):
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT') == 12
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.ADB') == 7
             assert vm.count('startOperation(') == 20  # 19 call sites and the function declaration
+    if git_blob_sha(raw_vm) == rev55_recovery_transition_vm_blob:
+        policy_path = root/'app/src/main/java/ru/forum/adbfastboottool/SideloadRecoveryTransitionPolicy.kt'
+        policy = policy_path.read_text()
+        # Ensure the reviewed recovery switch cannot be promoted into a false
+        # install SUCCESS, and is bound to the completed same-USB attempt.
+        assert vm.count('observePendingSideloadRecoveryTransition(proto)') == 1
+        assert 'sameUsbSerial = pending.serial != null && pending.serial == currentUsbSerial()' in vm
+        assert 'OperationOutcomeKind.VERIFY_PENDING' in vm.split('private fun observePendingSideloadRecoveryTransition(')[1].split('private fun verifyPendingSideloadIfReady(')[0]
+        assert 'before.vendorId == after.vendorId' in policy
+        assert 'before.deviceCodename.equals(after.deviceCodename, true)' in policy
+        assert 'before.productName.equals(after.productName, true)' in policy
+        assert 'transferFinished' in policy
+        assert 'fun sideloadZip(' in (root/'app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt').read_text()
 elif git_blob_sha(raw_vm) != expected_blob:
     reviewed_change = (
         b'                keyDirectory = adbKeyDir,\n'
