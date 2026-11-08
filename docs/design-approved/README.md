@@ -28,7 +28,7 @@ HTML and PNG design mockups are retained solely for visual reference and UI alig
 
 # NekoFlash 2.0 — согласованные решения
 
-**Актуальный REV44:** исходники прошли последующие этапы до REV43, идёт подготовка аппаратного тестирования. [Статус](../DEVELOPMENT_STATUS.md), [тестбук](../insiders/testbook.html). **Исторический REV5:** тогда был перенесён только минимальный Sideload REV3.
+**Архив утверждённых дизайнов REV2–REV4.** Формулировка о «текущем REV44» устарела: рабочая DEV-база уже [6a8accd8](../DEVELOPMENT_STATUS.md), а реальные результаты H1/H2/H3 есть в [реестре](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). Это согласованные макеты, не гарантированно актуальный интерфейс APK и не новый план испытаний. **Исторический REV5:** тогда был перенесён только минимальный Sideload REV3.
 
 - **REV2:** `NekoFlash-2.0-MASTER-DECISIONS-2026-10-09-RU-REV2.md`, реестр CSV и аудиты. Пять вкладок, общий дизайн, USB-панель, терминал.
 - **REV3 (утверждено):** `NekoFlash-2.0-SIDELOAD-REV3-APPROVED-2026-10-10.md` — третья вкладка только Sideload, никаких дополнительных ADB-функций.
