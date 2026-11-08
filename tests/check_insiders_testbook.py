@@ -86,7 +86,8 @@ assert all(case["stage"] == "lab" and case["intro"]["ru"] and
            case["intro"]["en"] and case["steps"] and case["expect"]["ru"] and
            case["expect"]["en"] for case in lab_objects)
 assert "разблокирован" in lab_objects[0]["intro"]["ru"].lower()
-assert "BACKUP" in lab_objects[0]["intro"]["en"].upper() or "recovery" in lab_objects[0]["intro"]["en"].lower()
+assert any("backup" in step["en"].lower() or "recovery" in step["en"].lower()
+           for step in lab_objects[0]["steps"]), "LAB-01 needs backup/recovery gates"
 assert "NekoFlashQA-REV56" in scenarios, "Missing isolated device test corpus"
 
 node = shutil.which("node")
