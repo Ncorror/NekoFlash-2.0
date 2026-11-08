@@ -1,14 +1,33 @@
-# NekoFlash 2.0 · состояние на 8 ноября 2026
+# NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
-## Актуальный снимок: `main` после REV55
+## Текущая база: `main=6a8accd8e33e` после PR #62
 
-- **Код:** [`main=efdc4a96e479`](https://github.com/Ncorror/NekoFlash-2.0/commit/efdc4a96e479d360a57a8b7dbba49d2ff905af13), PR #45 (REV49), #51 (REV51), #54 (REV52), #55 (REV53), #58 (REV54) и #59 (REV55) слиты; REV55 содержит только тестовый runner/font-scale fixture.
-- **Тесты кандидата:** [CI #501](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42426015449) PASS: 336 JVM, lint 0, API26 28/28 и независимый повтор API26 28/28 на том же SHA, API34 28/28, комплект тестировщика PASS. [Послемержевый CI `main` #502](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42427111327) **PASS**: build, API26, API34, пакет Insiders и pinning завершились успешно. Статус проверен по основному SHA, а не перенесён автоматически с PR.
-- **Аппаратная приёмка REV54:** POCO F7 Android 16 (host) → второй POCO X3 Pro vayu Android 12 с заблокированным загрузчиком: WRTE 1023/1024/1025, push/pull 512 файлов и 16 МиБ с проверкой SHA-256/байтов PASS. Подтверждены **именно эти операции и эта пара устройств**, не прошивка разделов. Приёмка этого дефекта завершена, [issue #57](https://github.com/Ncorror/NekoFlash-2.0/issues/57) закрыта с отчётом и ограничениями совместимости.
-- **Диагностика:** REV51 сохраняет повторяющиеся события и проверяет состав ZIP. Исторический пропуск начала журнала и сквозная проверка сохранности всех источников остаются в [issue #50](https://github.com/Ncorror/NekoFlash-2.0/issues/50); не объявлять эту проблему полностью решённой.
-- **TestBook:** в `main` присутствуют ручное копирование, варианты Share/Save и предупреждения об ограничениях Chrome `content://`. Физическая приёмка экспорта на Android остаётся в [issue #49](https://github.com/Ncorror/NekoFlash-2.0/issues/49).
-- **Терминал:** PR #56 закрыт **без слияния**, `test/terminal-input-lab` удалена; штатный терминал не заменён. Старые проверки поворота/IME остаются.
-- **Публикация:** официальный подписанный release REV55 не подтверждён. Опубликованный REV45 kit и снимки — историческая основа; для текущего теста использовать артефакт успешного `main` CI, обязательно фиксируя SHA сборки.
+**Исходники:** [`6a8accd8e33eef946efa1f18a829b0cc2b797e6e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). Последовательные изменения: REV49 (#45), REV51 (#51), REV52 (#54), REV53 (#55), REV54 (#58), REV55 (#59), документация #60, проверка состава диагностических source #61, задания TestBook #62. **Стабильный подписанный релиз на этот SHA не объявлялся.**
+
+**Автоматические проверки:** PR #62 [CI #42515445165](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42515445165) **PASS**, затем отдельный [post-merge main CI #42517047929](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929) **SUCCESS** по тому же источнику интеграции: build, API26, API34, упакованный двухфайловый Insiders kit и pinning успешны. Число 336 JVM/28+28 относится к отдельному точному [REV55 CI #501](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42426015449), а не автоматически к каждому будущему SHA.
+
+**Аппаратные испытания уже проводились** и не должны вновь назначаться как «первые»:
+- **H1** POCO F7 Android16 → разблокированный POCO X7 Pro rodin: ранее на alpha10 реальная запись `vendor_boot_a` и `vendor_boot_b` по 64 МиБ, Fastboot и final boot PASS.
+- **H2** POCO F7 Android16 → **разблокированный** POCO X3 Pro vayu Android14: на alpha10.1 Recovery flash 128 МиБ, три Recovery-verified Sideload ZIP, Fastbootd и final boot PASS; отдельная **REV48** запись Recovery 128 МиБ и переход в Fastbootd PASS, но **REV48 OrangeFox-R11.3 ZIP остался VERIFY_PENDING**, не установленный PASS.
+- **H2, REV51–53:** ZIP SHA 55/55, 103/103, 35/35, 46/46 для **сохранённых данных**; в REV52 короткий shell падал, затем в REV53 10/10 и 2/2 физически PASS. Старые пропущенные заголовки REV48 не восстановлены.
+- **H3** POCO F7 Android16 → **другой заблокированный** POCO X3 Pro vayu Android12: исходный ZLP баг 223/512, 1016-байтный файл FAIL 3/3; после REV54 1023/1024/1025, 512-file push+pull SHA и 16 МиБ round-trip **FIELD PASS**. [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57) закрыта только для этой связки. **На H3 разделы не прошивались.**
+
+**Полный [реестр свидетельств](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md)** / [EN](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) и [акт документального аудита](testing/DOCUMENTATION-AUDIT-2026-11-08-RU.md) — приоритетные источники. Исторические разделы ниже сохраняются как датированные снимки, а не текущий план.
+
+### Неподтверждённые и открытые пункты
+
+- [#49](https://github.com/Ncorror/NekoFlash-2.0/issues/49): REV48 TestBook Chrome `content://` copy/ZIP/JSON **FIELD FAIL**; новый fallback проверен кодом/CI, но реального физического PASS нет. Экспорт raw ZIP из APK — отдельный успешно наблюдавшийся механизм.
+- [#50](https://github.com/Ncorror/NekoFlash-2.0/issues/50): целостность байтов ZIP проверялась физически, но исторический начальный `log`/`trace` REV48 отсутствовал; `--check-source-inventory` PR #61 подтверждён CI, не новая аппаратная приемка всех источников.
+- [#47](https://github.com/Ncorror/NekoFlash-2.0/issues/47): возвращавшаяся после force-stop плашка `VERIFY_PENDING`; код исправлялся, физический регрессионный итог на новой APK не установлен. [#46](https://github.com/Ncorror/NekoFlash-2.0/issues/46) — **дизайн Operation Center отложен** по решению автора.
+- [#48](https://github.com/Ncorror/NekoFlash-2.0/issues/48): intermittent DocumentsUI root, без доказанной причины; [#20](https://github.com/Ncorror/NekoFlash-2.0/issues/20): поворот/IME на телефоне; [#19](https://github.com/Ncorror/NekoFlash-2.0/issues/19), [#36](https://github.com/Ncorror/NekoFlash-2.0/issues/36): большие буферы/память и общий стресс, не закрытые одним 512-файловым прогоном; [#16](https://github.com/Ncorror/NekoFlash-2.0/issues/16) — более широкая нестабильность CI-эмулятора.
+- **TestBook:** 43 сценария и LAB-01…LAB-06 — **список заданий**, не 43 новых аппаратных результата. Его дизайн, данные/прогресс/экспорт на PR #62 сохранены; исторические галочки не засчитывают destructive. **Следующие тесты составляются по дельте от реестра здесь в чате**, а не автоматически по всем карточкам. Существующие TestBook/отчёты не удалять.
+- **Получение APK:** после зелёного `main` CI бери [Insiders tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess), состоящий только из APK и соответствующего testbook.html (run ID, commit и SHA совпадают). Опубликованный REV45 pinned kit остаётся **архивным**; сам исходный HTML в `main` может включать старую ссылку на его контрольную сборку.
+
+---
+
+## Исторические снимки (сохранены без подмены версий)
+
+Ниже — прежние отчёты REV27/43/45/46–55. Любое утверждение «текущий», «main», «ещё не прошли» в них относится **к дате соответствующего исторического среза**, не к текущему `main`.
 
 ## Архивный снимок до интеграции REV49 — 7 ноября 2026
 
