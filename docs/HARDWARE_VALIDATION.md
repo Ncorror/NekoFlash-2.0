@@ -1,5 +1,23 @@
 <div align="center">
 
+## New physical field evidence — 9 November 2026, unlocked vayu
+
+This section **supplements** (does not retroactively rewrite) the 8 Nov and alpha10/REV48 history below. [Full RU details](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md) · [EN summary](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md).
+
+| Real hardware result | Classification |
+| --- | --- |
+| HOST POCO F7 → **unlocked A-only vayu**, current `main` build `6.0.0-alpha11+6a8accd8e33e.42517047929`: Mass Flash `boot` 128 MiB + `dtbo` 32 MiB + `recovery` 128 MiB; all final Fastboot OKAY, subsequent Recovery booted | **FIELD PASS 3/3**, not an Android-system boot guarantee |
+| `fastboot format userdata` generated F2FS + flash OKAY; Android could not boot, `init_user0_failed` | **Android boot FAIL / reason UNKNOWN** — [#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65) |
+| `fastboot -w`: `userdata` erased and rewritten; `erase:cache` no final reply for ~57/85 seconds, cancelled; metadata not erased | **PARTIAL DESTRUCTIVE FAIL** — [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), no automatic retry |
+| LineageOS original ZIP SHA-256 not equal to official; Recovery signature error 21 | **INSTALL FAIL due to mismatched source ZIP**; cannot infer USB transport fault |
+| OrangeFox R11.3 ZIP sent from Lineage Recovery; then new OrangeFox Recovery enumerated | **Recovery switch FIELD OBSERVED; ZIP installer exit code UNKNOWN**, not unconditional INSTALL PASS |
+| Same device candidate [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) | **CI PASS** (346 JVM, lint 0, API 26 and 34); **NO field acceptance of the new APK** |
+
+No flash/format was ever performed on the **other locked vayu**. Original private logs and photos remain private. Do not repeat Mass Flash/format on this TARGET to re-prove historical tests; investigate the failures instead.
+
+---
+
+
 <img src="artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
 
 # Physical-Device Validation
