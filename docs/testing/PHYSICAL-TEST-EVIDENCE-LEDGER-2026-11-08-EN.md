@@ -1,5 +1,20 @@
 # NekoFlash 2.0 — evidence ledger for tests already executed
 
+## #72 — 2 ms retry FIELD FAIL; xHCI recovery-window candidate
+
+Private diagnostic `NekoFlash-diagnostics-1794264520796.zip`: CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse. Exact build: `6.0.0-alpha11+94e870cf849d.42710802916`.
+
+The 256 MiB Pull confirms the first zero-byte `-EPROTO`; the v1 retry was actually exercised (`urbSubmissions=2`) but the second URB never completed and ended after 15,005 ms as `ETIMEDOUT` / `stage=stall_timeout`. Therefore the 2 ms retry is **FIELD FAIL**. Lifecycle remains FIELD PASS: failed=1, cancelled=0, WakeLock released immediately.
+
+Linux xHCI transaction-error handling uses endpoint halt/reset recovery and explicitly allows restart/STOPPED races on a millisecond scale with an up-to-100 ms recovery window. The next candidate keeps the same zero-byte-only safety predicate but waits **150/300/600 ms**. It deliberately avoids USBDEVFS_RESETEP and CLEAR_HALT without a real EPIPE stall.
+
+Exact head `6775cb3fbe2733f6ba97af14fc95e9f5a69a5534`: [CI #42715598717](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42715598717) SUCCESS; build/native/JVM/lint/API26 PASS, isolated API34 rerun PASS after the existing terminal-rotation visibility flake, tester kit PASS. [Matching tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42715598717/artifacts/13719825357).
+
+Status: **CI PASS / FIELD PENDING**. Run one physical 256 MiB Pull only; no Push/Sideload/flash/wipe repetition.
+
+---
+
+
 ## #72 — kernel EPROTO proven; bounded zero-byte retry candidate
 
 Private diagnostic `NekoFlash-diagnostics-1794262112529.zip`: CRC PASS, `CONSISTENT_SNAPSHOT`, 5/5 manifest entries match byte size and SHA-256, 2/2 JSON parse. The exact APK came from CI #42705941131.
