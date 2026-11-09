@@ -2870,48 +2870,20 @@ class AdbProtocol(
         val conn = connection ?: return null
         val ep = endpointIn ?: return null
         val buffer = inboundHeaderBuffer
-        if (AdbNativeUsbfsIn.isAvailable) {
-            val native = AdbNativeUsbfsIn.readExact(
-                connection = conn,
-                endpoint = ep,
-                buffer = buffer,
-                offset = 0,
-                length = buffer.size,
-                timeoutMs = timeoutMs.coerceAtLeast(1)
-            )
-            if (!native.success) {
-                if (native.timedOut && native.bytesTransferred == 0) {
-                    // Normal dispatcher idle poll: no header byte was consumed,
-                    // so stream synchronization is intact and the reader may wait again.
-                    return null
+        var totalRead = 0
+
+        while (totalRead < buffer.size) {
+            val read = conn.bulkTransfer(ep, buffer, totalRead, buffer.size - totalRead, timeoutMs)
+            if (read <= 0) {
+                if (totalRead > 0) {
+                    directReadFailureCode = AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT
+                    directReadFailureMessage =
+                        "ADB header interrupted after $totalRead/${buffer.size} bytes (result=$read); stream synchronization is no longer trusted"
+                    onLog("❌ $directReadFailureMessage")
                 }
-                directReadFailureCode = when {
-                    native.disconnected || connection == null ->
-                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
-                    native.bytesTransferred > 0 ->
-                        AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT
-                    else ->
-                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED
-                }
-                directReadFailureMessage = "ADB header ${native.message}"
-                onLog("❌ $directReadFailureMessage")
                 return null
             }
-        } else {
-            var totalRead = 0
-            while (totalRead < buffer.size) {
-                val read = conn.bulkTransfer(ep, buffer, totalRead, buffer.size - totalRead, timeoutMs)
-                if (read <= 0) {
-                    if (totalRead > 0) {
-                        directReadFailureCode = AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT
-                        directReadFailureMessage =
-                            "ADB header interrupted after $totalRead/${buffer.size} bytes (result=$read); stream synchronization is no longer trusted"
-                        onLog("❌ $directReadFailureMessage")
-                    }
-                    return null
-                }
-                totalRead += read
-            }
+            totalRead += read
         }
 
         val cmd   = readIntLe(buffer, 0).toLong() and 0xFFFFFFFFL
