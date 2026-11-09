@@ -1,5 +1,25 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+## Аудит #72 — серия ADB Pull, 9–10 ноября
+
+**Стенд:** POCO F7 / onyx Android 16 HOST → разблокированный POCO X3 Pro / vayu TARGET. TARGET проверялся и в OrangeFox Recovery, и в загруженном Evolution X Android 14. Исходные диагностические ZIP сохранены приватно; публичный GitHub содержит только обезличенную выжимку.
+
+| Ревизия / механизм | Реальный исход | Что доказано |
+| --- | --- | --- |
+| Исходный Java ADB-IN, 1-МиБ WRTE | **FIELD FAIL** в Recovery и Android | `adb push` 256 МиБ PASS, `pull` падает; после diagnostic fix причина раскрыта как `USB_IN_FAILED`, один факт: 1 015 808 / 1 048 576 байт |
+| Один synchronous `bulkTransfer(IN)` на 1 МиБ | **FIELD FAIL** | 0/1 048 576, `result=-1`, ~39 мс; увеличение read size не решение |
+| Java `UsbRequest`, 4×16 КиБ async window | **FIELD FAIL** | первый completion 0/16 384, ~3 мс; смена Java USB API не решила дефект |
+| `CNXN.maxdata=16 КиБ` + исходный Java reader | **FIELD FAIL по Pull; FIELD PASS по lifecycle** | peer реально присылает 16-КиБ WRTE; передача дошла до 134 217 728 / 268 435 456 (50%), затем 0/16 384 `USB_IN_FAILED`. После reader failure команда сразу завершилась FAILED, WakeLock освобождён, старые RUNNING→CANCELLED устранены |
+| Kernel HOST `dmesg` после теста | **DIAGNOSTIC** | xHCI/DWC3 link был перечислен и активен; явный USB disconnect появился позже app-level failure. Отфильтрованный dmesg не содержит доказанного errno причины |
+| Финальный native usbfs URB candidate, PR #73 | **CI PASS / FIELD PENDING** | ADB payload IN переведён на `USBDEVFS_SUBMITURB/REAPURB`; errno, `urb.status`, `actual_length` сохраняются. Headers остаются на проверенном Java path. C++/JVM/lint/API26/API34 PASS в [CI #42705941131](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42705941131) на head `e3ac779d0593f26ce181e84e44773d488145b758` |
+
+**Аудит транспорта:** финальный PR не трогает ADB Push/OUT, Fastboot flashing/native OUT, Sideload, firmware payloads или log retention. Fastboot native C++ защищён byte-exact hash после удаления ровно нового ADB-IN блока из in-memory проверки. Partial/failed ADB payload не публикуется, checksum остаётся обязательной, auto-retry команды отсутствует, pending URB должен быть discard+reap до освобождения памяти; неподтверждённый drain переводит backend в fail-closed poison state.
+
+**Следующая единственная физическая проверка:** тот же существующий 256-МиБ файл → новый destination через APK из [tester kit #42705941131](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42705941131/artifacts/13714112372), затем SHA-256 source/returned. Ни прошивка, ни wipe, ни новый Push для квалификации этого diff не нужны.
+
+---
+
+
 ## Перепроверка 9 ноября, 14:19–14:22 — ADB Pull в загруженном Android
 
 **Сборка та же:** `6.0.0-alpha11+808babac31f2.42576443632` (тестовый PR #71). **Новый архив:** `NekoFlash-diagnostics-1794223375308.zip` (сырой ZIP остаётся приватным).
