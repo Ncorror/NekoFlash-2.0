@@ -11,7 +11,8 @@ import android.hardware.usb.UsbEndpoint
  * exposes a generic negative result. AOSP Linux adb host uses
  * USBDEVFS_SUBMITURB/REAPURB for bulk IN and checks errno + urb.status.
  * This backend follows that transport shape for one framed ADB payload.
- * It never retries a failed URB and never publishes a partial packet.
+ * It may resubmit only a bounded zero-byte EPROTO-class failed IN URB; it
+ * never replays the ADB command and never publishes a partial packet.
  */
 internal object AdbNativeUsbfsIn {
     data class Result(
@@ -21,6 +22,7 @@ internal object AdbNativeUsbfsIn {
         val kernelIoctlErrno: Int,
         val urbStatus: Int,
         val actualLength: Int,
+        val urbSubmissions: Int,
         val elapsedMs: Long,
         val stage: Int,
         val message: String
@@ -54,7 +56,7 @@ internal object AdbNativeUsbfsIn {
             return failed("invalid destination range")
         }
         if (length == 0) {
-            return Result(true, 0, 0, 0, 0, 0, 0L, NativeUsbfsBackend.STAGE_DONE, "empty")
+            return Result(true, 0, 0, 0, 0, 0, 0, 0L, NativeUsbfsBackend.STAGE_DONE, "empty")
         }
         if (timeoutMs <= 0) return failed("invalid timeout")
         val fd = runCatching { connection.fileDescriptor }.getOrDefault(-1)
@@ -79,18 +81,23 @@ internal object AdbNativeUsbfsIn {
         val errno = raw[IDX_STOP_ERRNO].toInt()
         val status = raw[IDX_LAST_STATUS].toInt()
         val actual = raw[IDX_LAST_ACTUAL].toInt()
+        val submissions = raw[IDX_URB_SUBMISSIONS]
+            .coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
         val elapsed = raw[IDX_ELAPSED_MS].coerceAtLeast(0L)
         val stage = raw[IDX_STAGE].toInt()
         val kernelErrno = raw[IDX_KERNEL_IOCTL_ERRNO].toInt()
         val state = if (success) "OK" else "FAIL"
         val message = "native usbfs IN $state: bytes=$bytes/$requested, errno=$errno, " +
             "kernelErrno=$kernelErrno, urbStatus=$status, actual=$actual, " +
+            "urbSubmissions=$submissions, " +
             "stage=${NativeUsbfsBackend.stageLabel(stage)}, elapsedMs=$elapsed"
-        return Result(success, bytes, errno, kernelErrno, status, actual, elapsed, stage, message)
+        return Result(
+            success, bytes, errno, kernelErrno, status, actual, submissions, elapsed, stage, message
+        )
     }
 
     private fun failed(detail: String) = Result(
-        false, 0, 0, 0, 0, 0, 0L, NativeUsbfsBackend.STAGE_PREFLIGHT, detail
+        false, 0, 0, 0, 0, 0, 0, 0L, NativeUsbfsBackend.STAGE_PREFLIGHT, detail
     )
 
     private external fun nativeReadExact(
@@ -109,6 +116,7 @@ internal object AdbNativeUsbfsIn {
     private const val IDX_LAST_ACTUAL = 4
     private const val IDX_ELAPSED_MS = 5
     private const val IDX_STAGE = 6
+    private const val IDX_URB_SUBMISSIONS = 7
     private const val IDX_KERNEL_IOCTL_ERRNO = 13
     private const val RESULT_FIELDS = 14
 
