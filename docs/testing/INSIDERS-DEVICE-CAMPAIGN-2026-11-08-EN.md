@@ -1,3 +1,5 @@
+> **PREPARED PLAN, NOT AN EXECUTED FIELD REPORT.** PR #62's TestBook cards are potential tasks. H3 1023/1024/1025, recursive 512-file transfers, 16 MiB and historic H1/H2 real recovery/vendor_boot flashing were **already executed on recorded builds**. The **terminal output/header alignment after rotation also has a real Nov 7 physical PASS**, with tester screenshot recorded in [PR #45](https://github.com/Ncorror/NekoFlash-2.0/pull/45#issuecomment-6707179253); the operator reports three submissions. Do not reassign the same rotation check. Never schedule an automatic repeat without a specific changed SHA/device/missing evidence. Consult the [physical evidence ledger](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) first; agree the next small delta in chat. Do not overwrite old QA data; no destructive LAB on locked hardware.
+
 # NekoFlash 2.0 — Insiders Physical Device Campaign, November 8, 2026
 
 **Purpose:** validate the post-REV54/55 development build on real Android devices, including logs and authorized destructive laboratory operations. Retain raw evidence. [Русская инструкция](INSIDERS-DEVICE-CAMPAIGN-2026-11-08-RU.md).

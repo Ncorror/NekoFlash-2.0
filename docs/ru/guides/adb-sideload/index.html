@@ -29,7 +29,7 @@
 </script>
 </head>
 <body>
-<nav class="nav"><div class="wrap nav-inner"><a class="brand" href="../../"><span>Neko</span>Flash</a><div class="nav-links"><a href="../">Руководства</a><a href="https://github.com/Ncorror/NekoFlash">GitHub</a><a class="lang" href="../../../guides/adb-sideload/" hreflang="en">EN</a></div></div></nav>
+<nav class="nav"><div class="wrap nav-inner"><a class="brand" href="../../"><span>Neko</span>Flash</a><div class="nav-links"><a href="../">Руководства</a><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a><a class="lang" href="../../../guides/adb-sideload/" hreflang="en">EN</a></div></div></nav>
 <main><div class="wrap article">
 <div class="breadcrumbs"><a href="../../">NekoFlash</a> / <a href="../">Руководства</a> / ADB Sideload</div>
 <h1>ADB Sideload с Android без компьютера</h1>
@@ -41,6 +41,7 @@
 <h2>2. Подключите Android-хост</h2>
 <p>Соедините телефон или планшет с NekoFlash и целевое устройство кабелем USB OTG / USB-C с поддержкой передачи данных.</p>
 
+<div class="notice" style="margin:20px 0"><strong>Важное предупреждение для конкретной сборки (9 ноября 2026).</strong> В установленной DEV APK из <code>main</code> (<code>6a8accd8e33e</code>) выбор ZIP в диалоге файлов <strong>сразу запускает его отправку</strong>. Не открывай выбор файла, пока целевой телефон не подготовлен, а SHA-256 основного ROM ZIP не проверен по официальному источнику. В <a href="https://github.com/Ncorror/NekoFlash-2.0/pull/71">PR #71</a> уже реализованы отдельные «Выбрать ZIP» и «Начать Sideload» с подтверждением; CI прошёл, но <strong>PR ещё не в main и не принят аппаратно</strong>. 100% передачи и <code>DONEDONE</code> не доказывают успешную установку. При ошибке подписи основного ROM не обходить проверку — остановиться. <a href="https://github.com/Ncorror/NekoFlash-2.0/pull/63">Аудит реальных результатов</a>.</div>
 <h2>3. Выберите ZIP</h2>
 <p>Откройте вкладку Sideload в NekoFlash и выберите совместимый ZIP-файл обновления. Если файл сначала импортируется в рабочее хранилище NekoFlash, убедитесь, что свободного места достаточно.</p>
 
@@ -54,8 +55,8 @@
 <p>Проверьте, что ZIP предназначен именно для вашей модели и используемого recovery. Успешная USB-передача не означает, что пакет совместим с устройством.</p>
 
 <div class="notice" style="margin:42px 0"><strong>Безопасность прежде всего.</strong> Проверяйте источник ZIP, модель устройства и требования recovery до начала установки.</div>
-<div class="actions"><a class="btn primary" href="https://github.com/Ncorror/NekoFlash/releases/latest">Скачать NekoFlash</a><a class="btn" href="https://github.com/Ncorror/NekoFlash">Исходный код</a></div>
+<div class="actions"><a class="btn primary" href="https://github.com/Ncorror/NekoFlash-2.0/releases/latest">Скачать NekoFlash</a><a class="btn" href="https://github.com/Ncorror/NekoFlash-2.0">Исходный код</a></div>
 </div></main>
-<footer class="footer"><div class="wrap footer-inner"><div>© 2026 NekoFlash · Apache-2.0.</div><div><a href="https://github.com/Ncorror/NekoFlash">GitHub</a></div></div></footer>
+<footer class="footer"><div class="wrap footer-inner"><div>© 2026 NekoFlash · Apache-2.0.</div><div><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a></div></div></footer>
 </body>
 </html>
