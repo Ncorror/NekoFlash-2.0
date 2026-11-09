@@ -11,7 +11,8 @@ This section **supplements** (does not retroactively rewrite) the 8 Nov and alph
 | `fastboot -w`: `userdata` erased and rewritten; `erase:cache` no final reply for ~57/85 seconds, cancelled; metadata not erased | **PARTIAL DESTRUCTIVE FAIL** — [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), no automatic retry |
 | LineageOS original ZIP SHA-256 not equal to official; Recovery signature error 21 | **INSTALL FAIL due to mismatched source ZIP**; cannot infer USB transport fault |
 | OrangeFox R11.3 ZIP sent from Lineage Recovery; then new OrangeFox Recovery enumerated | **Recovery switch FIELD OBSERVED; ZIP installer exit code UNKNOWN**, not unconditional INSTALL PASS |
-| Same device candidate [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) | **CI PASS** (346 JVM, lint 0, API 26 and 34); **NO field acceptance of the new APK** |
+| Same device candidate [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) | **CI PASS**; on exact test build `6.0.0-alpha11+808babac31f2.42576443632`, **partial FIELD PASS**: Evolution X Sideload 2,282,083,364 bytes with Recovery `operation_end status=0`; Mass Flash `boot/dtbo/vbmeta` final OKAY 3/3; later Android 14 boot confirmed by tester photo. Not full PR acceptance (e.g. ZIP selection persistence untested) | 
+| New **256 MiB ADB Pull** on this PR #71 build, OrangeFox Recovery and booted Android 14 | **FIELD FAIL**: Recovery 2× and Android 1× `WRTE/INVALID_PAYLOAD` ([#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72)). Same file's remote SHA observed in both modes; initial source SHA comparison not shown. Error currently masks underlying USB-IN/checksum diagnostic cause |
 
 No flash/format was ever performed on the **other locked vayu**. Original private logs and photos remain private. Do not repeat Mass Flash/format on this TARGET to re-prove historical tests; investigate the failures instead.
 
