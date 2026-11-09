@@ -32,6 +32,20 @@ rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
 # Reverse this exact hunk to the already-audited REV54 blob before running
 # the longstanding transport hash guard. No transport/checksum bypass.
 rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
+# PR73 hardware follow-up: audit only the AOSP-style exact-size USB IN
+# payload read, then reverse to the previously approved diagnostics-only blob.
+# The outbound path, checksums, header reader and dispatcher stay hash-guarded.
+rev73_payload_adb_hash = '25b3e2a657278002db9c6d32aa1f529fb19bce69'
+if source_git_sha(data) == rev73_payload_adb_hash:
+    revised_payload = "        val buffer = ByteArray(length)\n        val readStartedMs = android.os.SystemClock.elapsedRealtime()\n        val inboundResult = AdbUsbInboundReadPolicy.readExact(\n            totalBytes = length,\n            apiLevel = android.os.Build.VERSION.SDK_INT\n        ) { offset, requestBytes, timeoutMs ->\n            conn.bulkTransfer(ep, buffer, offset, requestBytes, timeoutMs)\n        }\n        if (inboundResult is AdbUsbInboundReadPolicy.Result.Failed) {\n            directReadFailureCode = if (connection == null) {\n                AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n            } else {\n                AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n            }\n            val elapsedMs = android.os.SystemClock.elapsedRealtime() - readStartedMs\n            directReadFailureMessage = \"ADB payload USB IN failed after \" +\n                \"${inboundResult.bytesRead}/$length bytes (result=${inboundResult.transferResult}, \" +\n                \"requested=${inboundResult.requestedBytes}, requests=${inboundResult.requests}, \" +\n                \"elapsedMs=$elapsedMs, api=${android.os.Build.VERSION.SDK_INT})\"\n            return null\n        }\n\n".encode('utf-8')
+    previous_payload = "        val buffer = ByteArray(length)\n        var totalRead = 0\n\n        while (totalRead < length) {\n            // Keep individual host-controller transactions bounded, but read\n            // directly into the final payload buffer to avoid one allocation\n            // and one memcpy for every USB chunk.\n            val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)\n            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)\n            if (read <= 0) {\n                directReadFailureCode = if (connection == null) AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED else AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                directReadFailureMessage = \"ADB payload USB IN failed after $totalRead/$length bytes (result=$read)\"\n                return null\n            }\n            totalRead += read\n        }\n\n".encode('utf-8')
+    assert data.count(revised_payload) == 1, 'Unreviewed inbound USB payload change'
+    inbound_policy_file = base/'AdbUsbInboundReadPolicy.kt'
+    assert source_git_sha(inbound_policy_file.read_bytes()) == '9372ecbb6d33544014962bedc3c6b56fabbda1a8', 'Unreviewed inbound USB policy'
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbUsbInboundReadPolicyTest.kt').is_file()
+    data = data.replace(revised_payload, previous_payload, 1)
+    assert source_git_sha(data) == rev72_adb_hash, 'Unreviewed ADB transport changes in USB read patch'
+
 if source_git_sha(data) == rev72_adb_hash:
     revised = "readDataDirect(header.dataLength) ?: return AdbInboundFailurePolicy.payloadReadFailed(\n                cause = directReadFailureCode,\n                detail = directReadFailureMessage,\n                command = header.command,\n                payloadBytes = header.dataLength\n            )".encode('utf-8')
     previous = "readDataDirect(header.dataLength) ?: return AdbPacketDispatcher.ReadResult.Failed(\n                AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,\n                \"ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}\"\n            )".encode('utf-8')
