@@ -2810,9 +2810,11 @@ class AdbProtocol(
             AdbPacketDispatcher.ReadResult.Timeout
         }
         val payload = if (header.dataLength > 0) {
-            readDataDirect(header.dataLength) ?: return AdbPacketDispatcher.ReadResult.Failed(
-                AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,
-                "ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}"
+            readDataDirect(header.dataLength) ?: return AdbInboundFailurePolicy.payloadReadFailed(
+                cause = directReadFailureCode,
+                detail = directReadFailureMessage,
+                command = header.command,
+                payloadBytes = header.dataLength
             )
         } else EMPTY_PAYLOAD
         return AdbPacketDispatcher.ReadResult.PacketReady(
