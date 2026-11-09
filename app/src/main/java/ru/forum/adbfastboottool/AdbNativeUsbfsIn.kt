@@ -28,6 +28,9 @@ internal object AdbNativeUsbfsIn {
         val disconnected: Boolean
             get() = errnoCode == ERRNO_ENODEV || errnoCode == ERRNO_ESHUTDOWN ||
                 kernelIoctlErrno == ERRNO_ENODEV || kernelIoctlErrno == ERRNO_ESHUTDOWN
+
+        val timedOut: Boolean
+            get() = errnoCode == ERRNO_ETIMEDOUT || kernelIoctlErrno == ERRNO_ETIMEDOUT
     }
 
     private val loadFailure: Throwable? = runCatching {
@@ -107,6 +110,7 @@ internal object AdbNativeUsbfsIn {
     private const val IDX_KERNEL_IOCTL_ERRNO = 13
     private const val RESULT_FIELDS = 14
 
+    private const val ERRNO_ETIMEDOUT = 110
     private const val ERRNO_ENODEV = 19
     private const val ERRNO_ESHUTDOWN = 108
 }
