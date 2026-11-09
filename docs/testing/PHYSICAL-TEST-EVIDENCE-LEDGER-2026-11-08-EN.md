@@ -1,5 +1,20 @@
 # NekoFlash 2.0 — evidence ledger for tests already executed
 
+## #72 — 16 KiB URBs remain EPROTO; AOSP-style 4 KiB candidate
+
+Private diagnostic `NekoFlash-diagnostics-1794266433382.zip`: CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA-256 PASS, 2/2 JSON parse. Exact build: `6.0.0-alpha11+d42621bc0c30.42715598717`.
+
+The first 16 KiB payload transferred zero bytes. Native diagnostics report `urbSubmissions=4`: initial plus retries after 150/300/600 ms. All four 16 KiB IN URBs completed as `-EPROTO`; final `errno=71`, `urbStatus=-71`, `actual=0`, `elapsedMs=1060`. This rules out short xHCI recovery timing as the primary cause. Lifecycle remains FIELD PASS: failed=1, cancelled=0, WakeLock released immediately.
+
+Comparison with classic AOSP Linux ADB identified a material transaction-granularity difference: its `usb_read()` splits inbound traffic into **4096-byte bulk reads**. The current PR #73 candidate keeps the negotiated 16 KiB ADB frame but assembles each payload from 4 KiB native usbfs URBs. Partial/error packets are never published and checksum validation remains mandatory.
+
+Exact head `968a0e3e617ee45341a379aae6d586eae978e0db`: [CI #42720159930](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42720159930) **SUCCESS attempt 1** — strict guards, native 4 KiB policy/C++, JVM, lint, Debug APK, Android API26/API34 and tester kit PASS. [Matching tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42720159930/artifacts/13720027110).
+
+Status: **CI PASS / FIELD PENDING**. Run one physical 256 MiB Pull only; no Push/Sideload/flash/wipe repetition.
+
+---
+
+
 ## #72 — 2 ms retry FIELD FAIL; xHCI recovery-window candidate
 
 Private diagnostic `NekoFlash-diagnostics-1794264520796.zip`: CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse. Exact build: `6.0.0-alpha11+94e870cf849d.42710802916`.
