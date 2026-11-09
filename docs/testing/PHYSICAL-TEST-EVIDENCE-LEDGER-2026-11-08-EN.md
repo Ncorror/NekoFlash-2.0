@@ -1,5 +1,21 @@
 # NekoFlash 2.0 — evidence ledger for tests already executed
 
+## 9 November late field recheck (14:19–14:22), same test APK PR #71
+
+**Build:** `6.0.0-alpha11+808babac31f2.42576443632`; CI [#42576443632](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42576443632) PASS, **not merged into main**.
+
+- **Evolution X 14.0 vayu sideload INSTALL PASS:** 2,282,083,364-byte ZIP, `DONEDONE` followed by current-attempt Recovery `operation_end status=0`; **boot into Android 14 tester-confirmed** from a subsequent phone photograph. The older LineageOS bad-ZIP/format/wipe failures below remain separately valid.
+- **Mass Flash `boot/dtbo/vbmeta`: FIELD PASS 3/3** via final Fastboot OKAY. This is separate from the earlier `boot/dtbo/recovery` mass flash on a different build.
+- **ADB Push 256 MiB:** succeeded once in OrangeFox Recovery and again in booted Android; the TARGET SHA-256 is the same in both modes. **Original HOST file hash has not been independently supplied.**
+- **ADB Pull 256 MiB:** failed **twice in Recovery and once in Android** with `WRTE INVALID_PAYLOAD` (1,048,576 bytes; one Recovery retry at 422,256). This disproves a Recovery-only explanation; root cause remains unknown. Details in [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72).
+- **ZIP audit:** 87/87 and 30/30 entries matched export SHA-256 and byte sizes; CRC PASS, 18/18 JSON parse and 26/26 raw shell metadata/stream pairs. These are complete *snapshots of the included files*, not proof of all prior history.
+- **Code audit:** `readCompletePacketDirect` replaces specific `readDataDirect` USB-IN/checksum error codes with generic `INVALID_PAYLOAD`; second summary calls the transport-terminated operation `CANCELLED`. Preserve fail-closed transport and raw logs; improve diagnostics before another targeted Pull test.
+- **Recovery /data at 14:04:** `/metadata` was mounted ext4 but `/data` was not mounted, and `df /data` resolved to rootfs; `ro.crypto.state=encrypted`. This is a snapshot **before** the successful ROM installation, not proof of an ongoing Android mount problem.
+
+**Current qualification:** combined PR #71 has **partial real-hardware evidence**, not full UI lifecycle acceptance (ZIP persistence/restart unverified). Do not rewrite the historical early-9-Nov rows below.
+
+---
+
 > **Update, 9 November 2026:** this addendum records tests executed **after** the original 8 November snapshot. Preserve earlier H1/H2/H3 evidence; do not automatically repeat real destructive tests.
 
 ## 9 November field evidence — H2, unlocked A-only vayu
