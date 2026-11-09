@@ -30,6 +30,7 @@ rev52_adb_hash = '5a4f9c9640e13b404ab1706a0b07dcfc40ee30ea'
 rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
 # REV72: preserve the physically confirmed diagnostic provenance improvement.
 rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
+rev75_receive_adb_hash = '29d490d695e4a09c637d732a5070d3e0b40b987d'
 # REV76: ADB payload IN now follows AOSP Linux host transport shape:
 # native usbfs SUBMITURB/REAPURB with real errno/urb.status. Normalize only
 # the reviewed reader hunk and timeout constant back to REV75 before older guards.
@@ -56,7 +57,6 @@ if source_git_sha(data) == rev76_native_in_adb_hash:
 # REV75: Protocol negotiation is the fix, not failed large-read workarounds.
 # Verify the exact field-reviewed diagnostic source except for two
 # intentionally changed CNXN inbound-size hunks; then run all older guards.
-rev75_receive_adb_hash = '29d490d695e4a09c637d732a5070d3e0b40b987d'
 if source_git_sha(data) == rev75_receive_adb_hash:
     new_cnxn = "            sendMessageInternal(\n                A_CNXN,\n                LOCAL_ADB_VERSION,\n                AdbHostReceiveWindow.ADVERTISED_MAXDATA,\n                \"host::NekoFlash\\u0000\".toByteArray(Charsets.UTF_8)\n            )\n            onLog(\"ADB host receive maxdata: ${AdbHostReceiveWindow.ADVERTISED_MAXDATA} bytes (CNXN)\")".encode('utf-8')
     old_cnxn = "            sendMessageInternal(\n                A_CNXN,\n                LOCAL_ADB_VERSION,\n                MAX_PAYLOAD,\n                \"host::NekoFlash\\u0000\".toByteArray(Charsets.UTF_8)\n            )".encode('utf-8')
