@@ -611,7 +611,7 @@ static jlongArray native_adb_bulk_in_exact_impl(
     };
 
     while (total < length) {
-        const int requested = length - total;
+        const int requested = nekoflash::adb_usb_in_request_bytes(length - total);
         bool retry_same_range = false;
         std::memset(slot.urb.get(), 0, sizeof(*slot.urb));
         slot.urb->type = USBDEVFS_URB_TYPE_BULK;
