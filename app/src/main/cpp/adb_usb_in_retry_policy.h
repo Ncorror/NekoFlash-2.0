@@ -5,6 +5,13 @@
 namespace nekoflash {
 
 constexpr int kAdbUsbInMaxZeroByteBusRetries = 3;
+constexpr int kAdbUsbInUrbChunkBytes = 4 * 1024;
+
+constexpr int adb_usb_in_request_bytes(int remaining) noexcept {
+    if (remaining <= 0) return 0;
+    return remaining > kAdbUsbInUrbChunkBytes ? kAdbUsbInUrbChunkBytes : remaining;
+}
+
 constexpr int kAdbUsbInRetryBaseDelayUs = 150 * 1000;
 
 constexpr bool is_adb_usb_in_retryable_status(int status) noexcept {
