@@ -1,5 +1,20 @@
 # NekoFlash 2.0 — evidence ledger for tests already executed
 
+## #72 — kernel EPROTO proven; bounded zero-byte retry candidate
+
+Private diagnostic `NekoFlash-diagnostics-1794262112529.zip`: CRC PASS, `CONSISTENT_SNAPSHOT`, 5/5 manifest entries match byte size and SHA-256, 2/2 JSON parse. The exact APK came from CI #42705941131.
+
+The first 16 KiB payload handled by the native usbfs reader is a **FIELD FAIL** with a real kernel-level discriminator: `errno=71 (EPROTO)`, `urbStatus=-71`, `actual_length=0`, `kernelErrno=0`, `stage=urb_status`, 3 ms. The lifecycle fix remains **FIELD PASS**: summary records `ADB_READER_USB_IN_FAILED`, failed=1, cancelled=0, and the WakeLock is released immediately.
+
+PR #73 now resubmits only the same zero-byte failed IN transaction when status is `-EPROTO`, `-EILSEQ` or `-ETIME`, at most 3 times with 2/4/6 ms backoff. It never replays the ADB/SYNC command. Any partial error (`actual_length>0`), `EPIPE`, overflow, disconnect/shutdown, timeout, unknown status or checksum mismatch remains terminal fail-closed. Partial packets are never published to Kotlin, and diagnostics expose the URB submission count.
+
+New exact head `b3bb84b4526d99c6c7ca3c8d3f119bdf717c732d`: [Actions #42710802916](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42710802916) **SUCCESS attempt 1** — strict source guards, native C++/policy warnings-as-errors, JVM, lint, Debug APK, installed Android API26/API34 and verified tester-kit packaging all PASS.
+
+**Qualification boundary:** bounded-retry candidate is **CI PASS / FIELD PENDING**. Run exactly one physical 256 MiB Pull using the [matching tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42710802916/artifacts/13715664711), then require source/returned SHA-256 equality. Do not repeat Push, Sideload, flashing or wipe for this delta. PR #73 remains unmerged.
+
+---
+
+
 ## Issue #72 audit — ADB Pull series, 9–10 November
 
 **Rig:** POCO F7 / onyx Android 16 HOST → unlocked POCO X3 Pro / vayu TARGET, tested in OrangeFox Recovery and booted Evolution X Android 14. Raw diagnostics remain private; only sanitized evidence is recorded publicly.
