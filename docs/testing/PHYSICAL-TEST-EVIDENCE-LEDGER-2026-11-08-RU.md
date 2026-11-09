@@ -1,5 +1,24 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+## #72 — доказанный EPROTO и следующий bounded-retry кандидат
+
+**Новый приватный архив:** `NekoFlash-diagnostics-1794262112529.zip` — CRC PASS, `CONSISTENT_SNAPSHOT`, 5/5 файлов манифеста совпали по размеру и SHA-256, 2/2 JSON корректны. Испытана точная APK из CI #42705941131.
+
+| Наблюдение | Статус | Доказательство |
+| --- | --- | --- |
+| Native usbfs URB reader, первый 16-КиБ payload | **FIELD FAIL** | `errno=71 (EPROTO)`, `urbStatus=-71`, `actual_length=0`, `kernelErrno=0`, `stage=urb_status`, 3 мс |
+| Lifecycle после native failure | **FIELD PASS** | session-summary: `terminationReason=ADB_READER_USB_IN_FAILED`, `failed=1`, `cancelled=0`, WakeLock освобождён сразу |
+| Причина старого Java `-1` | **Уточнена** | доказан низкоуровневый USB transaction/protocol fault; файл/checksum/таймаут не являются причиной именно этого завершившегося URB |
+| Новый bounded retry PR #73 | **CI PASS / FIELD PENDING** | только `-EPROTO/-EILSEQ/-ETIME` при `actual_length=0`, max 3, backoff 2/4/6 мс; command-level retry запрещён |
+| Exact CI нового кандидата | **PASS** | head `b3bb84b4526d99c6c7ca3c8d3f119bdf717c732d`, [Actions #42710802916](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42710802916), attempt 1, source guards/C++/JVM/lint/API26/API34/tester kit PASS |
+
+**Fail-closed граница retry:** любой partial error (`actual_length>0`), stall/`EPIPE`, overflow, disconnect/shutdown, timeout, неизвестный URB status или checksum mismatch не повторяется. Повторяется не `adb pull` и не SYNC-команда, а только нулевой ошибочный IN transaction на текущем byte offset. Partial packet в Kotlin не публикуется.
+
+**Следующая единственная физическая проверка:** APK из [tester kit #42710802916](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42710802916/artifacts/13715664711), один Pull существующего 256-МиБ файла, затем сравнение SHA-256 source/returned. PR #73 остаётся незамерженным.
+
+---
+
+
 ## Аудит #72 — серия ADB Pull, 9–10 ноября
 
 **Стенд:** POCO F7 / onyx Android 16 HOST → разблокированный POCO X3 Pro / vayu TARGET. TARGET проверялся и в OrangeFox Recovery, и в загруженном Evolution X Android 14. Исходные диагностические ZIP сохранены приватно; публичный GitHub содержит только обезличенную выжимку.
