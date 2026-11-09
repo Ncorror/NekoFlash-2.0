@@ -71,5 +71,6 @@ class AdbNativeUsbfsInTest {
         assertEquals(110, result.errnoCode)
         assertEquals(15_000L, result.elapsedMs)
         assertFalse(result.disconnected)
+        assertTrue(result.timedOut)
     }
 }
