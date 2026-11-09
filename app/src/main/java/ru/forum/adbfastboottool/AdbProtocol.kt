@@ -92,6 +92,7 @@ class AdbProtocol(
     private val MAX_PAYLOAD = 1048576
     private val SYNC_DATA_CHUNK = 64 * 1024
     private val USB_BULK_CHUNK_BYTES = 16 * 1024
+    private val ADB_NATIVE_IN_TIMEOUT_MS = 15_000
     private val SYNC_MAX_STRING = 1024 * 1024
     private val SYNC_MODE_IFMT = 61440       // 0170000
     private val SYNC_MODE_IFDIR = 16384      // 0040000
@@ -2961,20 +2962,44 @@ class AdbProtocol(
         }
 
         val buffer = ByteArray(length)
-        var totalRead = 0
-
-        while (totalRead < length) {
-            // Keep individual host-controller transactions bounded, but read
-            // directly into the final payload buffer to avoid one allocation
-            // and one memcpy for every USB chunk.
-            val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)
-            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)
-            if (read <= 0) {
-                directReadFailureCode = if (connection == null) AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED else AdbPacketDispatcher.FailureCode.USB_IN_FAILED
-                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read)"
+        if (AdbNativeUsbfsIn.isAvailable) {
+            val native = AdbNativeUsbfsIn.readExact(
+                connection = conn,
+                endpoint = ep,
+                buffer = buffer,
+                offset = 0,
+                length = length,
+                timeoutMs = ADB_NATIVE_IN_TIMEOUT_MS
+            )
+            if (!native.success) {
+                directReadFailureCode = if (native.disconnected || connection == null) {
+                    AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
+                } else {
+                    AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                }
+                directReadFailureMessage = native.message
                 return null
             }
-            totalRead += read
+        } else {
+            // Compatibility fallback only. Production Android builds include
+            // the native usbfs library; never mix Java and native readers in
+            // one payload.
+            var totalRead = 0
+            while (totalRead < length) {
+                val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)
+                val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)
+                if (read <= 0) {
+                    directReadFailureCode = if (connection == null) {
+                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
+                    } else {
+                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                    }
+                    directReadFailureMessage =
+                        "ADB Java USB IN fallback failed after $totalRead/$length bytes (result=$read)"
+                    return null
+                }
+                totalRead += read
+            }
         }
 
         if (expectedChecksum != null && !AdbPacketChecksum.isValid(
