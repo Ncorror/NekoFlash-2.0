@@ -1,5 +1,26 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## Текущая подтверждённая точка — 9 ноября 2026
+
+**Production/release и main:** GitHub `main=6a8accd8e33e` (тот же функциональный SHA, что 8 ноября). Нового подписанного production APK или слитых Sideload PR **нет**. Подробный [реестр физических испытаний с дополнением 9 ноября](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md).
+
+**Три раздельные линии работ:**
+
+| Приоритет | Состояние | Проверенный результат | Следующий шаг |
+| --- | --- | --- | --- |
+| P0: **Sideload выбор и повторное использование ZIP** | [#69](https://github.com/Ncorror/NekoFlash-2.0/issues/69) → [PR #70](https://github.com/Ncorror/NekoFlash-2.0/pull/70) и объединённый [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) | До фикса выбор файла в `MainActivity` **сразу запускал USB-передачу**; исправлено в тестовом коде: выбор отдельно, подтверждение отдельно, SAF-документ сохраняется | PR #71 **CI PASS, FIELD NOT VERIFIED**. Следующий физический тест — безопасный выбор без отправки |
+| P1: **проверка смены Recovery после Sideload ZIP** | [#66](https://github.com/Ncorror/NekoFlash-2.0/issues/66) → [PR #68](https://github.com/Ncorror/NekoFlash-2.0/pull/68) и тот же PR #71 | При отправке OrangeFox из Lineage Recovery, старый Recovery сменился, но код смотрел только `RECOVERY`, игнорируя возвращение в `SIDELOAD`. Новое поведение различает **observed recovery switch** и **INSTALL SUCCESS** | Сохранять VERIFY_PENDING без подтверждённого exit-кода, не принимать старые `script succeeded` за новый PASS |
+| P0: **Fastboot erase/format** | [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), [#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65), тест [PR #67](https://github.com/Ncorror/NekoFlash-2.0/pull/67) | 9 ноября **Mass Flash FIELD PASS 3/3**; `format userdata` показал Fastboot OKAY, но Android boot FAIL; `-w` завис на `erase:cache` с уже изменённой `userdata`. PR #67 **CI PASS** охраняет fail-closed, но не устраняет причину | Только доказательный анализ Recovery /data/F2FS/metadata и причины молчания загрузчика; **без повторных wipes**, сохранить логи |
+
+**Единый объединённый test candidate:** [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) head `7e5ac5bc57220370f8404dc501f81c4828986ba2`. GitHub [Actions #42533760615](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615) проверил синтетический PR merge commit `198e521bd78df191e7fe3c77651a1df0169ea995` **SUCCESS**: **346 JVM PASS, 0 errors, 0 skipped, Lint 0**, полный `:app:assembleDebug`, проверки эмуляторов API 26 и API 34, **двухфайловый** Insiders Kit PASS. SHA-256 debug APK из лога: `2dbfbde3dd00615a356589d846481e987be007913c1a6e246c520b21fe8535ce`. Этот артефакт из **PR run**, а не из `main`; не скачивать исторический REV45 kit как будто он содержит фикс.
+
+**LineageOS ZIP:** известный первоначальный файл `20261108` **не совпал с официальным SHA-256**; установка Recovery отказала с `error:21`. Повторная загрузка начата, **результата нового SHA и успешной загрузки Android пока нет**. Не переписывать FAIL как PASS и не переносить его автоматически на транспорт.
+
+**Документы:** [PR #63](https://github.com/Ncorror/NekoFlash-2.0/pull/63) — отдельный документальный аудит. Он не меняет APK, TestBook HTML, рабочий USB и жизненный цикл. Старые заголовки/журналы ниже — **снимки на дату их создания**, не сегодняшний TODO.
+
+---
+
+
 ## Текущая база: `main=6a8accd8e33e` после PR #62
 
 **Исходники:** [`6a8accd8e33eef946efa1f18a829b0cc2b797e6e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). Последовательные изменения: REV49 (#45), REV51 (#51), REV52 (#54), REV53 (#55), REV54 (#58), REV55 (#59), документация #60, проверка состава диагностических source #61, задания TestBook #62. **Стабильный подписанный релиз на этот SHA не объявлялся.**
