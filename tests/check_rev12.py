@@ -46,7 +46,7 @@ if source_git_sha(data) == rev76_native_in_adb_hash:
     assert data.count(native_timeout) == 1, 'Unreviewed native ADB IN timeout change'
     native_wrapper = base/'AdbNativeUsbfsIn.kt'
     native_cpp = root/'app/src/main/cpp/native_usbfs.cpp'
-    assert source_git_sha(native_wrapper.read_bytes()) == 'afdfe936a1ffa436d37fce9671030f05cffa4f2c', 'Unreviewed native ADB IN Kotlin backend'
+    assert source_git_sha(native_wrapper.read_bytes()) == 'ed9d06d985f78d3b07e32e8cc3a55a8bc0f80aeb', 'Unreviewed native ADB IN Kotlin backend'
     assert source_git_sha(native_cpp.read_bytes()) == '86f81542e6d66290fc5938eb32f8c39c1e5028dd', 'Unreviewed native usbfs C++ backend'
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt').is_file()
     data = data.replace(native_header, java_header, 1)
@@ -65,7 +65,7 @@ if source_git_sha(data) == rev75_receive_adb_hash:
     assert data.count(new_cnxn) == 1, 'Unreviewed host maxdata change'
     assert data.count(new_rx_guard) == 1, 'Unreviewed receiver length bound'
     window = base/'AdbHostReceiveWindow.kt'
-    assert source_git_sha(window.read_bytes()) == '220a583df485e66ea543389c5d441bc8ab255c63', 'Unreviewed maxdata policy'
+    assert source_git_sha(window.read_bytes()) == '5f8dc850c64303b3fdb6e0aaa6d997da11b36c20', 'Unreviewed maxdata policy'
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbHostReceiveWindowTest.kt').is_file()
     reader_terminated = "            val header = readHeader(timeoutMs = 30_000) ?: run {\n                if (dispatcherTransportFailed || (packetDispatcher?.snapshot()?.readFailures ?: 0L) > 0L) {\n                    onLog(\"❌ ADB stream: reader terminated during data read\")\n                } else {\n                    onLog(\"❌ ADB stream: data read timeout\")\n                }\n                return null\n            }".encode('utf-8')
     reader_timeout = "            val header = readHeader(timeoutMs = 30_000) ?: run {\n                onLog(\"❌ ADB stream: data read timeout\")\n                return null\n            }".encode('utf-8')
