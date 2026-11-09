@@ -45,8 +45,8 @@ if source_git_sha(data) == rev76_native_in_adb_hash:
     native_cpp = root/'app/src/main/cpp/native_usbfs.cpp'
     retry_policy = root/'app/src/main/cpp/adb_usb_in_retry_policy.h'
     assert source_git_sha(native_wrapper.read_bytes()) == '6a8913eced78569bf668caad2bfb1e83e4d2cc94', 'Unreviewed native ADB IN Kotlin backend'
-    assert source_git_sha(native_cpp.read_bytes()) == '46850fa3c1339e03f9fc9bb9b6de0889e0fe5868', 'Unreviewed native usbfs C++ backend'
-    assert source_git_sha(retry_policy.read_bytes()) == '4f018313dd5e538bffa70e2c53f2aa5fa3d4e705', 'Unreviewed zero-byte ADB IN retry policy'
+    assert source_git_sha(native_cpp.read_bytes()) == '0223ba9908d6a87c1462a5ffc79ebb0d204273d5', 'Unreviewed native usbfs C++ backend'
+    assert source_git_sha(retry_policy.read_bytes()) == '0d05d30b3f89ec60cb6589d71c134fd6d9e2345e', 'Unreviewed zero-byte ADB IN retry policy'
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt').is_file()
     native_host_test = (root/'tests/native_transfer_deadline_test.cpp').read_text()
     assert 'should_retry_adb_usb_in(-EPROTO, 0, 0)' in native_host_test
@@ -55,6 +55,7 @@ if source_git_sha(data) == rev76_native_in_adb_hash:
     assert 'adb_usb_in_retry_delay_us(1) == 150000' in native_host_test
     assert 'adb_usb_in_retry_delay_us(2) == 300000' in native_host_test
     assert 'adb_usb_in_retry_delay_us(3) == 600000' in native_host_test
+    assert 'adb_usb_in_request_bytes(16384) == 4096' in native_host_test
     data = data.replace(native_reader, java_reader, 1)
     data = data.replace(native_timeout, b'', 1)
     assert source_git_sha(data) == rev75_receive_adb_hash, 'Native ADB IN patch touched unrelated protocol code'
