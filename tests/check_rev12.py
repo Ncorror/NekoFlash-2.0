@@ -28,6 +28,8 @@ rev52_adb_hash = '5a4f9c9640e13b404ab1706a0b07dcfc40ee30ea'
 # Before any older checksum/invariant checks, reverse the exact diff into
 # the byte-for-byte accepted REV53 ADB source. Never waive USB review.
 rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
+# REV72: preserve the physically confirmed diagnostic provenance improvement.
+rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
 # REV75: Protocol negotiation is the fix, not failed large-read workarounds.
 # Verify the exact field-reviewed diagnostic source except for two
 # intentionally changed CNXN inbound-size hunks; then run all older guards.
@@ -46,8 +48,6 @@ if source_git_sha(data) == rev75_receive_adb_hash:
     data = data.replace(new_rx_guard, old_rx_guard, 1)
     assert source_git_sha(data) == rev72_adb_hash, 'Unreviewed transport changes in CNXN receive fix'
 
-# REV72: preserve the physically confirmed diagnostic provenance improvement.
-rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
 if source_git_sha(data) == rev72_adb_hash:
     revised = "readDataDirect(header.dataLength) ?: return AdbInboundFailurePolicy.payloadReadFailed(\n                cause = directReadFailureCode,\n                detail = directReadFailureMessage,\n                command = header.command,\n                payloadBytes = header.dataLength\n            )".encode('utf-8')
     previous = "readDataDirect(header.dataLength) ?: return AdbPacketDispatcher.ReadResult.Failed(\n                AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,\n                \"ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}\"\n            )".encode('utf-8')
