@@ -1,4 +1,4 @@
-> **ARCHIVE / АРХИВ REV5:** bilingual contributor documentation is retained as an historical baseline. The up-to-date testing references are [DEV status](../DEVELOPMENT_STATUS.md), [Insiders testbook](../insiders/testbook.html), [RU guide](../testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN guide](../testing/INSIDERS-FIELD-TEST-REV43-EN.md). Legacy ZIP paths and REV5 test outcomes must not be treated as REV43 hardware evidence.
+> **ARCHIVE / АРХИВ REV5:** bilingual contributor documentation is retained as an historical baseline. The up-to-date references are [DEV status](../DEVELOPMENT_STATUS.md), [real hardware evidence ledger RU](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md), [EN](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) and [case-by-case TestBook reconciliation](../testing/TESTBOOK-43-EVIDENCE-MAP-2026-11-08-RU.md). The old REV43 guides and this REV5 continuation point are historical; do not treat old ZIP paths or checklist tasks as pending current hardware tests.
 
 <div align="center">
 

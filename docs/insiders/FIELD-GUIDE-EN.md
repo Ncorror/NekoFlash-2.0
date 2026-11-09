@@ -1,3 +1,5 @@
+> **HISTORICAL REV45/46 FIELD GUIDE — NOT A NEW TEST ASSIGNMENT.** Real USB 1023/1024/1025, recursive 512-file push/pull, 16 MiB and older real Recovery/Fastbootd/Sideload cases have already been exercised on explicitly recorded devices/builds. Read the [hardware evidence ledger](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) and [current Insiders landing page](README.md) before planning any new work. Never rerun the QA commands below over an existing corpus. Destructive LAB is excluded on a locked TARGET and requires a separate approved restore plan. Preserve historic TestBook progress; agree next tests from the unverified delta in chat.
+
 # NekoFlash 2.0 field guide · Insiders REV45
 
 Extract the ZIP, install the APK on the host and open testbook.html in a browser. The build panel lists the commit, CI run and APK digest. Use JSON export to save progress.
