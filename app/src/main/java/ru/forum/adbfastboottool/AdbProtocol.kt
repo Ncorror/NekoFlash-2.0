@@ -2956,20 +2956,25 @@ class AdbProtocol(
         }
 
         val buffer = ByteArray(length)
-        var totalRead = 0
-
-        while (totalRead < length) {
-            // Keep individual host-controller transactions bounded, but read
-            // directly into the final payload buffer to avoid one allocation
-            // and one memcpy for every USB chunk.
-            val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)
-            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)
-            if (read <= 0) {
-                directReadFailureCode = if (connection == null) AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED else AdbPacketDispatcher.FailureCode.USB_IN_FAILED
-                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read)"
-                return null
+        val readStartedMs = android.os.SystemClock.elapsedRealtime()
+        val inboundResult = AdbUsbInboundReadPolicy.readExact(
+            totalBytes = length,
+            apiLevel = android.os.Build.VERSION.SDK_INT
+        ) { offset, requestBytes, timeoutMs ->
+            conn.bulkTransfer(ep, buffer, offset, requestBytes, timeoutMs)
+        }
+        if (inboundResult is AdbUsbInboundReadPolicy.Result.Failed) {
+            directReadFailureCode = if (connection == null) {
+                AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
+            } else {
+                AdbPacketDispatcher.FailureCode.USB_IN_FAILED
             }
-            totalRead += read
+            val elapsedMs = android.os.SystemClock.elapsedRealtime() - readStartedMs
+            directReadFailureMessage = "ADB payload USB IN failed after " +
+                "${inboundResult.bytesRead}/$length bytes (result=${inboundResult.transferResult}, " +
+                "requested=${inboundResult.requestedBytes}, requests=${inboundResult.requests}, " +
+                "elapsedMs=$elapsedMs, api=${android.os.Build.VERSION.SDK_INT})"
+            return null
         }
 
         if (expectedChecksum != null && !AdbPacketChecksum.isValid(
