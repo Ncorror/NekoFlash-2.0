@@ -42,9 +42,9 @@ int main() {
     assert(!should_retry_adb_usb_in(-ENODEV, 0, 0));
     assert(!should_retry_adb_usb_in(-ESHUTDOWN, 0, 0));
     assert(adb_usb_in_retry_delay_us(0) == 0);
-    assert(adb_usb_in_retry_delay_us(1) == 2000);
-    assert(adb_usb_in_retry_delay_us(2) == 4000);
-    assert(adb_usb_in_retry_delay_us(3) == 6000);
+    assert(adb_usb_in_retry_delay_us(1) == 150000);
+    assert(adb_usb_in_retry_delay_us(2) == 300000);
+    assert(adb_usb_in_retry_delay_us(3) == 600000);
 
     std::cout << "PASS native deadlines + ADB IN zero-byte EPROTO-class bounded retry policy\n";
 }
