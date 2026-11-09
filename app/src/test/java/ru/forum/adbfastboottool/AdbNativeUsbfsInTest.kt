@@ -13,10 +13,13 @@ class AdbNativeUsbfsInTest {
         raw[4] = 16_384
         raw[5] = 4
         raw[6] = NativeUsbfsBackend.STAGE_DONE.toLong()
+        raw[7] = 2
         val result = AdbNativeUsbfsIn.decodeForTest(raw, 16_384)
         assertTrue(result.success)
         assertEquals(16_384, result.bytesTransferred)
         assertEquals(16_384, result.actualLength)
+        assertEquals(2, result.urbSubmissions)
+        assertTrue(result.message.contains("urbSubmissions=2"))
         assertEquals(0, result.errnoCode)
         assertFalse(result.disconnected)
     }
@@ -30,12 +33,15 @@ class AdbNativeUsbfsInTest {
         raw[4] = 0
         raw[5] = 3
         raw[6] = NativeUsbfsBackend.STAGE_STATUS.toLong()
+        raw[7] = 4
         val result = AdbNativeUsbfsIn.decodeForTest(raw, 16_384)
         assertFalse(result.success)
         assertEquals(71, result.errnoCode)
         assertEquals(-71, result.urbStatus)
         assertTrue(result.message.contains("errno=71"))
         assertTrue(result.message.contains("urbStatus=-71"))
+        assertEquals(4, result.urbSubmissions)
+        assertTrue(result.message.contains("urbSubmissions=4"))
     }
 
     @Test fun kernelSubmitErrnoIsPreservedSeparately() {
