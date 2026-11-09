@@ -1,5 +1,27 @@
 # NekoFlash 2.0 — evidence ledger for tests already executed
 
+> **Update, 9 November 2026:** this addendum records tests executed **after** the original 8 November snapshot. Preserve earlier H1/H2/H3 evidence; do not automatically repeat real destructive tests.
+
+## 9 November field evidence — H2, unlocked A-only vayu
+
+**HOST:** POCO F7 onyx Android 16. **TARGET:** unlocked POCO X3 Pro vayu Android 14, **A-only**, *not* the separate locked vayu. Actual installed APK: `6.0.0-alpha11+6a8accd8e33e.42517047929`, not the later PR test candidate. Raw ZIPs and device photos remain private.
+
+| Operation | Actual status | Interpretation |
+| --- | --- | --- |
+| Mass Flash `boot` 128 MiB, `dtbo` 32 MiB, `recovery` 128 MiB | **FIELD PASS 3/3**, true Fastboot final OKAY | 00:10:50–00:10:58; Recovery subsequently booted. Does not certify installed Android boots. |
+| `getvar current-slot`, `slot-count` | **Not available** | A-only target returns `FAIL Variable Not found`; no invented A/B slots. Fastbootd transition independently PASS. |
+| `fastboot format userdata` (F2FS) | **Host transfer OKAY, Android boot FAIL** | `mkfs.f2fs` 1.16, `flash:userdata OKAY`, then `init_user0_failed` and no Android boot. Root cause not established; [#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65). |
+| `fastboot -w` | **PARTIAL DESTRUCTIVE FAILURE** | `erase:userdata` and `flash:userdata` OKAY; `erase:cache` sent, **no final packet** for ~57/85s, cancelled. `flash:cache` and `erase:metadata` never executed. [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64); [PR #67](https://github.com/Ncorror/NekoFlash-2.0/pull/67) CI PASS regression test protects fail-closed behavior, not root-cause repair. |
+| LineageOS ZIP Sideload | **INSTALL FAIL, original ZIP SHA-256 mismatch** | Local `1e41d63e6bd60816a3174d7e16913c44389ca0981c9339840326bc4f0fab28a7` vs official `91d62ab3746841dc0ead83e36be458b390ef018b94afd8d579d4270f9a0dce21`; Recovery `Signature verification failed`, `error:21`. The old file must not be installed or bypassed. Mismatch origin unknown. |
+| OrangeFox R11.3 ZIP via **Lineage Recovery Sideload** | **Data served; Recovery changed; installer exit UNKNOWN** | 00:23:09 ZIP 73,757,208 B closed near 100% before `DONEDONE`; 00:24:11 device booted different Recovery banner `lineage_vayu` → `vayu` (USB `18D1:D001` → `2717:D001`), OrangeFox pictured. Do not attach an unrelated `E1001 system image update` screenshot to this ZIP installer as a proven failure. |
+| Private diagnostic ZIPs | **Manifest integrity PASS** | `1794172866747.zip` 23/23, `1794173155618.zip` and `1794175939025.zip` 39/39; does not guarantee lost earlier events were restored. |
+
+**New candidate, not yet on device:** [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) combines **non-mutating ZIP selection + explicit confirmed Start** with **Recovery change observation without false INSTALL SUCCESS**. [Combined CI #42533760615](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615) **SUCCESS**: 346 JVM tests, 0 failures, zero Lint findings, Android API 26/34 checks, two-file tester kit. PR head `7e5ac5bc57220370f8404dc501f81c4828986ba2`, GitHub synthetic merge/test SHA `198e521bd78df191e7fe3c77651a1df0169ea995`; `main` remains `6a8accd8e33e`. No physical acceptance for the combined APK.
+
+**Next evidence, not an automatic destructive rerun:** examine correct downloaded ROM SHA-256 when it exists; inspect current real Android boot/Recovery outcome; later verify the new Sideload UI on the existing target *without launching a flash when only selecting the file*. [#66](https://github.com/Ncorror/NekoFlash-2.0/issues/66), [#69](https://github.com/Ncorror/NekoFlash-2.0/issues/69) remain open until hardware verification. Do not publish original raw logs.
+
+---
+
 **Snapshot:** November 8, 2026, `main` source [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e), merged PR #62. This is an **evidence index, not a new checklist**. [Detailed RU ledger](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md).
 
 ## Evidence classification
