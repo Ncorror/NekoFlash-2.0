@@ -1,5 +1,17 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## Полевой результат 9 ноября, 14:22 — PR #71 проверен на H2
+
+**Точная испытанная APK:** `6.0.0-alpha11+808babac31f2.42576443632`, объединённый PR #71 head `5f76e33b14db7cd5b33c9f8fd2baef81844d5548`, [CI #42576443632](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42576443632) SUCCESS. **Не слита в main, не подписанный production release.**
+
+**Частичная аппаратная приёмка:** новый экран выбора/отдельное подтверждение Sideload видны на HOST; в 14:10 Recovery подтвердил Sideload Evolution X (2 282 083 364 байт) статусом `operation_end status=0`; Mass Flash `boot` 128 МиБ + `dtbo` 32 МиБ + `vbmeta` 8 КиБ получил финальные `OKAY` 3/3; тестировщик подтвердил последующую загрузку Evolution X Android 14. **Сохранение выбора после force-stop и повторное применение того же ZIP не аттестованы** — не присваивать PR общий FIELD PASS.
+
+**Новая P0-регрессия:** [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) — 256 МиБ ADB Push успешно выполнен дважды (Recovery/Android), но ADB Pull не завершается: два FAIL в Recovery и один в загруженном Android, `INVALID_PAYLOAD` на `WRTE` 1 МиБ (один повтор 422 256 байт). Низкоуровневая причина не доказана, так как `readCompletePacketDirect` скрывает `USB_IN_FAILED` или `CHECKSUM_MISMATCH` за общим статусом. Отдельно проверяем классификацию `CANCELLED` в сводке после протокольного сбоя. **Следующий шаг — прицельная диагностическая правка и unit-тесты, не новый wipe или Mass Flash.**
+
+**Два предоставленных ZIP:** 87/87 и 30/30 SHA/размер по манифестам, CRC PASS, 18/18 JSON, 26/26 пар raw shell metadata/streams. Подробный [единый реестр](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). Исходные ZIP и уникальные данные сохраняются вне публичного репозитория.
+
+---
+
 ## Текущая подтверждённая точка — 9 ноября 2026
 
 **Production/release и main:** GitHub `main=6a8accd8e33e` (тот же функциональный SHA, что 8 ноября). Нового подписанного production APK или слитых Sideload PR **нет**. Подробный [реестр физических испытаний с дополнением 9 ноября](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md).
@@ -8,7 +20,7 @@
 
 | Приоритет | Состояние | Проверенный результат | Следующий шаг |
 | --- | --- | --- | --- |
-| P0: **Sideload выбор и повторное использование ZIP** | [#69](https://github.com/Ncorror/NekoFlash-2.0/issues/69) → [PR #70](https://github.com/Ncorror/NekoFlash-2.0/pull/70) и объединённый [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) | До фикса выбор файла в `MainActivity` **сразу запускал USB-передачу**; исправлено в тестовом коде: выбор отдельно, подтверждение отдельно, SAF-документ сохраняется | PR #71 **CI PASS, FIELD NOT VERIFIED**. Следующий физический тест — безопасный выбор без отправки |
+| P0: **Sideload выбор и повторное использование ZIP** | [#69](https://github.com/Ncorror/NekoFlash-2.0/issues/69) → [PR #70](https://github.com/Ncorror/NekoFlash-2.0/pull/70) и объединённый [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) | До фикса выбор файла в `MainActivity` **сразу запускал USB-передачу**; исправлено в тестовом коде: выбор отдельно, подтверждение отдельно, SAF-документ сохраняется | PR #71 **CI PASS; частичный FIELD PASS 9 ноября (подтверждение и настоящая установка)**. Не проверено сохранение выбора после force-stop |
 | P1: **проверка смены Recovery после Sideload ZIP** | [#66](https://github.com/Ncorror/NekoFlash-2.0/issues/66) → [PR #68](https://github.com/Ncorror/NekoFlash-2.0/pull/68) и тот же PR #71 | При отправке OrangeFox из Lineage Recovery, старый Recovery сменился, но код смотрел только `RECOVERY`, игнорируя возвращение в `SIDELOAD`. Новое поведение различает **observed recovery switch** и **INSTALL SUCCESS** | Сохранять VERIFY_PENDING без подтверждённого exit-кода, не принимать старые `script succeeded` за новый PASS |
 | P0: **Fastboot erase/format** | [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), [#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65), тест [PR #67](https://github.com/Ncorror/NekoFlash-2.0/pull/67) | 9 ноября **Mass Flash FIELD PASS 3/3**; `format userdata` показал Fastboot OKAY, но Android boot FAIL; `-w` завис на `erase:cache` с уже изменённой `userdata`. PR #67 **CI PASS** охраняет fail-closed, но не устраняет причину | Только доказательный анализ Recovery /data/F2FS/metadata и причины молчания загрузчика; **без повторных wipes**, сохранить логи |
 
