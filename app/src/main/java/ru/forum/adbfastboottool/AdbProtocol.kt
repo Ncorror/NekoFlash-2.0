@@ -2870,20 +2870,52 @@ class AdbProtocol(
         val conn = connection ?: return null
         val ep = endpointIn ?: return null
         val buffer = inboundHeaderBuffer
-        var totalRead = 0
-
-        while (totalRead < buffer.size) {
-            val read = conn.bulkTransfer(ep, buffer, totalRead, buffer.size - totalRead, timeoutMs)
-            if (read <= 0) {
-                if (totalRead > 0) {
-                    directReadFailureCode = AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT
-                    directReadFailureMessage =
-                        "ADB header interrupted after $totalRead/${buffer.size} bytes (result=$read); stream synchronization is no longer trusted"
-                    onLog("❌ $directReadFailureMessage")
-                }
+        if (AdbNativeUsbfsIn.isAvailable) {
+            val requestLength = AdbNativeUsbfsIn.aospRequestLength(buffer.size, ep.maxPacketSize)
+            if (requestLength <= 0) {
+                directReadFailureCode = AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                directReadFailureMessage =
+                    "ADB header native USB IN has invalid transfer geometry: expected=${buffer.size}, maxPacket=${ep.maxPacketSize}"
+                onLog("❌ $directReadFailureMessage")
                 return null
             }
-            totalRead += read
+            val native = AdbNativeUsbfsIn.readTransfer(
+                connection = conn,
+                endpoint = ep,
+                buffer = buffer,
+                offset = 0,
+                expectedLength = buffer.size,
+                requestLength = requestLength,
+                timeoutMs = timeoutMs
+            )
+            if (!native.success) {
+                directReadFailureCode = when {
+                    native.disconnected || connection == null ->
+                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
+                    native.timedOut ->
+                        AdbPacketDispatcher.FailureCode.USB_IN_TIMEOUT_BUDGET
+                    else ->
+                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                }
+                directReadFailureMessage = "ADB header ${native.message}"
+                onLog("❌ $directReadFailureMessage")
+                return null
+            }
+        } else {
+            var totalRead = 0
+            while (totalRead < buffer.size) {
+                val read = conn.bulkTransfer(ep, buffer, totalRead, buffer.size - totalRead, timeoutMs)
+                if (read <= 0) {
+                    if (totalRead > 0) {
+                        directReadFailureCode = AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT
+                        directReadFailureMessage =
+                            "ADB header interrupted after $totalRead/${buffer.size} bytes (result=$read); stream synchronization is no longer trusted"
+                        onLog("❌ $directReadFailureMessage")
+                    }
+                    return null
+                }
+                totalRead += read
+            }
         }
 
         val cmd   = readIntLe(buffer, 0).toLong() and 0xFFFFFFFFL
@@ -2963,27 +2995,37 @@ class AdbProtocol(
 
         val buffer = ByteArray(length)
         if (AdbNativeUsbfsIn.isAvailable) {
-            val native = AdbNativeUsbfsIn.readExact(
+            val requestLength = AdbNativeUsbfsIn.aospRequestLength(length, ep.maxPacketSize)
+            if (requestLength <= 0) {
+                directReadFailureCode = AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                directReadFailureMessage =
+                    "ADB payload native USB IN has invalid transfer geometry: expected=$length, maxPacket=${ep.maxPacketSize}"
+                return null
+            }
+            val native = AdbNativeUsbfsIn.readTransfer(
                 connection = conn,
                 endpoint = ep,
                 buffer = buffer,
                 offset = 0,
-                length = length,
+                expectedLength = length,
+                requestLength = requestLength,
                 timeoutMs = ADB_NATIVE_IN_TIMEOUT_MS
             )
             if (!native.success) {
-                directReadFailureCode = if (native.disconnected || connection == null) {
-                    AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
-                } else {
-                    AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                directReadFailureCode = when {
+                    native.disconnected || connection == null ->
+                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
+                    native.timedOut ->
+                        AdbPacketDispatcher.FailureCode.USB_IN_TIMEOUT_BUDGET
+                    else ->
+                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED
                 }
                 directReadFailureMessage = native.message
                 return null
             }
         } else {
-            // Compatibility fallback only. Production Android builds include
-            // the native usbfs library; never mix Java and native readers in
-            // one payload.
+            // Compatibility fallback only. If native usbfs is unavailable,
+            // keep the whole session on Android's synchronous bulk path.
             var totalRead = 0
             while (totalRead < length) {
                 val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)

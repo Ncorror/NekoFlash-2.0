@@ -7,12 +7,11 @@ import android.hardware.usb.UsbEndpoint
 /**
  * ADB bulk-IN receiver backed by Linux usbfs URBs.
  *
- * Android's UsbDeviceConnection.bulkTransfer() wraps USBDEVFS_BULK and only
- * exposes a generic negative result. AOSP Linux adb host uses
- * USBDEVFS_SUBMITURB/REAPURB for bulk IN and checks errno + urb.status.
- * This backend follows that transport shape for one framed ADB payload.
- * It may resubmit only a bounded zero-byte EPROTO-class failed IN URB; it
- * never replays the ADB command and never publishes a partial packet.
+ * Current AOSP Linux adb treats each ADB header/payload as one USB transfer:
+ * the header receive buffer is rounded to the endpoint packet size, while a
+ * payload receive buffer is rounded up only when needed to avoid packet
+ * overflow. A completed transfer is accepted only when actual_length equals
+ * the ADB protocol length. No failed URB or ADB command is replayed here.
  */
 internal object AdbNativeUsbfsIn {
     data class Result(
@@ -42,39 +41,54 @@ internal object AdbNativeUsbfsIn {
     val isAvailable: Boolean
         get() = loadFailure == null
 
-    fun readExact(
+    internal fun aospRequestLength(expectedLength: Int, maxPacketSize: Int): Int {
+        if (expectedLength <= 0 || maxPacketSize <= 0) return -1
+        val remainder = expectedLength % maxPacketSize
+        val padding = if (remainder == 0) 0 else maxPacketSize - remainder
+        if (expectedLength > Int.MAX_VALUE - padding) return -1
+        return expectedLength + padding
+    }
+
+    fun readTransfer(
         connection: UsbDeviceConnection,
         endpoint: UsbEndpoint,
         buffer: ByteArray,
         offset: Int,
-        length: Int,
+        expectedLength: Int,
+        requestLength: Int,
         timeoutMs: Int
     ): Result {
         if (!isAvailable) return failed("native library unavailable")
         if (endpoint.direction != UsbConstants.USB_DIR_IN) return failed("endpoint is not IN")
-        if (offset < 0 || length < 0 || offset > buffer.size || length > buffer.size - offset) {
+        if (offset < 0 || expectedLength <= 0 || offset > buffer.size ||
+            expectedLength > buffer.size - offset) {
             return failed("invalid destination range")
         }
-        if (length == 0) {
-            return Result(true, 0, 0, 0, 0, 0, 0, 0L, NativeUsbfsBackend.STAGE_DONE, "empty")
-        }
+        if (requestLength < expectedLength) return failed("USB request is smaller than expected transfer")
         if (timeoutMs <= 0) return failed("invalid timeout")
         val fd = runCatching { connection.fileDescriptor }.getOrDefault(-1)
         if (fd < 0) return failed("invalid UsbDeviceConnection fd")
 
         val raw = try {
-            nativeReadExact(fd, endpoint.address, buffer, offset, length, timeoutMs)
+            nativeReadTransfer(
+                fd, endpoint.address, buffer, offset,
+                expectedLength, requestLength, timeoutMs
+            )
         } catch (error: Exception) {
             return failed("JNI ${error.javaClass.simpleName}: ${error.message ?: "no detail"}")
         } catch (error: LinkageError) {
             return failed("JNI ${error.javaClass.simpleName}: ${error.message ?: "no detail"}")
         }
-        return decode(raw, length)
+        return decode(raw, expectedLength, requestLength)
     }
 
-    internal fun decodeForTest(raw: LongArray, requested: Int): Result = decode(raw, requested)
+    internal fun decodeForTest(
+        raw: LongArray,
+        expectedLength: Int,
+        requestLength: Int = expectedLength
+    ): Result = decode(raw, expectedLength, requestLength)
 
-    private fun decode(raw: LongArray, requested: Int): Result {
+    private fun decode(raw: LongArray, expectedLength: Int, requestLength: Int): Result {
         if (raw.size < RESULT_FIELDS) return failed("short native result: ${raw.size}")
         val success = raw[IDX_SUCCESS] == 1L
         val bytes = raw[IDX_CONFIRMED_BYTES].coerceIn(0L, Int.MAX_VALUE.toLong()).toInt()
@@ -87,8 +101,8 @@ internal object AdbNativeUsbfsIn {
         val stage = raw[IDX_STAGE].toInt()
         val kernelErrno = raw[IDX_KERNEL_IOCTL_ERRNO].toInt()
         val state = if (success) "OK" else "FAIL"
-        val message = "native usbfs IN $state: bytes=$bytes/$requested, errno=$errno, " +
-            "kernelErrno=$kernelErrno, urbStatus=$status, actual=$actual, " +
+        val message = "native usbfs IN $state: bytes=$bytes/$expectedLength, request=$requestLength, " +
+            "errno=$errno, kernelErrno=$kernelErrno, urbStatus=$status, actual=$actual, " +
             "urbSubmissions=$submissions, " +
             "stage=${NativeUsbfsBackend.stageLabel(stage)}, elapsedMs=$elapsed"
         return Result(
@@ -100,12 +114,13 @@ internal object AdbNativeUsbfsIn {
         false, 0, 0, 0, 0, 0, 0, 0L, NativeUsbfsBackend.STAGE_PREFLIGHT, detail
     )
 
-    private external fun nativeReadExact(
+    private external fun nativeReadTransfer(
         fd: Int,
         endpointAddress: Int,
         buffer: ByteArray,
         offset: Int,
-        length: Int,
+        expectedLength: Int,
+        requestLength: Int,
         timeoutMs: Int
     ): LongArray
 

@@ -1,5 +1,5 @@
 #include "../app/src/main/cpp/transfer_deadline.h"
-#include "../app/src/main/cpp/adb_usb_in_retry_policy.h"
+#include "../app/src/main/cpp/adb_usb_in_transfer_policy.h"
 #include <cassert>
 #include <iostream>
 
@@ -30,28 +30,13 @@ int main() {
     explicit_cap.progress(start + 89999);
     assert(!explicit_cap.stalled(start + 90001));
     assert(explicit_cap.hard_expired(start + 90001));
-    using nekoflash::adb_usb_in_request_bytes;
-    using nekoflash::adb_usb_in_retry_delay_us;
-    using nekoflash::should_retry_adb_usb_in;
-    assert(should_retry_adb_usb_in(-EPROTO, 0, 0));
-    assert(should_retry_adb_usb_in(-EILSEQ, 0, 1));
-    assert(should_retry_adb_usb_in(-ETIME, 0, 2));
-    assert(!should_retry_adb_usb_in(-EPROTO, 0, 3));
-    assert(!should_retry_adb_usb_in(-EPROTO, 1, 0));
-    assert(!should_retry_adb_usb_in(-EPIPE, 0, 0));
-    assert(!should_retry_adb_usb_in(-EOVERFLOW, 0, 0));
-    assert(!should_retry_adb_usb_in(-ENODEV, 0, 0));
-    assert(!should_retry_adb_usb_in(-ESHUTDOWN, 0, 0));
-    assert(adb_usb_in_request_bytes(0) == 0);
-    assert(adb_usb_in_request_bytes(1) == 1);
-    assert(adb_usb_in_request_bytes(4095) == 4095);
-    assert(adb_usb_in_request_bytes(4096) == 4096);
-    assert(adb_usb_in_request_bytes(4097) == 4096);
-    assert(adb_usb_in_request_bytes(16384) == 4096);
-    assert(adb_usb_in_retry_delay_us(0) == 0);
-    assert(adb_usb_in_retry_delay_us(1) == 150000);
-    assert(adb_usb_in_retry_delay_us(2) == 300000);
-    assert(adb_usb_in_retry_delay_us(3) == 600000);
+    using nekoflash::is_valid_adb_usb_in_transfer;
+    assert(is_valid_adb_usb_in_transfer(24, 512));
+    assert(is_valid_adb_usb_in_transfer(16384, 16384));
+    assert(!is_valid_adb_usb_in_transfer(0, 512));
+    assert(!is_valid_adb_usb_in_transfer(512, 24));
+    assert(!is_valid_adb_usb_in_transfer(16384, 0));
+    assert(!is_valid_adb_usb_in_transfer(1024 * 1024 + 1, 1024 * 1024 + 1));
 
-    std::cout << "PASS native deadlines + ADB IN zero-byte EPROTO-class bounded retry policy\n";
+    std::cout << "PASS native deadlines + ADB IN single-transfer policy\n";
 }
