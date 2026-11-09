@@ -6,6 +6,12 @@
 
 **EN.** Check the [real hardware evidence ledger](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) before assigning new tasks. Previously completed 512-file transfers, 16 MiB, real Recovery and `vendor_boot` flashing remain recorded by build and device. A checklist is **not** proof that the work has or has not been done. The next focused physical test plan is to be agreed from the evidence gaps, not blindly from 43 cards.
 
+## 9 November 2026 update / обновление
+
+**RU:** На разблокированном `vayu` реальные **Mass Flash `boot/dtbo/recovery` 3/3 PASS**, `fastboot -w` и Android после `format userdata` — **FIELD FAIL**; исходный Lineage ZIP был с неверным SHA-256; Sideload OrangeFox из Lineage Recovery привёл к появлению другого Recovery, но installer exit-код не получен. [Полная таблица](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). **Не повторять destructive операции ради галочек TestBook.** Для теста **исправления выбора ZIP** смотри [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71), который уже прошёл [CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615), но **пока не слит в `main` и не испытан на телефоне**. Старый `main` запускает Sideload прямо после выбора файла — не считай его «безопасным выбором».
+
+**EN:** Actual unlocked-vayu Mass Flash `boot/dtbo/recovery` **FIELD PASS 3/3**, whereas `fastboot -w` partially failed and Android did not boot after `format userdata`. The original Lineage ZIP was hash-mismatched. OrangeFox ZIP sent from Lineage Recovery was followed by a different Recovery environment, without a captured installer exit code. [Detailed evidence](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). **Do not rerun destructive operations just for TestBook checkboxes.** New explicit Choose/Start Sideload exists in green [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) ([CI #42533760615](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615)), **not in `main` yet**. Main's current picker automatically starts sending a ZIP.
+
 ## Correct kit / правильный комплект
 
 1. Choose a **successful current `main` workflow**: [GitHub Actions downloads](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess). The `NekoFlash-Insiders-Tester-Kit` artifact contains **exactly two files**: Debug APK and `testbook.html`. Choose the kit's precise CI run, record the run ID and source SHA.
