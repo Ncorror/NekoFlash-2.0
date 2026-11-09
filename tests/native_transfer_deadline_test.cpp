@@ -30,6 +30,7 @@ int main() {
     explicit_cap.progress(start + 89999);
     assert(!explicit_cap.stalled(start + 90001));
     assert(explicit_cap.hard_expired(start + 90001));
+    using nekoflash::adb_usb_in_request_bytes;
     using nekoflash::adb_usb_in_retry_delay_us;
     using nekoflash::should_retry_adb_usb_in;
     assert(should_retry_adb_usb_in(-EPROTO, 0, 0));
@@ -41,6 +42,12 @@ int main() {
     assert(!should_retry_adb_usb_in(-EOVERFLOW, 0, 0));
     assert(!should_retry_adb_usb_in(-ENODEV, 0, 0));
     assert(!should_retry_adb_usb_in(-ESHUTDOWN, 0, 0));
+    assert(adb_usb_in_request_bytes(0) == 0);
+    assert(adb_usb_in_request_bytes(1) == 1);
+    assert(adb_usb_in_request_bytes(4095) == 4095);
+    assert(adb_usb_in_request_bytes(4096) == 4096);
+    assert(adb_usb_in_request_bytes(4097) == 4096);
+    assert(adb_usb_in_request_bytes(16384) == 4096);
     assert(adb_usb_in_retry_delay_us(0) == 0);
     assert(adb_usb_in_retry_delay_us(1) == 150000);
     assert(adb_usb_in_retry_delay_us(2) == 300000);
