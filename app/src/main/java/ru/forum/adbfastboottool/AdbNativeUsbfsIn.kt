@@ -62,7 +62,9 @@ internal object AdbNativeUsbfsIn {
 
         val raw = try {
             nativeReadExact(fd, endpoint.address, buffer, offset, length, timeoutMs)
-        } catch (error: Throwable) {
+        } catch (error: Exception) {
+            return failed("JNI ${error.javaClass.simpleName}: ${error.message ?: "no detail"}")
+        } catch (error: LinkageError) {
             return failed("JNI ${error.javaClass.simpleName}: ${error.message ?: "no detail"}")
         }
         return decode(raw, length)
