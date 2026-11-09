@@ -1,5 +1,18 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## EPROTO установлен аппаратно — bounded retry candidate, 10 ноября
+
+Архив `NekoFlash-diagnostics-1794262112529.zip` от native-URB сборки CI #42705941131 проверен: **CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse**. На первом 16-КиБ ADB WRTE получен настоящий kernel-level результат: `errno=71 (EPROTO)`, `kernelErrno=0`, `urbStatus=-71`, `actual_length=0`, `stage=urb_status`, `elapsedMs=3`. Это **FIELD FAIL** предыдущего native-кандидата и первое доказательство конкретного USB transaction/protocol fault вместо Java `-1`. Lifecycle fix остаётся FIELD PASS: операция сразу завершилась FAILED, `cancelled=0`.
+
+Так как ошибочный URB подтвердил **0 принятых байт**, PR #73 теперь допускает только низкоуровневое повторное выставление **того же IN URB на том же offset** для `-EPROTO/-EILSEQ/-ETIME`, максимум 3 раза с backoff 2/4/6 мс. ADB/SYNC-команда не пересылается. Любой partial error (`actual_length>0`), `EPIPE`, overflow, disconnect/shutdown, timeout, неизвестный status или checksum mismatch остаётся немедленным fail-closed. Pending URB по-прежнему обязан пройти DISCARDURB+REAP; неподтверждённый drain poison-ит backend. В diagnostics добавлено число URB submissions.
+
+**Новый exact candidate:** PR #73 head `b3bb84b4526d99c6c7ca3c8d3f119bdf717c732d`, [Actions #42710802916](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42710802916) — **SUCCESS attempt 1**: strict source guards, native policy/C++ `-Werror`, JVM, lint, Debug APK, Android API26/API34, tester kit PASS. [Matching Tester Kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42710802916/artifacts/13715664711).
+
+**Граница:** новый bounded-retry код = **CI PASS / FIELD PENDING**. Для квалификации нужен только один Pull существующего 256-МиБ файла и затем совпадающий SHA-256. Push, Sideload, flash, wipe и старые варианты повторять не требуется. PR не сливать до физического PASS.
+
+---
+
+
 ## Аудит ADB Pull — 10 ноября 2026
 
 **Текущий код main:** `9a7773ae9ca41fe0e428c083a54606062d812043`. Исправление ADB Pull остаётся **только** в [PR #73](https://github.com/Ncorror/NekoFlash-2.0/pull/73), не слито и не объявлено production.
