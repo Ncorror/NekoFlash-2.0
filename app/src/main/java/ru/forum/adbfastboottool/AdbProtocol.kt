@@ -2880,6 +2880,11 @@ class AdbProtocol(
                 timeoutMs = timeoutMs.coerceAtLeast(1)
             )
             if (!native.success) {
+                if (native.timedOut && native.bytesTransferred == 0) {
+                    // Normal dispatcher idle poll: no header byte was consumed,
+                    // so stream synchronization is intact and the reader may wait again.
+                    return null
+                }
                 directReadFailureCode = when {
                     native.disconnected || connection == null ->
                         AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
