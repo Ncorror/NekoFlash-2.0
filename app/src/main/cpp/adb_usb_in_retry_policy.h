@@ -20,9 +20,10 @@ constexpr bool should_retry_adb_usb_in(
 }
 
 constexpr int adb_usb_in_retry_delay_us(int retry_number) noexcept {
-    return retry_number <= 0
-        ? 0
-        : kAdbUsbInRetryBaseDelayUs * retry_number;
+    if (retry_number <= 0) return 0;
+    if (retry_number == 1) return kAdbUsbInRetryBaseDelayUs;
+    if (retry_number == 2) return kAdbUsbInRetryBaseDelayUs * 2;
+    return kAdbUsbInRetryBaseDelayUs * 4;
 }
 
 }  // namespace nekoflash
