@@ -1,5 +1,28 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+> **Дополнение 9 ноября 2026:** события после первоначального среза 8 ноября изложены в следующем разделе. Исторические H1/H2/H3 и статусы ниже сохранены; **не запускать уже выполненные разрушительные LAB-04/05/06 заново** просто ради отметки.
+
+## Аппаратный раунд 9 ноября — H2, разблокированный vayu (A-only)
+
+**Стенд:** POCO F7 / onyx Android 16 (HOST), отдельный **разблокированный** POCO X3 Pro / vayu Android 14 (TARGET), A-only. Тестировалась фактически установленная **`6.0.0-alpha11+6a8accd8e33e.42517047929`** из `main`; не подменять её будущим PR #71. Сырые ZIP и фотографии содержат приватные USB-журналы и в публичный GitHub не выкладываются.
+
+| Физическая операция / наблюдение | Проверенный исход | Доказательства и предел |
+| --- | --- | --- |
+| **Mass Flash**: `boot.img` 128 МиБ, `dtbo.img` 32 МиБ, `recovery.img` 128 МиБ | **FIELD PASS 3/3 (Fastboot final OKAY)** | 00:10:50–00:10:58, записи подтверждены ответами Fastboot; последующий запуск Recovery наблюдался. Не является автоматическим подтверждением совместимости образов и загрузки Android. |
+| A-only `getvar current-slot`, `slot-count` | **Не поддерживаются устройством по факту** | `FAIL Variable Not found` — ожидаемое отсутствие переменных слотов на A-only. Нельзя вызывать `set_active` / `_a` / `_b` без проверки схемы. |
+| Bootloader Fastboot → userspace Fastbootd | **FIELD PASS** | `getvar is-userspace` различает режимы; USB-переход наблюдался. |
+| `fastboot format userdata` / F2FS | **Транспорт/команда OKAY, Android boot FAIL** | `mkfs.f2fs 1.16.0`, sparse-образ ~100 540 байт для раздела ~242,94 ГБ; `download` и `flash:userdata` завершились `OKAY`, но Android не загрузился, Recovery показал `init_user0_failed`. Причина не доказана; [#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65). |
+| `fastboot -w` | **FIELD FAIL: частично выполнено, затем нет финального ответа** | `erase:userdata` и `flash:userdata` OKAY, `erase:cache` полностью отправлен, затем ~57/85 секунд без `INFO/OKAY/FAIL` до отмены. `flash:cache` / `erase:metadata` **НЕ выполнены**. Ретрай опасен, причина отсутствия ответа не установлена; [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), тест fail-closed [PR #67](https://github.com/Ncorror/NekoFlash-2.0/pull/67) — **CI PASS, не исправление причины на устройстве**. |
+| Sideload `lineage-22.2-20261108-nightly-vayu-signed.zip` | **Recovery INSTALL FAIL; SHA-256 исходного ZIP FAIL** | Локальная сумма `1e41d63e6bd60816a3174d7e16913c44389ca0981c9339840326bc4f0fab28a7`, официальная сумма через `mirrorbits.lineageos.org?...?sha256` — `91d62ab3746841dc0ead83e36be458b390ef018b94afd8d579d4270f9a0dce21`. Файл **не совпадает с официальным**; `Signature verification failed`, `error:21`, `Installation aborted`. Нельзя записывать INSTALL PASS из `DONEDONE` и нельзя обвинить USB-транспорт в изменении исходного ZIP без доказательств. |
+| Sideload `OrangeFox-R11.3-vayu.zip` **из Lineage Recovery** | **Передача почти 100%; восстановлено другое Recovery, installer exit code UNKNOWN** | 00:22:56 `lineage_vayu` USB `18D1:D001`; 00:23:09 отправка ZIP 73 757 208 байт; связь закрылась около 100% **до `DONEDONE`**; 00:24:11 новое Recovery `vayu` USB `2717:D001`, снимки OrangeFox. Это доказательство перехода Recovery, не автоматический `install SUCCESS`. Скриншот `E1001: Failed to update system image` **нельзя без временной привязки относить к установке OrangeFox ZIP**. |
+| Диагностические архивы этого раунда | **CRC, все манифестные SHA/размеры PASS** | `NekoFlash-diagnostics-1794172866747.zip` — 23/23; `1794173155618.zip` и `1794175939025.zip` — 39/39; предыдущий `1794171971075.zip` подтверждает частичное `-w`. Сохранность присутствующих файлов не равна полноте всей исторической записи. |
+
+**Следующая проверенная точка разработки:** [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) — объединение **явного выбора ZIP → отдельный подтверждаемый запуск** и **наблюдения смены Recovery**. [CI #42533760615](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615) **SUCCESS**, 346 JVM / 0 отказов, lint 0, API26/API34 и tester kit PASS; тестировалась GitHub PR merge ref `198e521bd78df191e7fe3c77651a1df0169ea995` для head `7e5ac5bc57220370f8404dc501f81c4828986ba2`. **APK этого PR на физическом телефоне не испытана, в `main` не слита**. Не объявлять исправленным фактическое восстановление Android или `erase:cache`.
+
+**Неизвестное состояние на момент этого аудита:** пользователь начал повторную загрузку корректного LineageOS ZIP. Результата новой SHA-256 и успешной загрузки Android пока нет. Не переписывать поле как PASS и не отправлять прежний неверный ZIP через Recovery.
+
+---
+
 **Срез:** 8 ноября 2026, исходники `main` на коммите [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e), PR #62 уже слит. **Это реестр свидетельств, а не новый список заданий.** [EN summary](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md).
 
 ## Правила статусов
