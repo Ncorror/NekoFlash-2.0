@@ -532,6 +532,11 @@ static jlongArray native_adb_bulk_in_exact_impl(
         return make_result(env, 0, 0, EINVAL, 0, 0, 0, STAGE_PREFLIGHT);
     }
 
+    if (backend_poisoned_noexcept()) {
+        return make_result(env, 0, 0, EUCLEAN, 0, 0,
+                           now_ms() - started, STAGE_PREFLIGHT);
+    }
+
     const jsize destination_size = env->GetArrayLength(destination);
     if (offset > destination_size || length > destination_size - offset) {
         return make_result(env, 0, 0, EINVAL, 0, 0, 0, STAGE_PREFLIGHT);
