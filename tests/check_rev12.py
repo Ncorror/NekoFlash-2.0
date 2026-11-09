@@ -33,7 +33,7 @@ rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
 # REV75: Protocol negotiation is the fix, not failed large-read workarounds.
 # Verify the exact field-reviewed diagnostic source except for two
 # intentionally changed CNXN inbound-size hunks; then run all older guards.
-rev75_receive_adb_hash = '52e5eecf182697f182a0eadc9430a64e98fd19aa'
+rev75_receive_adb_hash = '29d490d695e4a09c637d732a5070d3e0b40b987d'
 if source_git_sha(data) == rev75_receive_adb_hash:
     new_cnxn = "            sendMessageInternal(\n                A_CNXN,\n                LOCAL_ADB_VERSION,\n                AdbHostReceiveWindow.ADVERTISED_MAXDATA,\n                \"host::NekoFlash\\u0000\".toByteArray(Charsets.UTF_8)\n            )\n            onLog(\"ADB host receive maxdata: ${AdbHostReceiveWindow.ADVERTISED_MAXDATA} bytes (CNXN)\")".encode('utf-8')
     old_cnxn = "            sendMessageInternal(\n                A_CNXN,\n                LOCAL_ADB_VERSION,\n                MAX_PAYLOAD,\n                \"host::NekoFlash\\u0000\".toByteArray(Charsets.UTF_8)\n            )".encode('utf-8')
@@ -44,6 +44,10 @@ if source_git_sha(data) == rev75_receive_adb_hash:
     window = base/'AdbHostReceiveWindow.kt'
     assert source_git_sha(window.read_bytes()) == '220a583df485e66ea543389c5d441bc8ab255c63', 'Unreviewed maxdata policy'
     assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbHostReceiveWindowTest.kt').is_file()
+    reader_terminated = "            val header = readHeader(timeoutMs = 30_000) ?: run {\n                if (dispatcherTransportFailed || (packetDispatcher?.snapshot()?.readFailures ?: 0L) > 0L) {\n                    onLog(\"❌ ADB stream: reader terminated during data read\")\n                } else {\n                    onLog(\"❌ ADB stream: data read timeout\")\n                }\n                return null\n            }".encode('utf-8')
+    reader_timeout = "            val header = readHeader(timeoutMs = 30_000) ?: run {\n                onLog(\"❌ ADB stream: data read timeout\")\n                return null\n            }".encode('utf-8')
+    assert data.count(reader_terminated) == 1, 'Unreviewed failed-reader status propagation'
+    data = data.replace(reader_terminated, reader_timeout, 1)
     data = data.replace(new_cnxn, old_cnxn, 1)
     data = data.replace(new_rx_guard, old_rx_guard, 1)
     assert source_git_sha(data) == rev72_adb_hash, 'Unreviewed transport changes in CNXN receive fix'
