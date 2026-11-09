@@ -2,6 +2,45 @@
 
 **Дата среза:** 8 ноября 2026. База `main` перед документальным PR: [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). Изменения в этой ветке **только текст/документация**, не Android, ADB, Fastboot или TestBook. Реестр физических проверок: [RU](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md) · [EN](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md).
 
+## Продолжение полного документального аудита — 9 ноября 2026
+
+**Новая дата среза и проверенная точка:** исходники `main=6a8accd8e33e` не изменились; [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) head `7e5ac5bc57220370f8404dc501f81c4828986ba2` **CI PASS**, GitHub merge ref `198e521bd78df191e7fe3c77651a1df0169ea995`, run [#42533760615](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615) **SUCCESS**: 346/346 JVM, Lint 0, эмуляторы Android API26/34 PASS, debug APK и двухфайловый kit собраны. Это **не** означает merge в `main` или физическую приёмку.
+
+### Новые расхождения D19–D29 и что исправлено
+
+| ID | Проверенная ошибка, недосказанность или риск | Исправление / остаточный статус |
+| --- | --- | --- |
+| D19 | 8 ноября матрица TestBook `LAB-04` ошибочно выглядит как до сих пор неизученный **Mass Flash** | 9 ноября **реальный Mass Flash `boot/dtbo/recovery` 3/3 Fastboot OKAY** на разблокированном vayu; обновлены RU/EN реестр, HARDWARE_VALIDATION и строки LAB-04. Не повторять |
+| D20 | 8 ноября `LAB-06` помечен `NOT VERIFIED` | Реальные `format userdata` и `fastboot -w` **выполнены**, но показали **FIELD FAIL**: Android не загрузился после F2FS-формата, `-w` остановился на `erase:cache` с частично изменённой userdata. [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), [#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65). Нельзя снова назначить wipe для заполнения карточки |
+| D21 | `LAB-05`: статус ZIP переносился между OrangeFox/Lineage ROM и между разными попытками | Оригинальный **LineageOS 22.2 ZIP SHA-256 не совпал с официальным**; `Signature verification failed / error:21` → **INSTALL FAIL**, не USB FAIL. Отдельный `OrangeFox-R11.3-vayu.zip` **передан ИЗ Lineage Recovery**, затем загрузилось другое Recovery. **Installer exit code UNKNOWN** — не приписывать ZIP ни `E1001`, ни безусловный `INSTALL SUCCESS` без времени/журнала |
+| D22 | Факт `DONEDONE` из транспорта приравнивался к полной установке | Сохраняем независимые этапы: `BYTES SERVED`, `DONEDONE`, `RECOVERY SWITCH OBSERVED`, `INSTALL SUCCESS/FAIL VERIFIED`, `ANDROID BOOT VERIFIED`. Если Recovery не даёт код — `VERIFY_PENDING` |
+| D23 | В текущем `main` «Выбрать ZIP» фактически **сразу вызывает `viewModel.runSideload(source)`**, а устаревшие страницы предлагают безопасно выбирать файл заранее | Уточнены README RU/EN, сайты RU/EN, руководство Sideload RU/EN. **Отдельные Choose/Start+confirm, повторный выбор не требуется** только в тестовом [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71); **НЕ в main**. [#69](https://github.com/Ncorror/NekoFlash-2.0/issues/69) |
+| D24 | Раздельные PR #68 и #70 зелёные, но нельзя утверждать, что **их комбинация** прошла CI | Проверен **отдельный объединённый PR #71** и его конкретный run #42533760615. Его APK относится к GitHub synthetic merge SHA `198e521bd78`, не к подписанному релизу или историческому `REV45` ZIP |
+| D25 | Во множестве файлов `REV45`, `REV49`, `REV55` выглядит как современная версия | Исторические `docs/refactor/`, `docs/source-audit/`, `docs/design-approved/`, прежние PR и `START-HERE` оставлены как **датированные снимки**; актуальная правда — README, DEVELOPMENT_STATUS, этот реестр и Insiders README. Не выдавать старый набор/галерею за новую APK |
+| D26 | В документах о `fastboot -w` можно было бы описать успешный wipe, опираясь на два `OKAY` | Явно зафиксировано, что `erase:metadata` **не дошёл до отправки**, `flash:cache` тоже. Тест [PR #67](https://github.com/Ncorror/NekoFlash-2.0/pull/67) лишь защищает fail-closed от повторной отправки; **корневой дефект не устранён** |
+| D27 | CLI Fastboot A/B предполагался даже у старого A-only vayu | `getvar current-slot` / `slot-count` могут возвращать `FAIL Variable Not found`; A-only **не имеет A/B слотов для переключения**. В документации лабораторного раунда нельзя без проверки назначать `set_active`/suffix `_a`/ `_b` |
+| D28 | Масштабируемая инструкция требовала повторения уже завершённых тестов: 1024 WRTE, 512 файлов, 16 МиБ, Mass Flash, повторные форматы | В актуальных таблицах это **исторические пройденные или фактически проваленные испытания**, а не TODO. Для новой APK — только узкая **неразрушительная** проверка выбора/старта Sideload и реального сохранения выбора |
+| D29 | Состояние сторонней загрузки ROM может быть принято за завершённый PASS | Известен только **старый ZIP с неверным SHA** и факт начала нового скачивания. Новая контрольная сумма или успешная загрузка Android на момент аудита **не поступала**. Оставлено UNKNOWN, не нарисован PASS |
+
+### Проверенная область документального аудита
+
+- **Публичные точки входа:** `README.md`, `README_ru.md`, `CHANGELOG.md`, `docs/index.html`, `docs/ru/index.html`, Sideload guide RU/EN, `docs/insiders/README.md`, точные ссылки на GitHub CI и реестр. Сайт больше не представляет текущий auto-send за безопасный выбор ZIP.
+- **Матрицы выполнения:** `docs/DEVELOPMENT_STATUS.md`, `docs/HARDWARE_VALIDATION.md`, `docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-{RU,EN}.md`, `TESTBOOK-43-EVIDENCE-MAP`, `DOCUMENTATION-AUDIT`. Точные ограничения PASS/FAIL/PENDING связаны с issues #64–66/#69, PR #67/#68/#70/#71 и реальным SHA APK.
+- **Релизная документация:** `CHANGELOG.md` отражает лишь `Unreleased DEV` и не создаёт вымышленную production-версию. Исторические tag/REV45 screenshot/guide **не удалены**, старые SHA не подменяются новыми.
+- **TestBook и сохранение данных:** `docs/insiders/testbook.html` с 43 карточками, офлайновыми RU/EN/ZIP/JSON, оригинальными логами оставлен без изменений; экспорт Chrome `content://` **всё ещё не подтверждён физически** ([#49](https://github.com/Ncorror/NekoFlash-2.0/issues/49)). Инструмент APK SAF экспортирует отдельно, не приравнивать.
+- **Логи/безопасность/восстановление:** оригинальные диагностические ZIP **не выкладывались** в публичный GitHub и не удалялись; [#50](https://github.com/Ncorror/NekoFlash-2.0/issues/50) остаётся открытым для исторической полноты. Старые security review / утверждения о доступах к GitHub остаются датированными, **не считаются новой проверкой административных настроек**.
+
+**Что не входит в выполненный аудит:** полная ручная проверка каждого байта всех 431 файлов репозитория; фактический выход на сайты за пределами GitHub, живые доступы к настройкам branch protection, тестирование новых устройств и исходные приватные ZIP с повторным вычислением байтов в этом же документальном коммите. CI-структурные и локальные link checks будут оценены на точном SHA этого документального PR. Эти ограничения не отменяют детальной сверки публичных документов и аппаратных сводок.
+
+### Точка продолжения без повторных действий
+
+1. Подтвердить готовность документального PR #63 по его **последнему CI SHA**; мержить только после зелёного результата.
+2. PR #71 — **CI PASS**, но ещё не на телефоне. При новой APK выполнить **безопасную проверку**: выбрать ZIP и убедиться, что передачи не было; проверить имя/размер и отсутствие автозапуска. Повторная установка OrangeFox не нужна.
+3. Для `userdata`/`-w`: работать от текущих Recovery-фактов и журналов, не отправлять снова destructive `erase:cache` и `format userdata` без причины.
+4. Новый ROM ZIP — сверить свежий SHA с официальным; пока исходный SHA неверен, не делать Sideload, даже если приложение показывает 100%.
+
+---
+
 ## Метод
 
 Сверены GitHub merge PR #39–62, `main`, CI #413/#494/#501/#502/#42513570788/#42515445165 и текущий post-merge CI [#42517047929](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42517047929), [аппаратные отчёты alpha10 родин](../evidence/POCO_X7_PRO_ALPHA10.md) и [vayu](../evidence/POCO_X3_PRO_ALPHA10_1.md), [REV48 полевой отчёт](../insiders/FIELD-REPORT-2026-11-07-ONYX-VAYU-RU.md), комментарии [#57](https://github.com/Ncorror/NekoFlash-2.0/issues/57), [#50](https://github.com/Ncorror/NekoFlash-2.0/issues/50), [#52](https://github.com/Ncorror/NekoFlash-2.0/issues/52), [#47](https://github.com/Ncorror/NekoFlash-2.0/issues/47), [#49](https://github.com/Ncorror/NekoFlash-2.0/issues/49). Приватные ZIP **не импортировались в публичный GitHub**; этот аудит использует уже зафиксированные проверенные выводы, а не имитацию повторной верификации байтов.
@@ -38,11 +77,11 @@
 
 1. [Главный реестр выполненных физических тестов](PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md) — ответ «что уже делали, где PASS/FAIL».
 2. [Сопоставление всех 43 карточек TestBook с реальными свидетельствами](TESTBOOK-43-EVIDENCE-MAP-2026-11-08-RU.md) — какие уже покрыты, какие частично, а какие ещё не проверены.
-2. [Статус разработки](../DEVELOPMENT_STATUS.md) — текущая интеграционная точка, подтверждённые CI и открытые проблемы.
-3. [Аппаратная квалификация](../HARDWARE_VALIDATION.md) — короткая EN матрица H1/H2/H3.
-4. [Insiders](../insiders/README.md) — текущий путь к **двухфайловому комплекту** и исторический pinned REV45.
-5. [Исторический REV48 отчёт](../insiders/FIELD-REPORT-2026-11-07-ONYX-VAYU-RU.md) и [сохранённые alpha10](../evidence/) — доказательства без удаления.
-6. [Открытые GitHub issues](https://github.com/Ncorror/NekoFlash-2.0/issues?q=is%3Aissue+is%3Aopen) — неподтверждённые/активные дефекты.
+3. [Статус разработки](../DEVELOPMENT_STATUS.md) — текущая интеграционная точка, подтверждённые CI и открытые проблемы.
+4. [Аппаратная квалификация](../HARDWARE_VALIDATION.md) — короткая EN матрица H1/H2/H3.
+5. [Insiders](../insiders/README.md) — текущий путь к **двухфайловому комплекту** и исторический pinned REV45.
+6. [Исторический REV48 отчёт](../insiders/FIELD-REPORT-2026-11-07-ONYX-VAYU-RU.md) и [сохранённые alpha10](../evidence/) — доказательства без удаления.
+7. [Открытые GitHub issues](https://github.com/Ncorror/NekoFlash-2.0/issues?q=is%3Aissue+is%3Aopen) — неподтверждённые/активные дефекты.
 
 ## Что не меняли
 
