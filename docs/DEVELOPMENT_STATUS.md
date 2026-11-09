@@ -1,5 +1,22 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## Аудит ADB Pull — 10 ноября 2026
+
+**Текущий код main:** `9a7773ae9ca41fe0e428c083a54606062d812043`. Исправление ADB Pull остаётся **только** в [PR #73](https://github.com/Ncorror/NekoFlash-2.0/pull/73), не слито и не объявлено production.
+
+**Полевой дефект #72 подтверждён на H2 в OrangeFox Recovery и в загруженном Evolution X Android 14.** ADB Push 256 МиБ проходит, ADB Pull воспроизводимо падает на входящем USB. Последовательно проверены и сохранены как отрицательные доказательства: Java synchronous 16 КиБ внутри 1-МиБ WRTE, один 1-МиБ synchronous `bulkTransfer`, Java `UsbRequest` pipeline и согласование `CNXN.maxdata=16 КиБ` со старым Java reader. Последний вариант физически подтвердил 16-КиБ WRTE и дошёл до 50% файла, но всё равно получил `USB_IN_FAILED`; зато отдельное исправление жизненного цикла уже **FIELD PASS** — операция после reader failure завершается сразу как FAILED, без прежних ~30 секунд RUNNING/CANCELLED.
+
+**Kernel cross-check HOST:** POCO F7 / Android 16 / Linux 6.6.143-SakataX; X3 Pro был перечислен как High-Speed USB. В отфильтрованном `dmesg` нет одновременного USB disconnect/reset/stall в момент app-level Pull failure; явное отключение появилось позже. Java `UsbDeviceConnection.bulkTransfer()` не раскрывает kernel errno, поэтому старые логи не могут доказать EPIPE/EPROTO/ETIMEDOUT.
+
+**Результат полного source-аудита:** рабочий Fastboot native backend уже использует Linux usbfs URB. AOSP Linux adb host также принимает bulk IN через `USBDEVFS_SUBMITURB/REAPURB`, а не через Java synchronous bulk path. Финальный кандидат PR #73 переводит **только ADB payload IN** на отдельный native usbfs URB JNI reader с errno + `urb.status` + `actual_length`; 24-байтовые ADB headers сохраняют проверенный Java read, ADB Push/OUT, Fastboot, Sideload и checksums не переписаны. Partial packet не публикуется, command auto-retry отсутствует, URB при ошибке discard+reap, не доказанный drain poison-ит backend fail-closed. Консервативный wire-frame `CNXN.maxdata=16 КиБ` сохранён; это **не** ограничение размера файла.
+
+**Exact candidate CI:** [Actions #42705941131](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42705941131) — **SUCCESS, attempt 1** на PR head `e3ac779d0593f26ce181e84e44773d488145b758`: source guards, C++ `-Werror`, JVM, lint, Debug APK, Android API 26 + API 34, tester kit PASS. [Tester Kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42705941131/artifacts/13714112372).
+
+**Граница квалификации:** native URB candidate = **CI PASS / FIELD PENDING**. Для закрытия #72 и merge #73 нужен ровно один новый физический Pull 256 МиБ на этой APK и совпадающий SHA-256. Повторять Push, wipe, flash, Sideload или старые Pull-сборки не требуется.
+
+---
+
+
 ## Полевой результат 9 ноября, 14:22 — PR #71 проверен на H2
 
 **Точная испытанная APK:** `6.0.0-alpha11+808babac31f2.42576443632`, объединённый PR #71 head `5f76e33b14db7cd5b33c9f8fd2baef81844d5548`, [CI #42576443632](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42576443632) SUCCESS. **Не слита в main, не подписанный production release.**
