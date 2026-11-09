@@ -79,8 +79,21 @@ class AdbPacketDispatcher(
 
     fun take(timeoutMs: Int): Packet? {
         if (timeoutMs <= 0) return queue.poll()
+        val deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs.toLong())
         return try {
-            queue.poll(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            while (true) {
+                // A terminal USB failure must wake a blocked SYNC Pull quickly.
+                // Previously queue.poll(30s) survived the reader's failure and
+                // kept Operation Center RUNNING until a manual cable detach.
+                val remainingNs = deadline - System.nanoTime()
+                if (remainingNs <= 0) return queue.poll()
+                val sliceMs = minOf(100L, TimeUnit.NANOSECONDS.toMillis(remainingNs).coerceAtLeast(1L))
+                val packet = queue.poll(sliceMs, TimeUnit.MILLISECONDS)
+                if (packet != null) return packet
+                if (!running.get()) return queue.poll()
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             null
