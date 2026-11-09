@@ -1,5 +1,20 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## 16-КиБ native URB FIELD FAIL → AOSP-style 4-КиБ candidate, 10 ноября
+
+Архив `NekoFlash-diagnostics-1794266433382.zip` проверен полностью: **CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA-256 PASS, 2/2 JSON parse**. Точная APK: `6.0.0-alpha11+d42621bc0c30.42715598717`.
+
+Физический результат xHCI-recovery candidate: **FIELD FAIL**. Первый 16-КиБ ADB WRTE не передал ни байта. Native backend выполнил **4 submissions** (initial + три zero-byte retries с 150/300/600 мс), и все четыре завершились `-EPROTO`; итог: `errno=71`, `urbStatus=-71`, `actual=0`, `urbSubmissions=4`, `stage=urb_status`, `elapsedMs=1060`. Это исключает короткое recovery-window как основную причину. Lifecycle остаётся **FIELD PASS**: WakeLock освобождён сразу, `failed=1`, `cancelled=0`.
+
+Полный AOSP-сверочный аудит выявил материальное отличие: классический Linux ADB `usb_read()` разбивает входящий поток на **4096-байтовые bulk reads**, а NekoFlash native reader подавал один **16 384-байтовый URB** на каждый negotiated WRTE. Новый PR #73 сохраняет `CNXN.maxdata=16 КиБ` как ADB wire-frame bound, но собирает каждый payload из четырёх native usbfs URB по **4096 байт**. Последний неполный фрагмент читает ровно остаток. Partial/error packet не публикуется; checksum проверяется только после полной сборки. ADB/SYNC command replay отсутствует.
+
+**Exact candidate:** PR #73 head `968a0e3e617ee45341a379aae6d586eae978e0db`. [Actions #42720159930](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42720159930) — **SUCCESS attempt 1**: strict source guards, native 4-КиБ policy/C++ `-Werror`, JVM, lint, Debug APK, Android API26, Android API34 и tester kit PASS. [Matching Tester Kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42720159930/artifacts/13720027110).
+
+**Статус:** 4-КиБ AOSP-style candidate = **CI PASS / FIELD PENDING**. Следующий аппаратный шаг — только один Pull существующего 256-МиБ файла и затем SHA-256 при успехе. Старые Push/Sideload/flash/wipe не повторять.
+
+---
+
+
 ## 2-мс retry FIELD FAIL → xHCI recovery-window candidate, 10 ноября
 
 Новый архив `NekoFlash-diagnostics-1794264520796.zip` проверен полностью: **CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse**. Точная APK: `6.0.0-alpha11+94e870cf849d.42710802916`.
