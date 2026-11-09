@@ -1,4 +1,5 @@
 #include "../app/src/main/cpp/transfer_deadline.h"
+#include "../app/src/main/cpp/adb_usb_in_retry_policy.h"
 #include <cassert>
 #include <iostream>
 
@@ -29,5 +30,21 @@ int main() {
     explicit_cap.progress(start + 89999);
     assert(!explicit_cap.stalled(start + 90001));
     assert(explicit_cap.hard_expired(start + 90001));
-    std::cout << "PASS native deadlines: long progress, stalled first/next URB, optional cap, 64-bit clock\n";
+    using nekoflash::adb_usb_in_retry_delay_us;
+    using nekoflash::should_retry_adb_usb_in;
+    assert(should_retry_adb_usb_in(-EPROTO, 0, 0));
+    assert(should_retry_adb_usb_in(-EILSEQ, 0, 1));
+    assert(should_retry_adb_usb_in(-ETIME, 0, 2));
+    assert(!should_retry_adb_usb_in(-EPROTO, 0, 3));
+    assert(!should_retry_adb_usb_in(-EPROTO, 1, 0));
+    assert(!should_retry_adb_usb_in(-EPIPE, 0, 0));
+    assert(!should_retry_adb_usb_in(-EOVERFLOW, 0, 0));
+    assert(!should_retry_adb_usb_in(-ENODEV, 0, 0));
+    assert(!should_retry_adb_usb_in(-ESHUTDOWN, 0, 0));
+    assert(adb_usb_in_retry_delay_us(0) == 0);
+    assert(adb_usb_in_retry_delay_us(1) == 2000);
+    assert(adb_usb_in_retry_delay_us(2) == 4000);
+    assert(adb_usb_in_retry_delay_us(3) == 6000);
+
+    std::cout << "PASS native deadlines + ADB IN zero-byte EPROTO-class bounded retry policy\n";
 }
