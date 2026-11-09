@@ -1,5 +1,6 @@
 #include <jni.h>
 #include "transfer_deadline.h"
+#include "adb_usb_in_retry_policy.h"
 #include <atomic>
 #include <cerrno>
 #include <cstdint>
@@ -569,6 +570,7 @@ static jlongArray native_adb_bulk_in_exact_impl(
     int last_status = 0;
     int last_actual = 0;
     int last_kernel_errno = 0;
+    int zero_byte_bus_retries = 0;
     int64_t last_progress_ms = started;
 
     auto finish = [&](bool success, int error_code, int stage,
@@ -610,6 +612,7 @@ static jlongArray native_adb_bulk_in_exact_impl(
 
     while (total < length) {
         const int requested = length - total;
+        bool retry_same_range = false;
         std::memset(slot.urb.get(), 0, sizeof(*slot.urb));
         slot.urb->type = USBDEVFS_URB_TYPE_BULK;
         slot.urb->endpoint = static_cast<unsigned char>(endpoint_address & 0xFF);
@@ -647,6 +650,14 @@ static jlongArray native_adb_bulk_in_exact_impl(
                 last_actual = slot.urb->actual_length;
 
                 if (last_status != 0) {
+                    if (nekoflash::should_retry_adb_usb_in(
+                            last_status, last_actual, zero_byte_bus_retries)) {
+                        ++zero_byte_bus_retries;
+                        usleep(static_cast<useconds_t>(
+                            nekoflash::adb_usb_in_retry_delay_us(zero_byte_bus_retries)));
+                        retry_same_range = true;
+                        break;
+                    }
                     const int status_errno = last_status < 0 ? -last_status : EIO;
                     return finish(false, status_errno, STAGE_STATUS);
                 }
@@ -655,6 +666,7 @@ static jlongArray native_adb_bulk_in_exact_impl(
                 }
 
                 total += last_actual;
+                zero_byte_bus_retries = 0;
                 last_progress_ms = now_ms();
                 break;
             }
@@ -670,6 +682,8 @@ static jlongArray native_adb_bulk_in_exact_impl(
             }
             usleep(REAP_POLL_SLEEP_US);
         }
+
+        if (retry_same_range) continue;
     }
 
     return finish(true, 0, STAGE_DONE, last_kernel_errno);
