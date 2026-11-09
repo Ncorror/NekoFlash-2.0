@@ -237,9 +237,10 @@ class AdbProtocol(
             sendMessageInternal(
                 A_CNXN,
                 LOCAL_ADB_VERSION,
-                MAX_PAYLOAD,
+                AdbHostReceiveWindow.ADVERTISED_MAXDATA,
                 "host::NekoFlash\u0000".toByteArray(Charsets.UTF_8)
             )
+            onLog("ADB host receive maxdata: ${AdbHostReceiveWindow.ADVERTISED_MAXDATA} bytes (CNXN)")
 
             val header = readHeader() ?: run {
                 onLog("ERROR: ADB connection failed (no response)")
@@ -2893,7 +2894,7 @@ class AdbProtocol(
             onLog("❌ $directReadFailureMessage")
             return null
         }
-        if (len < 0 || len > MAX_PAYLOAD) {
+        if (!AdbHostReceiveWindow.isAccepted(len)) {
             directReadFailureCode = AdbPacketDispatcher.FailureCode.INVALID_HEADER
             directReadFailureMessage = "ADB header payload length out of range: $len"
             onLog("❌ $directReadFailureMessage")
@@ -2956,46 +2957,20 @@ class AdbProtocol(
         }
 
         val buffer = ByteArray(length)
-        val readStartedMs = android.os.SystemClock.elapsedRealtime()
-        if (android.os.Build.VERSION.SDK_INT >= 28 && length > AdbUsbInboundPipeline.CHUNK_BYTES) {
-            // One reader, four bounded async USBFS requests in flight.
-            // This avoids the failing 1 MiB synchronous bulkTransfer without
-            // accepting partial ADB frames or relying on automatic replay.
-            val received = readInboundPipelined(conn, ep, buffer)
-            if (!received.ok) {
-                directReadFailureCode = if (connection == null) {
-                    AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
-                } else {
-                    AdbPacketDispatcher.FailureCode.USB_IN_FAILED
-                }
-                val elapsedMs = android.os.SystemClock.elapsedRealtime() - readStartedMs
-                directReadFailureMessage = "ADB async USB IN failed after " +
-                    "${received.bytesRead}/$length bytes (requests=${received.requests}, " +
-                    "elapsedMs=$elapsedMs, api=${android.os.Build.VERSION.SDK_INT}, detail=${received.detail})"
+        var totalRead = 0
+
+        while (totalRead < length) {
+            // Keep individual host-controller transactions bounded, but read
+            // directly into the final payload buffer to avoid one allocation
+            // and one memcpy for every USB chunk.
+            val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)
+            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)
+            if (read <= 0) {
+                directReadFailureCode = if (connection == null) AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED else AdbPacketDispatcher.FailureCode.USB_IN_FAILED
+                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read)"
                 return null
             }
-        } else {
-            // Keep the proven small-transfer/legacy USB path; never request
-            // more than 16 KiB synchronously from a pre-P USB host.
-            val inboundResult = AdbUsbInboundReadPolicy.readExact(
-                totalBytes = length,
-                apiLevel = 27
-            ) { offset, requestBytes, timeoutMs ->
-                conn.bulkTransfer(ep, buffer, offset, requestBytes, timeoutMs)
-            }
-            if (inboundResult is AdbUsbInboundReadPolicy.Result.Failed) {
-                directReadFailureCode = if (connection == null) {
-                    AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED
-                } else {
-                    AdbPacketDispatcher.FailureCode.USB_IN_FAILED
-                }
-                val elapsedMs = android.os.SystemClock.elapsedRealtime() - readStartedMs
-                directReadFailureMessage = "ADB sync USB IN failed after " +
-                    "${inboundResult.bytesRead}/$length bytes (result=${inboundResult.transferResult}, " +
-                    "requested=${inboundResult.requestedBytes}, requests=${inboundResult.requests}, " +
-                    "elapsedMs=$elapsedMs, api=${android.os.Build.VERSION.SDK_INT})"
-                return null
-            }
+            totalRead += read
         }
 
         if (expectedChecksum != null && !AdbPacketChecksum.isValid(
@@ -3012,90 +2987,6 @@ class AdbProtocol(
             return null
         }
         return buffer
-    }
-
-    private data class AsyncInboundStatus(
-        val ok: Boolean,
-        val bytesRead: Int,
-        val requests: Int,
-        val detail: String
-    )
-
-    /**
-     * Android USBFS may reject a single synchronous 1 MiB bulk read. Queue a
-     * small fixed number of 16 KiB URBs simultaneously instead. Each queued
-     * request owns its exact position within one validated ADB payload.
-     * No request is queued beyond that payload, and no short completion is
-     * accepted as part of a valid frame.
-     *
-     * The ADB dispatcher is the sole USB IN reader on this connection.
-     */
-    private fun readInboundPipelined(
-        conn: UsbDeviceConnection,
-        ep: UsbEndpoint,
-        output: ByteArray
-    ): AsyncInboundStatus {
-        val chunks = AdbUsbInboundPipeline.plan(output.size)
-        val tracker = AdbUsbInboundPipeline.Tracker(chunks)
-        data class Pending(val chunk: AdbUsbInboundPipeline.Chunk, val data: ByteBuffer)
-        val inFlight = LinkedHashMap<UsbRequest, Pending>()
-        var next = 0
-        var requests = 0
-
-        fun failed(detail: String): AsyncInboundStatus =
-            AsyncInboundStatus(false, tracker.acceptedBytes, requests, detail)
-
-        try {
-            while (!tracker.complete) {
-                while (next < chunks.size && inFlight.size < AdbUsbInboundPipeline.MAX_IN_FLIGHT) {
-                    val chunk = chunks[next]
-                    val request = UsbRequest()
-                    if (!request.initialize(conn, ep)) {
-                        request.close()
-                        return failed("REQUEST_INIT_FAILED offset=${chunk.offset}")
-                    }
-                    val direct = ByteBuffer.allocateDirect(chunk.size)
-                    if (!request.queue(direct)) {
-                        request.close()
-                        return failed("REQUEST_QUEUE_FAILED offset=${chunk.offset} bytes=${chunk.size}")
-                    }
-                    inFlight[request] = Pending(chunk, direct)
-                    requests++
-                    next++
-                }
-
-                val completed = try {
-                    conn.requestWait(15_000L)
-                } catch (_: java.util.concurrent.TimeoutException) {
-                    return failed("REQUEST_WAIT_TIMEOUT pending=${inFlight.size}")
-                }
-                if (completed == null) return failed("REQUEST_WAIT_NULL pending=${inFlight.size}")
-                val pending = inFlight.remove(completed)
-                    ?: return failed("UNEXPECTED_USB_REQUEST_COMPLETION")
-                val size = pending.data.position()
-                if (!tracker.accept(pending.chunk.index, size)) {
-                    completed.close()
-                    return failed(
-                        "SHORT_OR_INVALID_COMPLETION offset=${pending.chunk.offset} " +
-                            "expected=${pending.chunk.size} actual=$size"
-                    )
-                }
-                pending.data.flip()
-                pending.data.get(output, pending.chunk.offset, size)
-                completed.close()
-            }
-            return AsyncInboundStatus(true, tracker.acceptedBytes, requests, "COMPLETE")
-        } catch (error: Exception) {
-            return failed("USB_REQUEST_EXCEPTION ${error.javaClass.simpleName}: ${error.message ?: "no detail"}")
-        } finally {
-            // Pending requests are never allowed to survive a failed frame.
-            // The dispatcher will close the transport; never resume a partial
-            // ADB packet or retry the command automatically.
-            for (request in inFlight.keys) {
-                runCatching { request.cancel() }
-                runCatching { request.close() }
-            }
-        }
     }
 
     fun disconnect() {
