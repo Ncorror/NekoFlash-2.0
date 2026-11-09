@@ -30,6 +30,25 @@ rev52_adb_hash = '5a4f9c9640e13b404ab1706a0b07dcfc40ee30ea'
 rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
 # REV72: preserve the physically confirmed diagnostic provenance improvement.
 rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
+# REV76: ADB payload IN now follows AOSP Linux host transport shape:
+# native usbfs SUBMITURB/REAPURB with real errno/urb.status. Normalize only
+# the reviewed reader hunk and timeout constant back to REV75 before older guards.
+rev76_native_in_adb_hash = '8472d9ed83d3a2e75c97e75fbd7e0cfe207cd2fa'
+if source_git_sha(data) == rev76_native_in_adb_hash:
+    native_reader = "        val buffer = ByteArray(length)\n        if (AdbNativeUsbfsIn.isAvailable) {\n            val native = AdbNativeUsbfsIn.readExact(\n                connection = conn,\n                endpoint = ep,\n                buffer = buffer,\n                offset = 0,\n                length = length,\n                timeoutMs = ADB_NATIVE_IN_TIMEOUT_MS\n            )\n            if (!native.success) {\n                directReadFailureCode = if (native.disconnected || connection == null) {\n                    AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                } else {\n                    AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                }\n                directReadFailureMessage = native.message\n                return null\n            }\n        } else {\n            // Compatibility fallback only. Production Android builds include\n            // the native usbfs library; never mix Java and native readers in\n            // one payload.\n            var totalRead = 0\n            while (totalRead < length) {\n                val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)\n                val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)\n                if (read <= 0) {\n                    directReadFailureCode = if (connection == null) {\n                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                    } else {\n                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                    }\n                    directReadFailureMessage =\n                        \"ADB Java USB IN fallback failed after $totalRead/$length bytes (result=$read)\"\n                    return null\n                }\n                totalRead += read\n            }\n        }\n".encode('utf-8')
+    java_reader = "        val buffer = ByteArray(length)\n        var totalRead = 0\n\n        while (totalRead < length) {\n            // Keep individual host-controller transactions bounded, but read\n            // directly into the final payload buffer to avoid one allocation\n            // and one memcpy for every USB chunk.\n            val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)\n            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)\n            if (read <= 0) {\n                directReadFailureCode = if (connection == null) AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED else AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                directReadFailureMessage = \"ADB payload USB IN failed after $totalRead/$length bytes (result=$read)\"\n                return null\n            }\n            totalRead += read\n        }\n".encode('utf-8')
+    native_timeout = "    private val ADB_NATIVE_IN_TIMEOUT_MS = 15_000\n".encode('utf-8')
+    assert data.count(native_reader) == 1, 'Unreviewed native ADB IN reader change'
+    assert data.count(native_timeout) == 1, 'Unreviewed native ADB IN timeout change'
+    native_wrapper = base/'AdbNativeUsbfsIn.kt'
+    native_cpp = root/'app/src/main/cpp/native_usbfs.cpp'
+    assert source_git_sha(native_wrapper.read_bytes()) == '5ff725160c67c043374399d18fffb62215f10c25', 'Unreviewed native ADB IN Kotlin backend'
+    assert source_git_sha(native_cpp.read_bytes()) == '86f81542e6d66290fc5938eb32f8c39c1e5028dd', 'Unreviewed native usbfs C++ backend'
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt').is_file()
+    data = data.replace(native_reader, java_reader, 1)
+    data = data.replace(native_timeout, b'', 1)
+    assert source_git_sha(data) == rev75_receive_adb_hash, 'Native ADB IN patch touched unrelated protocol code'
+
 # REV75: Protocol negotiation is the fix, not failed large-read workarounds.
 # Verify the exact field-reviewed diagnostic source except for two
 # intentionally changed CNXN inbound-size hunks; then run all older guards.
