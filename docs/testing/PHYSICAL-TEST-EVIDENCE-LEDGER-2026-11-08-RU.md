@@ -1,5 +1,22 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+## #72 — 16-КиБ URB стабильно EPROTO; AOSP-style 4-КиБ кандидат
+
+**Архив:** `NekoFlash-diagnostics-1794266433382.zip` — CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA-256 PASS, 2/2 JSON parse. **Build:** `6.0.0-alpha11+d42621bc0c30.42715598717`.
+
+- Remote STAT: 268 435 456 байт.
+- Первый 16-КиБ native payload: `actual=0`, `-EPROTO`.
+- `urbSubmissions=4`: initial + retry после 150/300/600 мс.
+- Все четыре 16-КиБ URB завершились `EPROTO`; итог `elapsedMs=1060`. Recovery timing как первопричина исключён.
+- Lifecycle FIELD PASS: `terminationReason=ADB_READER_USB_IN_FAILED`, `failed=1`, `cancelled=0`, WakeLock освобождён сразу.
+- Сверка с классическим AOSP Linux ADB выявила 4096-байтовую гранулярность входящих bulk reads. Новый кандидат собирает один 16-КиБ WRTE из 4×4096-byte usbfs URB; ADB framing и checksum не ослабляются.
+- Exact head `968a0e3e617ee45341a379aae6d586eae978e0db`; [CI #42720159930](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42720159930) **SUCCESS attempt 1**: source guards/native C++/JVM/lint/API26/API34/tester kit PASS.
+- Tester kit: [artifact 13720027110](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42720159930/artifacts/13720027110).
+- Статус: **CI PASS / FIELD PENDING**. Следующий тест — один Pull 256 МиБ.
+
+---
+
+
 ## #72 — 2-мс retry FIELD FAIL, xHCI recovery-window кандидат
 
 **Архив:** `NekoFlash-diagnostics-1794264520796.zip` — CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse. **Build:** `6.0.0-alpha11+94e870cf849d.42710802916`.
