@@ -5,9 +5,10 @@ package ru.forum.adbfastboottool
  * as a *single* ADB WRTE packet. This is CNXN.maxdata, NOT a file-size cap.
  *
  * ADB's receiver controls the size of packets sent by the other side.
- * The current synchronous USB bulk reader has field-verified 16 KiB
- * transfers but fails on device-generated 1 MiB WRTE packets. The AOSP
- * 16 KiB USBFS read unit is a safe receive window for this host API.
+ * Field evidence on the POCO F7 host showed unstable sustained transfers
+ * with 1 MiB WRTE packets. The receive engine is now native usbfs URB-based,
+ * but 16 KiB remains the conservative negotiated wire-frame limit until a
+ * larger value has separate physical acceptance.
  *
  * Large logical streams (e.g. 256 MiB adb pull) still transfer in many
  * WRTE frames; SYNC DATA messages are reassembled independently.
