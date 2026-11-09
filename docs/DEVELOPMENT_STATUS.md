@@ -1,5 +1,20 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## 2-мс retry FIELD FAIL → xHCI recovery-window candidate, 10 ноября
+
+Новый архив `NekoFlash-diagnostics-1794264520796.zip` проверен полностью: **CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse**. Точная APK: `6.0.0-alpha11+94e870cf849d.42710802916`.
+
+Физический результат bounded-retry v1: **FIELD FAIL**. Первый 16-КиБ payload снова дал нулевой `-EPROTO`; код действительно сделал один retry (`urbSubmissions=2`), но второй URB не получил completion и через 15 005 мс завершился `ETIMEDOUT` / `stage=stall_timeout`. Lifecycle остаётся FIELD PASS: `failed=1`, `cancelled=0`, WakeLock освобождён сразу.
+
+Kernel-аудит xHCI показывает, что USB transaction error на non-iso endpoint проходит через halt/reset path, а endpoint restart может оставаться STOPPED миллисекунды; kernel-код допускает окно восстановления до ~100 мс. Поэтому 2-мс userspace retry признан гонкой с восстановлением controller endpoint. `USBDEVFS_RESETEP` намеренно не используется из-за documented risk data-toggle desync; `CLEAR_HALT` не применяется без `EPIPE` STALL.
+
+**Новый exact candidate:** PR #73 head `6775cb3fbe2733f6ba97af14fc95e9f5a69a5534`. Zero-byte retry safety boundary не изменена, но backoff теперь **150/300/600 мс**. [Actions #42715598717](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42715598717) завершён **SUCCESS**: build/native/JVM/lint/API26 PASS; API34 первый attempt поймал уже известный terminal-rotation visibility flake, isolated API34 rerun PASS; tester kit PASS. [Matching Tester Kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42715598717/artifacts/13719825357).
+
+**Статус:** CI PASS / FIELD PENDING. Нужен один физический Pull существующего 256-МиБ файла; Push/Sideload/flash/wipe не повторять.
+
+---
+
+
 ## EPROTO установлен аппаратно — bounded retry candidate, 10 ноября
 
 Архив `NekoFlash-diagnostics-1794262112529.zip` от native-URB сборки CI #42705941131 проверен: **CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse**. На первом 16-КиБ ADB WRTE получен настоящий kernel-level результат: `errno=71 (EPROTO)`, `kernelErrno=0`, `urbStatus=-71`, `actual_length=0`, `stage=urb_status`, `elapsedMs=3`. Это **FIELD FAIL** предыдущего native-кандидата и первое доказательство конкретного USB transaction/protocol fault вместо Java `-1`. Lifecycle fix остаётся FIELD PASS: операция сразу завершилась FAILED, `cancelled=0`.
