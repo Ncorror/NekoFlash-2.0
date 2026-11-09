@@ -5,7 +5,7 @@
 namespace nekoflash {
 
 constexpr int kAdbUsbInMaxZeroByteBusRetries = 3;
-constexpr int kAdbUsbInRetryBaseDelayUs = 2 * 1000;
+constexpr int kAdbUsbInRetryBaseDelayUs = 150 * 1000;
 
 constexpr bool is_adb_usb_in_retryable_status(int status) noexcept {
     return status == -EPROTO || status == -EILSEQ || status == -ETIME;
