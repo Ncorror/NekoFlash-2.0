@@ -1,5 +1,21 @@
 # NekoFlash 2.0 — evidence ledger for tests already executed
 
+## Issue #72 audit — ADB Pull series, 9–10 November
+
+**Rig:** POCO F7 / onyx Android 16 HOST → unlocked POCO X3 Pro / vayu TARGET, tested in OrangeFox Recovery and booted Evolution X Android 14. Raw diagnostics remain private; only sanitized evidence is recorded publicly.
+
+- Original Java ADB-IN: **FIELD FAIL** on 256 MiB Pull in Recovery and Android; diagnostic revision exposed `USB_IN_FAILED` (one packet stopped at 1,015,808 / 1,048,576 bytes). Push remained successful.
+- One 1 MiB synchronous Java bulk read: **FIELD FAIL** at 0/1,048,576, `-1`, ~39 ms.
+- Java `UsbRequest` four-by-16 KiB window: **FIELD FAIL**, first completion 0/16,384, ~3 ms.
+- `CNXN.maxdata=16 KiB` + original Java reader: framing change physically worked and Pull reached 50% (134,217,728 / 268,435,456), but then failed at 0/16,384. Separate lifecycle fix **FIELD PASS**: reader failure now ends promptly as FAILED instead of remaining RUNNING and becoming CANCELLED.
+- HOST kernel dmesg showed DWC3/xHCI active and a later explicit disconnect; no simultaneous disconnect/reset/stall was proven at the app-level failure. The filtered log cannot reveal the Java bulk failure's kernel errno.
+- Final [PR #73](https://github.com/Ncorror/NekoFlash-2.0/pull/73) candidate: **CI PASS / FIELD PENDING**. ADB payload IN now uses a dedicated native usbfs URB reader (`USBDEVFS_SUBMITURB/REAPURB`) retaining errno, `urb.status` and `actual_length`; ADB headers retain the proven Java path. Partial packets are never published, checksum remains mandatory, no command auto-retry, pending URB is discard+reap on failure, uncertain drain poisons the backend fail-closed. ADB Push/OUT, Fastboot, Sideload, firmware and log retention are unchanged.
+- Exact head `e3ac779d0593f26ce181e84e44773d488145b758`: [CI #42705941131](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42705941131) **SUCCESS attempt 1**, including strict source guards, native C++ warnings-as-errors, JVM, lint, Debug APK and installed Android API 26/34.
+- Final acceptance requires one physical 256 MiB Pull using the [matching tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42705941131/artifacts/13714112372), followed by source/returned SHA-256 equality. No reflash, wipe, Sideload or repeat Push is required.
+
+---
+
+
 ## 9 November late field recheck (14:19–14:22), same test APK PR #71
 
 **Build:** `6.0.0-alpha11+808babac31f2.42576443632`; CI [#42576443632](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42576443632) PASS, **not merged into main**.
