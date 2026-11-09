@@ -12,6 +12,16 @@ English
 
 The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes are not published APK releases.** The technical REV number is independent of `versionName` / `versionCode`; see [development status](docs/DEVELOPMENT_STATUS.md). Historical build/release statements refer to the source snapshot in which they were recorded.
 
+## Unreleased field/candidate changes — 9 November 2026
+
+**No signed production release and no new merge to `main`.** Main source baseline remains [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). See [hardware evidence RU](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md) / [EN](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md).
+
+- **New physical field PASS:** unlocked A-only POCO X3 Pro vayu; native Fastboot **Mass Flash 3/3** `boot`, `dtbo`, `recovery`, final OKAY for each, then Recovery boot. Distinct from older legacy tests and the **locked vayu** USB ZLP regression.
+- **New field failures:** Android failed to boot after `fastboot format userdata` despite F2FS and final Fastboot OKAY ([#65](https://github.com/Ncorror/NekoFlash-2.0/issues/65)). `fastboot -w` left a partial destructive reset, with no response from `erase:cache` after userdata changes ([#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64)). [PR #67](https://github.com/Ncorror/NekoFlash-2.0/pull/67) only adds CI-tested fail-closed coverage; **not** a firmware repair.
+- **Sideload facts:** LineageOS main ROM ZIP local SHA-256 differed from official and Recovery returned error 21. OrangeFox ZIP was sent from Lineage Recovery, and a different Recovery subsequently booted; the original installer exit code remained unknown. `DONEDONE` alone is **not** installer success ([#66](https://github.com/Ncorror/NekoFlash-2.0/issues/66)).
+- **Candidate safety/UX fixes:** [PR #70](https://github.com/Ncorror/NekoFlash-2.0/pull/70) separates ZIP selection from explicit Sideload send and retains SAF document selection; [PR #68](https://github.com/Ncorror/NekoFlash-2.0/pull/68) records evidence of a Recovery change without false success. **Combined [PR #71](https://github.com/Ncorror/NekoFlash-2.0/pull/71) CI SUCCESS** ([run #42533760615](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42533760615)): 346 JVM tests, lint 0, API26/34 and Insiders kit PASS. **No physical acceptance of this newer APK yet, no merge**. Original USBFS transport, `AdbProtocol.sideloadZip` and completed historical tests remain intact.
+- **Documentation:** [PR #63](https://github.com/Ncorror/NekoFlash-2.0/pull/63) reconciles real physical evidence, stale TestBook completion and safe next tests; does not backfill missing private logs, alter app code or publish a release.
+
 ## Unreleased NekoFlash 2.0 DEV — REV46–55 + evidence docs (6–8 Nov 2026)
 
 **Source integrated, not a new signed release.** Current audited integration baseline: [`6a8accd8e33e`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a8accd8e33eef946efa1f18a829b0cc2b797e6e). For **physical** versus **CI-only** results see [evidence ledger](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) and [documentation reconciliation](docs/testing/DOCUMENTATION-AUDIT-2026-11-08-RU.md).
