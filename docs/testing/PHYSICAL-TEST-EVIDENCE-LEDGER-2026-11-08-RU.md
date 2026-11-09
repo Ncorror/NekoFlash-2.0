@@ -1,5 +1,22 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+## #72 — 2-мс retry FIELD FAIL, xHCI recovery-window кандидат
+
+**Архив:** `NekoFlash-diagnostics-1794264520796.zip` — CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA PASS, 2/2 JSON parse. **Build:** `6.0.0-alpha11+94e870cf849d.42710802916`.
+
+- Pull 256 МиБ стартовал, STAT подтвердил 268 435 456 байт.
+- Первый native IN payload: zero-byte `-EPROTO`.
+- Retry policy реально сработала один раз: `urbSubmissions=2`.
+- Второй URB не завершился; финал через 15 005 мс: `errno=110`, `kernelErrno=0`, предыдущий `urbStatus=-71`, `actual=0`, `stage=stall_timeout`.
+- **Вывод:** 2-мс retry = FIELD FAIL; он слишком рано подаёт новый URB в xHCI endpoint recovery window.
+- Lifecycle = FIELD PASS: `terminationReason=ADB_READER_USB_IN_FAILED`, `failed=1`, `cancelled=0`, WakeLock освобождён.
+- Следующий кандидат не использует RESETEP/CLEAR_HALT; сохраняет zero-byte-only retry, но ждёт **150/300/600 мс**.
+- Exact head `6775cb3fbe2733f6ba97af14fc95e9f5a69a5534`; [CI #42715598717](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42715598717) SUCCESS после isolated API34 rerun; tester kit [13719825357](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42715598717/artifacts/13719825357).
+- Статус: **CI PASS / FIELD PENDING**. Следующий аппаратный шаг — только один Pull 256 МиБ.
+
+---
+
+
 ## #72 — доказанный EPROTO и следующий bounded-retry кандидат
 
 **Новый приватный архив:** `NekoFlash-diagnostics-1794262112529.zip` — CRC PASS, `CONSISTENT_SNAPSHOT`, 5/5 файлов манифеста совпали по размеру и SHA-256, 2/2 JSON корректны. Испытана точная APK из CI #42705941131.
