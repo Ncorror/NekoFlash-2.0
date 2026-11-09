@@ -28,6 +28,23 @@ rev52_adb_hash = '5a4f9c9640e13b404ab1706a0b07dcfc40ee30ea'
 # Before any older checksum/invariant checks, reverse the exact diff into
 # the byte-for-byte accepted REV53 ADB source. Never waive USB review.
 rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
+# REV72: review ONLY the inbound reader's failure-provenance handoff.
+# Reverse this exact hunk to the already-audited REV54 blob before running
+# the longstanding transport hash guard. No transport/checksum bypass.
+rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
+if source_git_sha(data) == rev72_adb_hash:
+    revised = "readDataDirect(header.dataLength) ?: return AdbInboundFailurePolicy.payloadReadFailed(\n                cause = directReadFailureCode,\n                detail = directReadFailureMessage,\n                command = header.command,\n                payloadBytes = header.dataLength\n            )".encode('utf-8')
+    previous = "readDataDirect(header.dataLength) ?: return AdbPacketDispatcher.ReadResult.Failed(\n                AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,\n                \"ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}\"\n            )".encode('utf-8')
+    assert data.count(revised) == 1, 'Unreviewed ADB inbound diagnostic change'
+    policy = (base/'AdbInboundFailurePolicy.kt').read_text()
+    assert 'cause?.takeUnless { it == AdbPacketDispatcher.FailureCode.NONE }' in policy
+    assert 'AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD' in policy
+    assert 'detail?.takeIf { it.isNotBlank() }' in policy
+    assert 'AdbPacketDispatcher.ReadResult.Failed(code, message)' in policy
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbInboundFailurePolicyTest.kt').is_file()
+    data = data.replace(revised, previous, 1)
+    assert source_git_sha(data) == rev54_adb_hash, 'REV72 touched unreviewed ADB transport'
+
 if source_git_sha(data) == rev54_adb_hash:
     rev54_reviewed_hunks = [
         ("        if (!bulkWriteFully(header)) throw Exception(\"ADB header transfer error\")\n        if (!finishAdbUsbOutTransfer(header.size)) {\n            throw Exception(\"ADB header USB ZLP transfer error (bytes=${header.size})\")\n        }\n", "        if (!bulkWriteFully(header)) throw Exception(\"ADB header transfer error\")\n"),
