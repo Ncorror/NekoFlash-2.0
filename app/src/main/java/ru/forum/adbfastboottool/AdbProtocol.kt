@@ -2194,7 +2194,11 @@ class AdbProtocol(
             if (stream.closed || cancelled) return null
 
             val header = readHeader(timeoutMs = 30_000) ?: run {
-                onLog("❌ ADB stream: data read timeout")
+                if (dispatcherTransportFailed || (packetDispatcher?.snapshot()?.readFailures ?: 0L) > 0L) {
+                    onLog("❌ ADB stream: reader terminated during data read")
+                } else {
+                    onLog("❌ ADB stream: data read timeout")
+                }
                 return null
             }
             when (header.command) {
