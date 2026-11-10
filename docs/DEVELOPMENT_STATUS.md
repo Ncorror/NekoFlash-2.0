@@ -2,11 +2,11 @@
 
 ## Актуальная релизная точка — 10 ноября 2026
 
-Текущий `main`: [`0faca68e302b8007f340926025f7672cb9e6b3cb`](https://github.com/Ncorror/NekoFlash-2.0/commit/0faca68e302b8007f340926025f7672cb9e6b3cb), `6.0.0-alpha11` / versionCode 234. [CI #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) полностью **SUCCESS**: 338 JVM, lint 0, Android API26/API34, tester kit и pinning.
+База Android-кода перед документальным релизным sync: [`0faca68e302b8007f340926025f7672cb9e6b3cb`](https://github.com/Ncorror/NekoFlash-2.0/commit/0faca68e302b8007f340926025f7672cb9e6b3cb), `6.0.0-alpha11` / versionCode 234. [CI #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) полностью **SUCCESS**: 338 JVM, lint 0, Android API26/API34, tester kit и pinning.
 
 PR #74 уже слит: выбор ZIP для Sideload отделён от выполнения и сам по себе не отправляет данные. Открытые issue #20/#46/#47/#48/#64/#72 и PR #67/#68/#73 помечены как post-release/backlog и **не блокируют alpha11 release candidate**. В частности, ветка ADB Pull #73 остаётся изолированной и не должна попадать в `main`.
 
-Единственный обязательный технический релизный gate после документальной синхронизации — собрать **подписанный Release APK на точном финальном SHA** через ручной `workflow_dispatch` с `sign_release=true`. Workflow сверяет постоянный сертификат с pinned SHA-256 и затем повторно проверяет подпись готового APK. До такого запуска нельзя утверждать, что alpha11 production artifact готов.
+После документальной синхронизации `main` получит новый commit SHA даже без изменений Android-кода. Единственный обязательный технический релизный gate — собрать **подписанный Release APK на точном финальном SHA** через ручной `workflow_dispatch` с `sign_release=true`. Workflow сверяет постоянный сертификат с pinned SHA-256 и затем повторно проверяет подпись готового APK. До такого запуска нельзя утверждать, что alpha11 production artifact готов.
 
 [Полный release-readiness аудит](RELEASE_READINESS-2026-11-10.md). Разделы ниже сохраняют хронологию экспериментов и полевых доказательств; их старые слова `candidate/pending` относятся к своим датированным SHA и не заменяют этот актуальный блок.
 

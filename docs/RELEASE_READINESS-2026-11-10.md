@@ -3,16 +3,17 @@
 ## Candidate identity
 
 - Repository: `Ncorror/NekoFlash-2.0`
-- Current main: `0faca68e302b8007f340926025f7672cb9e6b3cb`
+- Application-code baseline entering this documentation-only audit: `0faca68e302b8007f340926025f7672cb9e6b3cb`
+- Important: merging release documentation advances `main` and changes the APK's embedded `BUILD_COMMIT`, even when Android source is unchanged. The final signed artifact must therefore be built from the final tagged SHA.
 - Android version: `6.0.0-alpha11`
 - versionCode: `234`
 - Production application ID: `ru.forum.adbfastboottool`
 - Debug application ID: `ru.forum.adbfastboottool.dev`
 - minSdk 26, compileSdk 36, targetSdk 34 (targetSdk is intentionally pinned in source; GitHub APK distribution is the current release path).
 
-## Exact-main CI
+## Application-baseline CI
 
-GitHub Actions [run #42736593646 / #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) on the exact main SHA is **SUCCESS**.
+GitHub Actions [run #42736593646 / #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) on the exact application baseline is **SUCCESS**.
 
 Verified jobs:
 - build — SUCCESS;
@@ -27,9 +28,9 @@ Build evidence:
 - instrumentation contract expects and passed 28 tests on each API26/API34 matrix;
 - repository security/source guards and native transfer policy tests passed.
 
-## Current tester kit
+## Audited pre-documentation tester kit
 
-Run #647 artifact `NekoFlash-Insiders-Tester-Kit`, artifact ID `13727327902`.
+Run #647 artifact `NekoFlash-Insiders-Tester-Kit`, artifact ID `13727327902`, is the verified baseline entering this docs sync.
 
 Local integrity verification of the downloaded artifact:
 - ZIP CRC: PASS;
@@ -40,6 +41,8 @@ Local integrity verification of the downloaded artifact:
 - packaged HTML sourceCommit: `0faca68e302b8007f340926025f7672cb9e6b3cb`;
 - packaged HTML runId: `42736593646`;
 - embedded APK SHA matches the actual APK.
+
+After the documentation merge, do not reuse the APK hash above as the final-main hash: `GITHUB_SHA` is embedded in the APK, so the next successful main run will produce a different binary digest. Always use the hash embedded in the tester kit from that exact run.
 
 The static TestBook still carries the historical campaign label `REV49` / `insiders-rev49`. Its packaged build provenance is current and exact. This audit intentionally does **not** change `campaign-tag.txt`, because doing so would publish a new Insiders prerelease automatically.
 
@@ -53,7 +56,7 @@ The source is fail-closed for production release packaging:
 - the APK certificate digest is checked again against the same pinned fingerprint;
 - the release artifact refuses filenames containing `unsigned`.
 
-**Not yet verified on this exact candidate:** no `NekoFlash-0faca68e...-release` artifact exists in run #647 because ordinary push CI does not execute the manual signing path. Therefore production alpha11 is not yet ready to publish until a signed exact-final-SHA run succeeds.
+**Not yet verified on this exact candidate:** no signed release artifact exists in run #647 because ordinary push CI does not execute the manual signing path. Therefore production alpha11 is not yet ready to publish until a signed **final-SHA** run succeeds.
 
 ## Integrated release changes confirmed in main
 
@@ -89,7 +92,7 @@ The repository still contains many old backup/docs/fix/test branches. Most check
 
 ## Final gate before publication
 
-1. Merge this documentation-only release-readiness update after green CI.
+1. Merge this documentation-only release-readiness update after green CI and require the new post-merge `main` CI to pass.
 2. On the resulting exact final `main` SHA, run **Build Android APK → Run workflow → sign_release=true** in the protected `nekoflash-release` environment.
 3. Require all jobs to pass and verify the uploaded `NekoFlash-<final-sha>-release` artifact contains the signed `NekoFlash-6.0.0-alpha11-release.apk`, `apk-signature.txt`, `build-info.txt` and checksum.
 4. Confirm certificate SHA-256 equals the pinned permanent fingerprint.

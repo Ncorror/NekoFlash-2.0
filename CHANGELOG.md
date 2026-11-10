@@ -14,7 +14,7 @@ The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes 
 
 ## Release-candidate readiness — 10 November 2026
 
-**Current main:** [`0faca68e302b`](https://github.com/Ncorror/NekoFlash-2.0/commit/0faca68e302b8007f340926025f7672cb9e6b3cb), `versionName=6.0.0-alpha11`, `versionCode=234`. This is still unreleased source until the permanent-key signed APK is built and verified.
+**Application-code baseline entering release-doc sync:** [`0faca68e302b`](https://github.com/Ncorror/NekoFlash-2.0/commit/0faca68e302b8007f340926025f7672cb9e6b3cb), `versionName=6.0.0-alpha11`, `versionCode=234`. The documentation-only sync may advance `main` without changing Android source. The release remains unreleased until the permanent-key signed APK is built and verified on the final tagged SHA.
 
 - Merged [PR #74](https://github.com/Ncorror/NekoFlash-2.0/pull/74): selecting a Sideload ZIP no longer starts transfer; execution is a separate confirmed action and the SAF selection can be reused.
 - Post-merge [CI #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) **SUCCESS**: 338/338 JVM tests, lint 0, installed Android API26/API34, verified two-file Insiders kit and pinning job.
