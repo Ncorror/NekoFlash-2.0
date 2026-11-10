@@ -1,6 +1,6 @@
 #include <jni.h>
 #include "transfer_deadline.h"
-#include "adb_usb_in_transfer_policy.h"
+#include "adb_usb_in_sync_policy.h"
 #include <atomic>
 #include <cerrno>
 #include <cstdint>
@@ -518,44 +518,34 @@ Java_ru_forum_adbfastboottool_NativeUsbfsBackend_nativeBackendState(
     }
 }
 
-static jlongArray native_adb_bulk_in_transfer_impl(
+static jlongArray native_adb_bulk_in_sync_exact_impl(
     JNIEnv* env,
     jint fd,
     jint endpoint_address,
     jbyteArray destination,
     jint offset,
-    jint expected_length,
-    jint request_length,
+    jint length,
     jint timeout_ms) {
 
     const int64_t started = now_ms();
     if (fd < 0 || destination == nullptr || offset < 0 || timeout_ms <= 0 ||
         (endpoint_address & 0x80) == 0 || (endpoint_address & 0x0F) == 0 ||
-        !nekoflash::is_valid_adb_usb_in_transfer(expected_length, request_length)) {
+        !nekoflash::is_valid_adb_sync_in_length(length)) {
         return make_result(env, 0, 0, EINVAL, 0, 0, 0, STAGE_PREFLIGHT);
     }
-
     if (backend_poisoned_noexcept()) {
         return make_result(env, 0, 0, EUCLEAN, 0, 0,
                            now_ms() - started, STAGE_PREFLIGHT);
     }
 
     const jsize destination_size = env->GetArrayLength(destination);
-    if (offset > destination_size || expected_length > destination_size - offset) {
+    if (offset > destination_size || length > destination_size - offset) {
         return make_result(env, 0, 0, EINVAL, 0, 0, 0, STAGE_PREFLIGHT);
     }
 
-    UniqueFd usb_fd(dup(fd));
-    if (!usb_fd.valid()) {
-        const int dup_errno = errno;
-        return make_result(env, 0, 0, dup_errno, 0, 0,
-                           now_ms() - started, STAGE_OPEN, 0, 0, 0,
-                           DRAIN_NOT_NEEDED, 0, 0, dup_errno);
-    }
-
-    std::vector<UrbSlot> slots;
+    std::vector<unsigned char> buffer;
     try {
-        slots.emplace_back(static_cast<size_t>(request_length));
+        buffer.resize(static_cast<size_t>(length));
     } catch (const std::bad_alloc&) {
         return make_result(env, 0, 0, ENOMEM, 0, 0,
                            now_ms() - started, STAGE_PREFLIGHT);
@@ -564,126 +554,60 @@ static jlongArray native_adb_bulk_in_transfer_impl(
                            now_ms() - started, STAGE_JNI);
     }
 
-    PendingUrbOwnershipGuard pending_guard(slots);
-    UrbSlot& slot = slots[0];
-    int pending_count = 0;
-    int transferred = 0;
-    int submissions = 0;
-    int last_status = 0;
+    int total = 0;
+    int requests = 0;
     int last_actual = 0;
-    int last_kernel_errno = 0;
-    int64_t last_progress_ms = started;
 
-    auto finish = [&](bool success, int error_code, int stage,
-                      int kernel_errno = 0) -> jlongArray {
-        const int pending_at_stop = pending_count;
-        int drain_state = pending_count > 0 ? DRAIN_REAPED : DRAIN_NOT_NEEDED;
-        int drain_errno = 0;
-        if (pending_count > 0) {
-            if (!discard_and_reap_all(usb_fd.get(), slots, &pending_count, &drain_errno)) {
-                pending_guard.abandon_and_poison();
-                drain_state = DRAIN_FAILED;
-                success = false;
-                error_code = drain_errno != 0 ? drain_errno : EIO;
-                stage = STAGE_DRAIN;
-            }
+    while (total < length) {
+        usbdevfs_bulktransfer transfer{};
+        transfer.ep = static_cast<unsigned int>(endpoint_address & 0xFF);
+        transfer.len = static_cast<unsigned int>(length - total);
+        transfer.timeout = static_cast<unsigned int>(timeout_ms);
+        transfer.data = buffer.data() + total;
+
+        int result;
+        do {
+            result = ioctl(fd, USBDEVFS_BULK, &transfer);
+        } while (result < 0 && errno == EINTR);
+        ++requests;
+
+        if (result < 0) {
+            const int bulk_errno = errno;
+            return make_result(
+                env, 0, total, bulk_errno, 0, last_actual,
+                now_ms() - started, STAGE_READ, requests, 0, 0,
+                DRAIN_NOT_NEEDED, 0, backend_poisoned_noexcept() ? 1 : 0,
+                bulk_errno);
         }
-        if (success) {
-            env->SetByteArrayRegion(
-                destination, offset, expected_length,
-                reinterpret_cast<const jbyte*>(slot.buffer.get()));
-            if (env->ExceptionCheck()) {
-                success = false;
-                error_code = EFAULT;
-                stage = STAGE_JNI;
-                env->ExceptionClear();
-            }
+        if (result <= 0 || result > length - total) {
+            return make_result(
+                env, 0, total, EPROTO, 0, result,
+                now_ms() - started, STAGE_LENGTH, requests);
         }
-        if (drain_state != DRAIN_FAILED) pending_guard.disarm();
-        const int64_t stopped = now_ms();
-        const int64_t last_age = (stopped - last_progress_ms) > 0
-            ? stopped - last_progress_ms : 0;
-        usb_fd.reset();
-        return make_result(
-            env, success ? 1 : 0, transferred, error_code, last_status, last_actual,
-            stopped - started, stage, submissions, pending_at_stop, last_age,
-            drain_state, drain_errno, backend_poisoned_noexcept() ? 1 : 0,
-            kernel_errno);
-    };
-
-    std::memset(slot.urb.get(), 0, sizeof(*slot.urb));
-    slot.urb->type = USBDEVFS_URB_TYPE_BULK;
-    slot.urb->endpoint = static_cast<unsigned char>(endpoint_address & 0xFF);
-    slot.urb->status = -1;
-    slot.urb->buffer = slot.buffer.get();
-    slot.urb->buffer_length = request_length;
-    slot.urb->usercontext = slot.urb.get();
-    slot.requested = request_length;
-
-    int submit_result;
-    do {
-        submit_result = ioctl(usb_fd.get(), USBDEVFS_SUBMITURB, slot.urb.get());
-    } while (submit_result < 0 && errno == EINTR);
-
-    if (submit_result < 0) {
-        const int submit_errno = errno;
-        last_kernel_errno = submit_errno;
-        return finish(false, submit_errno, STAGE_SUBMIT, submit_errno);
+        last_actual = result;
+        total += result;
     }
 
-    slot.pending = true;
-    pending_count = 1;
-    ++submissions;
-    const int64_t wait_started = now_ms();
-
-    while (slot.pending) {
-        void* completed = nullptr;
-        if (ioctl(usb_fd.get(), USBDEVFS_REAPURBNDELAY, &completed) == 0) {
-            if (completed != slot.urb.get()) {
-                return finish(false, EPROTO, STAGE_REAP);
-            }
-            slot.pending = false;
-            pending_count = 0;
-            last_status = slot.urb->status;
-            last_actual = slot.urb->actual_length;
-            transferred = last_actual > 0 ? last_actual : 0;
-            last_progress_ms = now_ms();
-
-            if (last_status != 0) {
-                const int status_errno = last_status < 0 ? -last_status : EIO;
-                return finish(false, status_errno, STAGE_STATUS);
-            }
-            if (last_actual != expected_length) {
-                return finish(false, EPROTO, STAGE_LENGTH);
-            }
-            transferred = expected_length;
-            return finish(true, 0, STAGE_DONE, last_kernel_errno);
-        }
-
-        const int reap_errno = errno;
-        if (reap_errno == EINTR) continue;
-        if (reap_errno != EAGAIN) {
-            last_kernel_errno = reap_errno;
-            return finish(false, reap_errno, STAGE_REAP, reap_errno);
-        }
-        if (now_ms() - wait_started >= timeout_ms) {
-            return finish(false, ETIMEDOUT, STAGE_TIMEOUT);
-        }
-        usleep(REAP_POLL_SLEEP_US);
+    env->SetByteArrayRegion(
+        destination, offset, length,
+        reinterpret_cast<const jbyte*>(buffer.data()));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+        return make_result(env, 0, total, EFAULT, 0, last_actual,
+                           now_ms() - started, STAGE_JNI, requests);
     }
 
-    return finish(false, EIO, STAGE_REAP);
+    return make_result(env, 1, total, 0, 0, last_actual,
+                       now_ms() - started, STAGE_DONE, requests);
 }
 
 extern "C" JNIEXPORT jlongArray JNICALL
-Java_ru_forum_adbfastboottool_AdbNativeUsbfsIn_nativeReadTransfer(
+Java_ru_forum_adbfastboottool_AdbNativeUsbfsIn_nativeReadSyncExact(
     JNIEnv* env, jobject /*thiz*/, jint fd, jint endpoint_address,
-    jbyteArray destination, jint offset, jint expected_length,
-    jint request_length, jint timeout_ms) {
+    jbyteArray destination, jint offset, jint length, jint timeout_ms) {
     try {
-        return native_adb_bulk_in_transfer_impl(
-            env, fd, endpoint_address, destination, offset,
-            expected_length, request_length, timeout_ms);
+        return native_adb_bulk_in_sync_exact_impl(
+            env, fd, endpoint_address, destination, offset, length, timeout_ms);
     } catch (const std::bad_alloc&) {
         return make_result(env, 0, 0, ENOMEM, 0, 0, 0, STAGE_JNI);
     } catch (...) {

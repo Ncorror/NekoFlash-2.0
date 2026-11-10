@@ -1,5 +1,5 @@
 #include "../app/src/main/cpp/transfer_deadline.h"
-#include "../app/src/main/cpp/adb_usb_in_transfer_policy.h"
+#include "../app/src/main/cpp/adb_usb_in_sync_policy.h"
 #include <cassert>
 #include <iostream>
 
@@ -30,13 +30,11 @@ int main() {
     explicit_cap.progress(start + 89999);
     assert(!explicit_cap.stalled(start + 90001));
     assert(explicit_cap.hard_expired(start + 90001));
-    using nekoflash::is_valid_adb_usb_in_transfer;
-    assert(is_valid_adb_usb_in_transfer(24, 512));
-    assert(is_valid_adb_usb_in_transfer(16384, 16384));
-    assert(!is_valid_adb_usb_in_transfer(0, 512));
-    assert(!is_valid_adb_usb_in_transfer(512, 24));
-    assert(!is_valid_adb_usb_in_transfer(16384, 0));
-    assert(!is_valid_adb_usb_in_transfer(1024 * 1024 + 1, 1024 * 1024 + 1));
+    using nekoflash::is_valid_adb_sync_in_length;
+    assert(is_valid_adb_sync_in_length(1));
+    assert(is_valid_adb_sync_in_length(16384));
+    assert(!is_valid_adb_sync_in_length(0));
+    assert(!is_valid_adb_sync_in_length(16385));
 
-    std::cout << "PASS native deadlines + ADB IN single-transfer policy\n";
+    std::cout << "PASS native deadlines + ADB synchronous BULK IN policy\n";
 }

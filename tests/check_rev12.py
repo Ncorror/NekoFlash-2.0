@@ -31,6 +31,39 @@ rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
 # REV72: preserve the physically confirmed diagnostic provenance improvement.
 rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
 rev75_receive_adb_hash = '29d490d695e4a09c637d732a5070d3e0b40b987d'
+# REV79: async usbfs URBs fail on the first payload on the physical host,
+# while Android's synchronous BULK path previously transferred ~128 MiB.
+# Preserve the field-proven header reader and use native USBDEVFS_BULK only
+# for payloads so the exact ioctl errno is retained without command replay.
+rev79_sync_bulk_adb_hash = '9268bf2760cccb3b5b89a58c9ea4a706c87df1a2'
+normalized_from_rev79 = False
+if source_git_sha(data) == rev79_sync_bulk_adb_hash:
+    rev79_header = "        val buffer = inboundHeaderBuffer\n        var totalRead = 0\n\n        while (totalRead < buffer.size) {\n            val read = conn.bulkTransfer(ep, buffer, totalRead, buffer.size - totalRead, timeoutMs)\n            if (read <= 0) {\n                if (totalRead > 0) {\n                    directReadFailureCode = AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT\n                    directReadFailureMessage =\n                        \"ADB header interrupted after $totalRead/${buffer.size} bytes (result=$read); stream synchronization is no longer trusted\"\n                    onLog(\"❌ $directReadFailureMessage\")\n                }\n                return null\n            }\n            totalRead += read\n        }".encode("utf-8")
+    rev78_header = "        val buffer = inboundHeaderBuffer\n        if (AdbNativeUsbfsIn.isAvailable) {\n            val requestLength = AdbNativeUsbfsIn.aospRequestLength(buffer.size, ep.maxPacketSize)\n            if (requestLength <= 0) {\n                directReadFailureCode = AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                directReadFailureMessage =\n                    \"ADB header native USB IN has invalid transfer geometry: expected=${buffer.size}, maxPacket=${ep.maxPacketSize}\"\n                onLog(\"❌ $directReadFailureMessage\")\n                return null\n            }\n            val native = AdbNativeUsbfsIn.readTransfer(\n                connection = conn,\n                endpoint = ep,\n                buffer = buffer,\n                offset = 0,\n                expectedLength = buffer.size,\n                requestLength = requestLength,\n                timeoutMs = timeoutMs\n            )\n            if (!native.success) {\n                // The dispatcher intentionally polls the ADB header reader in\n                // short slices. No data during one slice is normal idle, not a\n                // transport failure. Payload timeouts remain terminal.\n                if (native.isCleanNoDataTimeout) return null\n                directReadFailureCode = when {\n                    native.disconnected || connection == null ->\n                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                    native.timedOut ->\n                        AdbPacketDispatcher.FailureCode.USB_IN_TIMEOUT_BUDGET\n                    else ->\n                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                }\n                directReadFailureMessage = \"ADB header ${native.message}\"\n                onLog(\"❌ $directReadFailureMessage\")\n                return null\n            }\n        } else {\n            var totalRead = 0\n            while (totalRead < buffer.size) {\n                val read = conn.bulkTransfer(ep, buffer, totalRead, buffer.size - totalRead, timeoutMs)\n                if (read <= 0) {\n                    if (totalRead > 0) {\n                        directReadFailureCode = AdbPacketDispatcher.FailureCode.PARTIAL_HEADER_TIMEOUT\n                        directReadFailureMessage =\n                            \"ADB header interrupted after $totalRead/${buffer.size} bytes (result=$read); stream synchronization is no longer trusted\"\n                        onLog(\"❌ $directReadFailureMessage\")\n                    }\n                    return null\n                }\n                totalRead += read\n            }\n        }".encode("utf-8")
+    rev79_payload = "        val buffer = ByteArray(length)\n        if (AdbNativeUsbfsIn.isAvailable) {\n            val native = AdbNativeUsbfsIn.readExact(\n                connection = conn,\n                endpoint = ep,\n                buffer = buffer,\n                offset = 0,\n                length = length,\n                timeoutMs = ADB_SYNC_IN_TIMEOUT_MS\n            )\n            if (!native.success) {\n                directReadFailureCode = when {\n                    native.disconnected || connection == null ->\n                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                    native.timedOut ->\n                        AdbPacketDispatcher.FailureCode.USB_IN_TIMEOUT_BUDGET\n                    else ->\n                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                }\n                directReadFailureMessage = native.message\n                return null\n            }\n        } else {\n            // Compatibility fallback only. This is the same synchronous USB\n            // transport shape, but Android's wrapper collapses errno to -1.\n            var totalRead = 0\n            while (totalRead < length) {\n                val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)\n                val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, ADB_SYNC_IN_TIMEOUT_MS)\n                if (read <= 0) {\n                    directReadFailureCode = if (connection == null) {\n                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                    } else {\n                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                    }\n                    directReadFailureMessage =\n                        \"ADB Java USB IN fallback failed after $totalRead/$length bytes (result=$read)\"\n                    return null\n                }\n                totalRead += read\n            }\n        }".encode("utf-8")
+    rev78_payload = "        val buffer = ByteArray(length)\n        if (AdbNativeUsbfsIn.isAvailable) {\n            val requestLength = AdbNativeUsbfsIn.aospRequestLength(length, ep.maxPacketSize)\n            if (requestLength <= 0) {\n                directReadFailureCode = AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                directReadFailureMessage =\n                    \"ADB payload native USB IN has invalid transfer geometry: expected=$length, maxPacket=${ep.maxPacketSize}\"\n                return null\n            }\n            val native = AdbNativeUsbfsIn.readTransfer(\n                connection = conn,\n                endpoint = ep,\n                buffer = buffer,\n                offset = 0,\n                expectedLength = length,\n                requestLength = requestLength,\n                timeoutMs = ADB_NATIVE_IN_TIMEOUT_MS\n            )\n            if (!native.success) {\n                directReadFailureCode = when {\n                    native.disconnected || connection == null ->\n                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                    native.timedOut ->\n                        AdbPacketDispatcher.FailureCode.USB_IN_TIMEOUT_BUDGET\n                    else ->\n                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                }\n                directReadFailureMessage = native.message\n                return null\n            }\n        } else {\n            // Compatibility fallback only. If native usbfs is unavailable,\n            // keep the whole session on Android's synchronous bulk path.\n            var totalRead = 0\n            while (totalRead < length) {\n                val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)\n                val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)\n                if (read <= 0) {\n                    directReadFailureCode = if (connection == null) {\n                        AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED\n                    } else {\n                        AdbPacketDispatcher.FailureCode.USB_IN_FAILED\n                    }\n                    directReadFailureMessage =\n                        \"ADB Java USB IN fallback failed after $totalRead/$length bytes (result=$read)\"\n                    return null\n                }\n                totalRead += read\n            }\n        }".encode("utf-8")
+    rev79_timeout = "    private val ADB_SYNC_IN_TIMEOUT_MS = 5_000\n".encode("utf-8")
+    rev78_timeout = "    private val ADB_NATIVE_IN_TIMEOUT_MS = 15_000\n".encode("utf-8")
+    assert data.count(rev79_header) == 1, 'Unreviewed REV79 Java ADB header restoration'
+    assert data.count(rev79_payload) == 1, 'Unreviewed REV79 sync BULK payload change'
+    assert data.count(rev79_timeout) == 1, 'Unreviewed REV79 payload timeout change'
+    native_wrapper = base/'AdbNativeUsbfsIn.kt'
+    native_cpp = root/'app/src/main/cpp/native_usbfs.cpp'
+    sync_policy = root/'app/src/main/cpp/adb_usb_in_sync_policy.h'
+    native_test = root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt'
+    native_host_test_path = root/'tests/native_transfer_deadline_test.cpp'
+    assert source_git_sha(native_wrapper.read_bytes()) == 'c6d540255768a5dc6952583ebcd4be16f5c3a288', 'Unreviewed REV79 native sync BULK wrapper'
+    assert source_git_sha(native_cpp.read_bytes()) == '4be1c17f9b9c7ef016b2246b1889e588c850ddbd', 'Unreviewed REV79 native sync BULK implementation'
+    assert source_git_sha(sync_policy.read_bytes()) == '1c96e01213f3992a87d44b2b2e101259f776e0ce', 'Unreviewed REV79 sync BULK policy'
+    assert source_git_sha(native_test.read_bytes()) == 'bebdd5229013c430e4161f62b687676c79893b80', 'Unreviewed REV79 native sync BULK tests'
+    assert source_git_sha(native_host_test_path.read_bytes()) == 'fff0b3731898defce9acab1900e3f6422b272b54', 'Unreviewed REV79 native host policy tests'
+    assert not (root/'app/src/main/cpp/adb_usb_in_transfer_policy.h').exists(), 'Obsolete REV77 async transfer policy still present'
+    data = data.replace(rev79_header, rev78_header, 1)
+    data = data.replace(rev79_payload, rev78_payload, 1)
+    data = data.replace(rev79_timeout, rev78_timeout, 1)
+    assert source_git_sha(data) == 'de26bae1c95171b9ccf22400279c693eac5bddf2', 'REV79 touched unrelated ADB protocol code'
+    normalized_from_rev79 = True
+
 # REV78: field regression proved the dispatcher's 500 ms header poll slice
 # was misclassified as a fatal native timeout. Normalize only the exact idle
 # handling hunk back to REV77; payload timeout semantics stay unchanged.
@@ -41,8 +74,9 @@ if source_git_sha(data) == rev78_idle_header_adb_hash:
     assert data.count(rev78_idle) == 1, 'Unreviewed REV78 idle-header timeout change'
     native_wrapper = base/'AdbNativeUsbfsIn.kt'
     native_test = root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt'
-    assert source_git_sha(native_wrapper.read_bytes()) == '0210501d140b215b0f8ecd712af147f80e1e45c1', 'Unreviewed REV78 native timeout classification'
-    assert source_git_sha(native_test.read_bytes()) == '15bfa21313b251734a835fda73e9bd0682e8c803', 'Unreviewed REV78 native timeout tests'
+    if not normalized_from_rev79:
+        assert source_git_sha(native_wrapper.read_bytes()) == '0210501d140b215b0f8ecd712af147f80e1e45c1', 'Unreviewed REV78 native timeout classification'
+        assert source_git_sha(native_test.read_bytes()) == '15bfa21313b251734a835fda73e9bd0682e8c803', 'Unreviewed REV78 native timeout tests'
     data = data.replace(rev78_idle, b'', 1)
     assert source_git_sha(data) == 'e76676ddfa580e30032134dcca64b661dac826ec', 'REV78 touched unrelated ADB protocol code'
     normalized_from_rev78 = True
@@ -219,13 +253,14 @@ if source_git_sha(data) == rev77_aosp_native_in_adb_hash:
     transfer_policy = root/'app/src/main/cpp/adb_usb_in_transfer_policy.h'
     native_test = root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt'
     native_host_test_path = root/'tests/native_transfer_deadline_test.cpp'
-    if not normalized_from_rev78:
-        assert source_git_sha(native_wrapper.read_bytes()) == 'e2bcc22cf03b1679dd8df793747da6324e25f7e6', 'Unreviewed REV77 native ADB IN Kotlin backend'
-        assert source_git_sha(native_test.read_bytes()) == '85dfe3f7a960259c848dae227d3bdcd9c52c213d', 'Unreviewed REV77 Kotlin native-IN tests'
-    assert source_git_sha(native_cpp.read_bytes()) == 'e7de38ffa2f2bf57ea4061472b570706c04e4be3', 'Unreviewed REV77 native usbfs C++ backend'
-    assert source_git_sha(transfer_policy.read_bytes()) == '0f65e1cf4ed433eba18d82a32283b7e60bd5eb61', 'Unreviewed REV77 single-transfer policy'
-    assert source_git_sha(native_host_test_path.read_bytes()) == '2a17aabfa54f2750f440604b3a700e2f129051cc', 'Unreviewed REV77 native host tests'
-    assert not (root/'app/src/main/cpp/adb_usb_in_retry_policy.h').exists(), 'Obsolete REV76 retry policy still present'
+    if not normalized_from_rev79:
+        if not normalized_from_rev78:
+            assert source_git_sha(native_wrapper.read_bytes()) == 'e2bcc22cf03b1679dd8df793747da6324e25f7e6', 'Unreviewed REV77 native ADB IN Kotlin backend'
+            assert source_git_sha(native_test.read_bytes()) == '85dfe3f7a960259c848dae227d3bdcd9c52c213d', 'Unreviewed REV77 Kotlin native-IN tests'
+        assert source_git_sha(native_cpp.read_bytes()) == 'e7de38ffa2f2bf57ea4061472b570706c04e4be3', 'Unreviewed REV77 native usbfs C++ backend'
+        assert source_git_sha(transfer_policy.read_bytes()) == '0f65e1cf4ed433eba18d82a32283b7e60bd5eb61', 'Unreviewed REV77 single-transfer policy'
+        assert source_git_sha(native_host_test_path.read_bytes()) == '2a17aabfa54f2750f440604b3a700e2f129051cc', 'Unreviewed REV77 native host tests'
+        assert not (root/'app/src/main/cpp/adb_usb_in_retry_policy.h').exists(), 'Obsolete REV76 retry policy still present'
     data = data.replace(rev77_header, rev76_header, 1)
     data = data.replace(rev77_payload, rev76_payload, 1)
     assert source_git_sha(data) == '8472d9ed83d3a2e75c97e75fbd7e0cfe207cd2fa', 'REV77 touched unrelated ADB protocol code'
