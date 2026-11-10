@@ -54,11 +54,27 @@ internal class FastbootPlanExecutor(
                 }
             }
         }
+        var completed = 0
         prepared.forEachIndexed { index, action ->
-            checkCancelled()
-            log("Fastboot ${index + 1}/${prepared.size}: ${action.label}")
-            onProgress("${index + 1}/${prepared.size}: ${action.label}")
-            action.execute()
+            try {
+                checkCancelled()
+                log("Fastboot ${index + 1}/${prepared.size}: ${action.label}")
+                onProgress("${index + 1}/${prepared.size}: ${action.label}")
+                action.execute()
+                completed++
+            } catch (error: Exception) {
+                val confirmed = prepared.take(completed).joinToString(" -> ") { it.label }.ifBlank { "none" }
+                val notAttempted = prepared.drop(index + 1).joinToString(" -> ") { it.label }.ifBlank { "none" }
+                // A Fastboot failure/timeout can happen after the device has started mutating
+                // the current partition. Never classify the in-flight step as untouched.
+                log(
+                    "⚠️ Fastboot plan STOPPED after $completed/${prepared.size} completed steps. " +
+                        "Failed or unresolved: ${action.label} (device may have changed). " +
+                        "Completed: $confirmed. Not attempted: $notAttempted. No automatic retry."
+                )
+                onProgress("Stopped at ${index + 1}/${prepared.size}: ${action.label}; $completed completed")
+                throw error
+            }
         }
     }
 
@@ -89,6 +105,13 @@ internal class FastbootPlanExecutor(
         }
         is FastbootExecutionStep.Inspect -> listOf(Prepared("inspect ${step.partition}") { port.inspect(step.partition) })
         is FastbootExecutionStep.Format -> targets(step.partition, step.slot).map { target ->
+            if (target == "userdata") {
+                log(
+                    "ℹ️ format userdata recreates only /data. It does not reset separate /metadata " +
+                        "encryption keys or verify that Android will boot. Use a full device-specific " +
+                        "factory/FBE reset when that is the intended operation."
+                )
+            }
             flash(target, filesystem(target, step.type, step.size, step.options))
         }
         is FastbootExecutionStep.Wipe -> listOf("userdata", "cache", "metadata").flatMap { partition ->
