@@ -379,7 +379,10 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_sideload_page_title">Sideload</string>
     <string name="layout_sideload_no_file">ZIP-файл не выбран</string>
     <string name="layout_sideload_selected_file">Файл: %1$s</string>
-    <string name="layout_sideload_verdict_note">Установка запускается только в подтверждённом режиме Sideload. Итог определяет Recovery, а не только передача файла.</string>
+    <string name="layout_sideload_selected_file_size">Файл: %1$s\nРазмер: %2$s</string>
+    <string name="layout_sideload_size_unknown">неизвестен</string>
+    <string name="layout_start_sideload">Запустить Sideload</string>
+    <string name="layout_sideload_verdict_note">Выбор ZIP безопасен и ничего не отправляет. Передача начинается только после нажатия «Запустить Sideload» в подтверждённом режиме Sideload. Итог определяет Recovery, а не только передача файла.</string>
     <string name="shell_usb_panel_desc">USB-подключение: подробности</string>
     <string name="shell_terminal_open_desc">Открыть терминал</string>
     <string name="shell_terminal_icon">&gt;_</string>

@@ -375,7 +375,10 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="layout_sideload_page_title">Sideload</string>
     <string name="layout_sideload_no_file">ZIP file not selected</string>
     <string name="layout_sideload_selected_file">File: %1$s</string>
-    <string name="layout_sideload_verdict_note">Install runs only in confirmed Sideload mode. The final result is determined by Recovery, not merely by file transfer.</string>
+    <string name="layout_sideload_selected_file_size">File: %1$s\nSize: %2$s</string>
+    <string name="layout_sideload_size_unknown">unknown</string>
+    <string name="layout_start_sideload">Start Sideload</string>
+    <string name="layout_sideload_verdict_note">Selecting a ZIP is non-destructive. Transfer starts only after Start Sideload is pressed in confirmed Sideload mode. The final result is determined by Recovery, not merely by file transfer.</string>
     <string name="shell_usb_panel_desc">USB connection details</string>
     <string name="shell_terminal_open_desc">Open terminal</string>
     <string name="shell_terminal_icon">&gt;_</string>

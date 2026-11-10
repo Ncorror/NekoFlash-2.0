@@ -234,8 +234,14 @@ assert 'java.nio.ByteBuffer' in source
 
 assert 'registerDirectSideloadLauncher()' in main
 assert 'startDirectSideloadFilePicker()' in main
+picker_body = main.split('private fun registerDirectSideloadLauncher()')[1].split('private fun startDirectSideloadFilePicker()')[0]
+assert 'pendingSideloadSource = source' in picker_body
+assert 'viewModel.runSideload(source)' not in picker_body
+assert 'R.id.btnStartSideload).setOnClickListener' in main
+assert 'viewModel.adbPeerMode.value != AdbProtocol.PeerMode.SIDELOAD' in main
 assert 'viewModel.runSideload(source)' in main
 assert 'R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main
+assert 'android:id="@+id/btnStartSideload"' in (root/'app/src/main/res/layout/page_adb.xml').read_text()
 assert 'private val folderName = "NekoFlash"' in main
 assert 'fun runSideload(file: File) = runSideload(FirmwareSource.WorkspaceFile(file))' in vm
 assert 'proto.sideloadZip(source, getApplication<Application>().contentResolver)' in vm

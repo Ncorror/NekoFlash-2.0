@@ -24,6 +24,7 @@ import android.provider.DocumentsContract
 import android.provider.OpenableColumns
 import android.provider.Settings
 import android.text.InputType
+import android.text.format.Formatter
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
@@ -135,6 +136,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var workspacePath: File
     private lateinit var importFileLauncher: ActivityResultLauncher<Intent>
     private lateinit var sideloadZipLauncher: ActivityResultLauncher<Intent>
+    private var pendingSideloadSource: FirmwareSource.SafDocument? = null
     private lateinit var quickImageLauncher: ActivityResultLauncher<Intent>
     private lateinit var massImageLauncher: ActivityResultLauncher<Intent>
     private var pendingMassPartition: String? = null
@@ -243,6 +245,12 @@ class MainActivity : AppCompatActivity() {
         selectedFastbootSection = savedInstanceState?.getInt("fastboot_section", 0) ?: 0
         pendingMassPartition = savedInstanceState?.getString("mass_picker_partition")
         restoredMassQueueState = savedInstanceState?.getBundle("mass_queue_ui")
+        pendingSideloadSource = savedInstanceState?.getString(STATE_SIDELOAD_URI)?.let { rawUri ->
+            val name = savedInstanceState.getString(STATE_SIDELOAD_NAME)
+                ?: getString(R.string.rev12_sideload_unnamed)
+            val size = savedInstanceState.getLong(STATE_SIDELOAD_SIZE, -1L).takeIf { it >= 0L }
+            FirmwareSource.SafDocument(rawUri.toUri(), name, size)
+        }
 
         // Never trust exported Intent extras as an onboarding bypass. This
         // check also covers ACTION_USB_DEVICE_ATTACHED, activity recreation,
@@ -343,6 +351,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.connectionState.observe(this) {
             refreshConnectionStatusLabel()
             updateDeviceOverview()
+            refreshSideloadControls()
             if (selectedWindow == "unlock") buildUnlockPage()
         }
 
@@ -360,6 +369,7 @@ class MainActivity : AppCompatActivity() {
             // ADB transport один, но peer mode различается: system/recovery/sideload.
             refreshConnectionStatusLabel()
             updateDeviceOverview()
+            refreshSideloadControls()
         }
         viewModel.transportSessionId.observe(this) { updateDeviceOverview() }
 
@@ -414,6 +424,7 @@ class MainActivity : AppCompatActivity() {
                 restoreBrightness()
             }
             updateDeviceOverview()
+            refreshSideloadControls()
             renderOperationProgressUi(rawProgress)
         }
 
@@ -449,6 +460,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         setupButtons()
+        refreshSideloadControls()
         setupFastbootWorkflowUi()
         initializeOperationCenterDialog()
         if (!hideRestoredTerminalResultOnColdLaunch && savedInstanceState?.getBoolean(STATE_OPERATION_CENTER_OPEN) == true) {
@@ -533,6 +545,11 @@ class MainActivity : AppCompatActivity() {
         if (::consoleDockController.isInitialized) outState.putBoolean("rev26.terminal.open", consoleDockController.isExpanded)
         outState.putStringArrayList("rev26.terminal.history", ArrayList(commandHistory))
         outState.putInt("rev26.terminal.historyIndex", historyIndex)
+        pendingSideloadSource?.let { source ->
+            outState.putString(STATE_SIDELOAD_URI, source.uri.toString())
+            outState.putString(STATE_SIDELOAD_NAME, source.displayName)
+            outState.putLong(STATE_SIDELOAD_SIZE, source.sizeHint ?: -1L)
+        }
         super.onSaveInstanceState(outState)
     }
 
@@ -598,8 +615,20 @@ class MainActivity : AppCompatActivity() {
 
         // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
-            // Direct SAF selection; no all-files workspace permission or copy.
+            // Selection is intentionally non-destructive. USB starts only from
+            // the separate Start Sideload control below.
             startDirectSideloadFilePicker()
+        }
+        findViewById<Button>(R.id.btnStartSideload).setOnClickListener {
+            val source = pendingSideloadSource ?: return@setOnClickListener
+            if (viewModel.operationActive.value == true ||
+                viewModel.adbPeerMode.value != AdbProtocol.PeerMode.SIDELOAD
+            ) {
+                refreshSideloadControls()
+                return@setOnClickListener
+            }
+            autoShowGuiOperation = true
+            viewModel.runSideload(source)
         }
         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
 
@@ -1776,6 +1805,25 @@ class MainActivity : AppCompatActivity() {
 
     // ─── РАЗРЕШЕНИЯ И ФАЙЛЫ ──────────────────────────────────────────────────
 
+    private fun refreshSideloadControls() {
+        if (!::viewModel.isInitialized) return
+        val source = pendingSideloadSource
+        val selectedLabel = findViewById<TextView>(R.id.tvSideloadSelectedZip)
+        selectedLabel.text = if (source == null) {
+            getString(R.string.layout_sideload_no_file)
+        } else {
+            val size = source.sizeHint
+                ?.takeIf { it >= 0L }
+                ?.let { Formatter.formatShortFileSize(this, it) }
+                ?: getString(R.string.layout_sideload_size_unknown)
+            getString(R.string.layout_sideload_selected_file_size, source.displayName, size)
+        }
+        findViewById<Button>(R.id.btnStartSideload).isEnabled =
+            source != null &&
+                viewModel.adbPeerMode.value == AdbProtocol.PeerMode.SIDELOAD &&
+                viewModel.operationActive.value != true
+    }
+
     private fun registerDirectSideloadLauncher() {
         sideloadZipLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) return@registerForActivityResult
@@ -1796,11 +1844,9 @@ class MainActivity : AppCompatActivity() {
                 queryDisplayName(uri) ?: getString(R.string.rev12_sideload_unnamed)
             )
             val source = FirmwareSource.SafDocument(uri, display, queryFileSize(uri))
-            findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
-                getString(R.string.layout_sideload_selected_file, display)
+            pendingSideloadSource = source
             viewModel.log(getString(R.string.rev12_sideload_source_selected, display))
-            autoShowGuiOperation = true
-            viewModel.runSideload(source)
+            refreshSideloadControls()
         }
     }
 
@@ -4860,6 +4906,10 @@ class MainActivity : AppCompatActivity() {
     private val PARTITION_NAME_PATTERN = Regex("^[A-Za-z0-9._:-]+$")
 
     companion object {
+        private const val STATE_SIDELOAD_URI = "release.sideload.uri"
+        private const val STATE_SIDELOAD_NAME = "release.sideload.name"
+        private const val STATE_SIDELOAD_SIZE = "release.sideload.size"
+
         private const val USB_PERMISSION_TIMEOUT_MS = 30_000L
         private const val EXTRA_USB_INTENT_CONSUMED = "nekoflash_usb_intent_consumed"
         private const val STARTUP_USB_SCAN_DELAY_MS = 350L
