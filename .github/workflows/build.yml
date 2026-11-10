@@ -75,6 +75,8 @@ jobs:
 
       - name: Native transfer deadline regression tests
         run: |
+          g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/adb_sync_in_test.cpp -o /tmp/adb-sync-in-test
+          /tmp/adb-sync-in-test
           g++ -std=c++17 -Wall -Wextra -Werror -fsanitize=address,undefined tests/native_transfer_deadline_test.cpp -o /tmp/native-deadline-test
           /tmp/native-deadline-test
 

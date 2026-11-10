@@ -2962,10 +2962,20 @@ class AdbProtocol(
             // directly into the final payload buffer to avoid one allocation
             // and one memcpy for every USB chunk.
             val chunkLength = minOf(USB_BULK_CHUNK_BYTES, length - totalRead)
-            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)
+            val native = if (AdbSyncUsbIn.available) {
+                AdbSyncUsbIn.read(conn.fileDescriptor, ep.address, buffer, totalRead, chunkLength, 5000)
+            } else null
+            val read = native?.result ?: conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)
             if (read <= 0) {
+                val endpointStatus = runCatching { AdbSyncUsbIn.endpointStatus(conn, ep.address) }
+                    .getOrElse { "postFailureEndpointStatus=unknown error=${it.javaClass.simpleName}" }
                 directReadFailureCode = if (connection == null) AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED else AdbPacketDispatcher.FailureCode.USB_IN_FAILED
-                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read)"
+                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read); " +
+                    (native?.detail(chunkLength) ?: "backend=java errno=unknown requested=$chunkLength actual=unknown") +
+                    "; phase=payload command=0x${command.toString(16)} endpoint=0x${ep.address.toString(16)} " +
+                    "maxPacket=${ep.maxPacketSize} interface=${adbInterface?.id} " +
+                    "generation=${dispatcherGeneration.get()} reader=${Thread.currentThread().name} " +
+                    "cancelled=$cancelled connectionCurrent=${connection === conn} $endpointStatus"
                 return null
             }
             totalRead += read

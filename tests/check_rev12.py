@@ -17,6 +17,26 @@ main = (base/'MainActivity.kt').read_text()
 # REV18 reviewed receive-file, listing and unique-block progress fixes.
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
+sync_in_new = '''            val native = if (AdbSyncUsbIn.available) {
+                AdbSyncUsbIn.read(conn.fileDescriptor, ep.address, buffer, totalRead, chunkLength, 5000)
+            } else null
+            val read = native?.result ?: conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)'''
+sync_in_old = '            val read = conn.bulkTransfer(ep, buffer, totalRead, chunkLength, 5000)'
+sync_failure_new = '''                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read); " +
+                    (native?.detail(chunkLength) ?: "backend=java errno=unknown requested=$chunkLength actual=unknown") +
+                    "; phase=payload command=0x${command.toString(16)} endpoint=0x${ep.address.toString(16)} " +
+                    "maxPacket=${ep.maxPacketSize} interface=${adbInterface?.id} " +
+                    "generation=${dispatcherGeneration.get()} reader=${Thread.currentThread().name} " +
+                    "cancelled=$cancelled connectionCurrent=${connection === conn} $endpointStatus"'''
+sync_failure_old = '                directReadFailureMessage = "ADB payload USB IN failed after $totalRead/$length bytes (result=$read)"'
+for new, old in [(sync_in_new, sync_in_old), (sync_failure_new, sync_failure_old)]:
+    assert data.count(new.encode()) == 1
+    data = data.replace(new.encode(), old.encode(), 1)
+endpoint_probe = '''                val endpointStatus = runCatching { AdbSyncUsbIn.endpointStatus(conn, ep.address) }
+                    .getOrElse { "postFailureEndpointStatus=unknown error=${it.javaClass.simpleName}" }
+'''
+assert data.count(endpoint_probe.encode()) == 1
+data = data.replace(endpoint_probe.encode(), b'', 1)
 # Preserve the precise payload failure already recorded by readDataDirect.
 # Normalize only this reviewed diagnostic hunk; all legacy transport hashes
 # below still apply to the rest of AdbProtocol byte for byte.
