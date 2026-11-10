@@ -39,17 +39,22 @@ def run():
     texts = list(page.iter())
     ids = [el.attrib.get(AND + 'id', '') for el in texts]
     buttons = [el for el in texts if el.tag.endswith('MaterialButton')]
-    require(len(buttons) == 2, 'Sideload must show exactly two buttons')
-    for value in ['containerAdb', 'btnAdbSideload', 'btnSideloadImport', 'tvSideloadSelectedZip']:
+    require(len(buttons) == 3, 'Sideload must show exactly three buttons: Choose, Start, Import')
+    for value in ['containerAdb', 'btnAdbSideload', 'btnStartSideload', 'btnSideloadImport', 'tvSideloadSelectedZip']:
         require(ids.count('@+id/' + value) == 1, 'Required UI ID not unique: ' + value)
+    start_button = next(el for el in buttons if el.attrib.get(AND + 'id') == '@+id/btnStartSideload')
+    require(start_button.attrib.get(AND + 'enabled') == 'false',
+            'Start Sideload must be disabled until source and SIDELOAD mode are confirmed')
     for res in ['values', 'values-ru']:
         strings = ET.parse(base / ('res/' + res + '/strings.xml')).getroot()
         found = [s.attrib['name'] for s in strings.findall('string')]
-        for key in ['layout_sideload_page_title','layout_sideload_no_file','layout_sideload_selected_file','layout_sideload_verdict_note']:
+        for key in ['layout_sideload_page_title','layout_sideload_no_file','layout_sideload_selected_file',
+                    'layout_sideload_selected_file_size','layout_start_sideload','layout_sideload_verdict_note']:
             require(found.count(key)==1, f'String {key} missing/duplicated in {res}')
     main = (base / 'java/ru/forum/adbfastboottool/MainActivity.kt').read_text(encoding='utf-8')
     require('R.id.tvSideloadSelectedZip' in main, 'Missing chosen-file UI binding')
-    require('viewModel.runSideload(source)' in main, 'Direct SAF Sideload action is disconnected')
+    require('R.id.btnStartSideload).setOnClickListener' in main, 'Explicit Start Sideload action is disconnected')
+    require('viewModel.runSideload(source)' in main, 'Explicit SAF Sideload execution is disconnected')
     require('R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main,
             'Explicit import fallback disappeared')
     require('R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main, 'Import behavior changed')
@@ -57,7 +62,7 @@ def run():
     for tab in ['tabHome','tabFastboot','tabAdb','tabUnlock','tabSettings']:
         require(nav.count('android:id="@+id/' + tab + '"') == 1, 'Missing fifth-tab shell ID: ' + tab)
     require('Sideload' in (base/'res/values-ru/strings.xml').read_text(encoding='utf-8'), 'Sideload tab label missing')
-    print(f'PASS: {len(xmls)} XML resources parsed; Sideload REV3 2-button contract; RU/EN; original transport hashes; 5 tabs')
+    print(f'PASS: {len(xmls)} XML resources parsed; Sideload explicit-start 3-button contract; RU/EN; original transport hashes; 5 tabs')
 
 if __name__ == '__main__':
     run()
