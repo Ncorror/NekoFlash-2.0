@@ -1,6 +1,6 @@
 # NekoFlash Insiders — device testing and evidence / аппаратное тестирование
 
-**Release-candidate application baseline:** [`0faca68e302b`](https://github.com/Ncorror/NekoFlash-2.0/commit/0faca68e302b8007f340926025f7672cb9e6b3cb), 10 Nov 2026. [Post-merge CI #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) **SUCCESS**. This remains DEV/release-candidate material until a permanent-key signed production APK is built on the final SHA.
+**Release-candidate application baseline:** [`6a13d8ed2ff8`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a13d8ed2ff806faf06d85e637f942e89eb6c4bf), 10 Nov 2026. [Post-merge CI #653](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42804598658) **SUCCESS** with 347/347 JVM tests, lint 0, API26/API34 and verified two-file tester kit PASS. This remains DEV/release-candidate material until a permanent-key signed production APK is built on the final SHA.
 
 **RU.** Уже выполненные аппаратные проверки не повторяем по старым карточкам. Реестр: [RU](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md) / [EN](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). Физический PASS исправленного вывода/заголовка терминала после поворота 7 ноября остаётся принятым. Mass Flash, Recovery, ZLP, 512 файлов и 16 МиБ также сохраняют свои исходные результаты.
 

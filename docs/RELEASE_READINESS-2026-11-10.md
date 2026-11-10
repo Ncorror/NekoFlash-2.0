@@ -3,7 +3,7 @@
 ## Candidate identity
 
 - Repository: `Ncorror/NekoFlash-2.0`
-- Application-code baseline entering this documentation-only audit: `0faca68e302b8007f340926025f7672cb9e6b3cb`
+- Current application-code baseline before final documentation sync: `6a13d8ed2ff806faf06d85e637f942e89eb6c4bf`
 - Important: merging release documentation advances `main` and changes the APK's embedded `BUILD_COMMIT`, even when Android source is unchanged. The final signed artifact must therefore be built from the final tagged SHA.
 - Android version: `6.0.0-alpha11`
 - versionCode: `234`
@@ -13,7 +13,7 @@
 
 ## Application-baseline CI
 
-GitHub Actions [run #42736593646 / #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) on the exact application baseline is **SUCCESS**.
+GitHub Actions [run #42804598658 / #653](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42804598658) on the exact application baseline is **SUCCESS**.
 
 Verified jobs:
 - build — SUCCESS;
@@ -23,23 +23,23 @@ Verified jobs:
 - pin field kit job — SUCCESS.
 
 Build evidence:
-- 338 JVM tests, 0 failures, 0 errors, 0 skipped;
+- 347 JVM tests, 0 failures, 0 errors, 0 skipped;
 - Android Lint: 0 Warning/Error/Fatal findings;
 - instrumentation contract expects and passed 28 tests on each API26/API34 matrix;
 - repository security/source guards and native transfer policy tests passed.
 
-## Audited pre-documentation tester kit
+## Audited current tester kit
 
-Run #647 artifact `NekoFlash-Insiders-Tester-Kit`, artifact ID `13727327902`, is the verified baseline entering this docs sync.
+Run #653 artifact `NekoFlash-Insiders-Tester-Kit`, artifact ID `13757708292`, is the verified application-baseline kit entering the final docs sync.
 
 Local integrity verification of the downloaded artifact:
 - ZIP CRC: PASS;
 - exactly 2 files;
-- ZIP SHA-256: `73ad2b92003a7ce515b3936800e13e5e1a5b36107e771f3d973a6031240bc61b`;
-- `NekoFlash-6.0.0-alpha11-debug.apk`: 10,933,968 bytes, SHA-256 `b89a321ac5fea7e4162f1163c2bb94e4a79d5e80c36c5e9fa0e76899c6c2efc1`;
-- `testbook.html`: 164,084 bytes, SHA-256 `a3e74547dfd361e72ef2f3247fe2013d074d4ffcd1549c657cac2b35615a9a30`;
-- packaged HTML sourceCommit: `0faca68e302b8007f340926025f7672cb9e6b3cb`;
-- packaged HTML runId: `42736593646`;
+- ZIP SHA-256: `a4773158fa903e145fea66bd28d86addafcd3702007ebaf5df63c7140cfe9aaf`;
+- `NekoFlash-6.0.0-alpha11-debug.apk`: 10,938,304 bytes, SHA-256 `46230d199aa4eba93cb219b878c6395de9fd41ca1bfa2c042d096b663410f677`;
+- `testbook.html`: 164,084 bytes, SHA-256 `b57d22fc9dffec453759716838db5adad8b7a9a7ec2bcfdd3f0f824ecfa74f01`;
+- packaged HTML sourceCommit: `6a13d8ed2ff806faf06d85e637f942e89eb6c4bf`;
+- packaged HTML runId: `42804598658`;
 - embedded APK SHA matches the actual APK.
 
 After the documentation merge, do not reuse the APK hash above as the final-main hash: `GITHUB_SHA` is embedded in the APK, so the next successful main run will produce a different binary digest. Always use the hash embedded in the tester kit from that exact run.
@@ -56,7 +56,7 @@ The source is fail-closed for production release packaging:
 - the APK certificate digest is checked again against the same pinned fingerprint;
 - the release artifact refuses filenames containing `unsigned`.
 
-**Not yet verified on this exact candidate:** no signed release artifact exists in run #647 because ordinary push CI does not execute the manual signing path. Therefore production alpha11 is not yet ready to publish until a signed **final-SHA** run succeeds.
+**Not yet verified on this exact candidate:** no signed release artifact exists in run #653 because ordinary push CI does not execute the manual signing path. Therefore production alpha11 is not yet ready to publish until a signed **final-SHA** run succeeds.
 
 ## Integrated release changes confirmed in main
 
@@ -80,19 +80,19 @@ Open issues are intentionally post-release/backlog:
 - #72 — large ADB Pull EPROTO.
 
 Release-hardening integration:
-- #67 fail-closed `fastboot -w` regression coverage is included in candidate PR #76;
-- #68 Recovery replacement observation is included in candidate PR #76 and remains `VERIFY_PENDING` without a proven installer result;
-- #73 ADB Pull diagnostics remain excluded from alpha11.
+- #67 fail-closed `fastboot -w` regression coverage is merged through PR #76;
+- #68 Recovery replacement observation is merged through PR #76 and remains `VERIFY_PENDING` without a proven installer result;
+- #73 ADB Pull diagnostics were closed without merge and remain excluded from alpha11.
 
 Do not merge #73 for release.
 
 ## Repository hygiene
 
-The repository still contains many old backup/docs/fix/test branches. Most checked historical REV46–55/docs branches are strictly behind main with zero unique commits; several experimental branches are diverged. Branch deletion is **not** part of this audit and requires a separate cleanup decision. The branch set does not change the content of `main`.
+Historical backup/docs/fix/test branches were audited before cleanup. Release content is preserved in `main`, merged PR history, issues, and CI artifacts; experimental ADB Pull work remains documented under #72/#73 but is not part of alpha11. Branch cleanup is performed only after the final docs merge and its post-merge CI, retaining `main` as the working branch.
 
 ## Final gate before publication
 
-1. Merge this documentation-only release-readiness update after green CI and require the new post-merge `main` CI to pass.
+1. On the exact final `main` SHA, require the normal build/JVM/lint/API26/API34/tester-kit CI to pass before production signing.
 2. On the resulting exact final `main` SHA, run **Build Android APK → Run workflow → sign_release=true** in the protected `nekoflash-release` environment.
 3. Require all jobs to pass and verify the uploaded `NekoFlash-<final-sha>-release` artifact contains the signed `NekoFlash-6.0.0-alpha11-release.apk`, `apk-signature.txt`, `build-info.txt` and checksum.
 4. Confirm certificate SHA-256 equals the pinned permanent fingerprint.

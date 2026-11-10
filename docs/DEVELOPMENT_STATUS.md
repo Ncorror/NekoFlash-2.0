@@ -2,9 +2,9 @@
 
 ## Актуальная релизная точка — 10 ноября 2026
 
-База Android-кода перед документальным релизным sync: [`0faca68e302b8007f340926025f7672cb9e6b3cb`](https://github.com/Ncorror/NekoFlash-2.0/commit/0faca68e302b8007f340926025f7672cb9e6b3cb), `6.0.0-alpha11` / versionCode 234. [CI #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) полностью **SUCCESS**: 338 JVM, lint 0, Android API26/API34, tester kit и pinning.
+Текущая база Android-кода перед финальным документальным sync: [`6a13d8ed2ff806faf06d85e637f942e89eb6c4bf`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a13d8ed2ff806faf06d85e637f942e89eb6c4bf), `6.0.0-alpha11` / versionCode 234. [CI #653](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42804598658) полностью **SUCCESS**: 347 JVM, lint 0, Android API26/API34, tester kit и pinning.
 
-PR #74 уже слит: выбор ZIP для Sideload отделён от выполнения и сам по себе не отправляет данные. Alpha11-кандидат PR #76 интегрирует fail-closed тест из #67 и консервативную фиксацию смены Recovery из #68 без ложного `INSTALL SUCCESS`; issue #20/#46/#47/#48/#64/#72 остаются post-release/backlog. Ветка ADB Pull #73 остаётся изолированной и не должна попадать в `main`.
+PR #74 уже слит: выбор ZIP для Sideload отделён от выполнения и сам по себе не отправляет данные. PR #76 тоже слит: fail-closed тест из #67 и консервативная фиксация смены Recovery из #68 уже находятся в `main` без ложного `INSTALL SUCCESS`; issue #20/#46/#47/#48/#64/#72 остаются post-release/backlog. Экспериментальный ADB Pull #73 закрыт без merge и не входит в alpha11.
 
 После документальной синхронизации `main` получит новый commit SHA даже без изменений Android-кода. Единственный обязательный технический релизный gate — собрать **подписанный Release APK на точном финальном SHA** через ручной `workflow_dispatch` с `sign_release=true`. Workflow сверяет постоянный сертификат с pinned SHA-256 и затем повторно проверяет подпись готового APK. До такого запуска нельзя утверждать, что alpha11 production artifact готов.
 
