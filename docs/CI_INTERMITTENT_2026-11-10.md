@@ -41,7 +41,7 @@ java.lang.IllegalStateException: command keyboard visible did not settle within 
    - Documented in project backlog
    - Affects terminal/IME timing-sensitive tests
 
-### Evidence This is Infrastructure, Not Code
+### Evidence of Intermittency (not a root-cause discriminator)
 
 **Previous Successful Runs on Same Baseline:**
 
@@ -53,7 +53,7 @@ java.lang.IllegalStateException: command keyboard visible did not settle within 
 
 **Pattern:** Same application code had both initial IME timeouts and later passing checks; a transient timing issue is plausible, not proven.
 
-### Why This is NOT Blocking
+### Checks that passed independently
 
 1. **Build Success:** Code compiles cleanly
 2. **API 26 Success:** All tests pass on stable emulator
@@ -68,14 +68,20 @@ java.lang.IllegalStateException: command keyboard visible did not settle within 
 
 ### Recommendation
 
-Use successful #660 as the current PR CI evidence. Preserve the first failed attempt; if the IME timeout recurs, inspect the test and emulator state before assigning root cause. Signed release verification is a separate gate.
+Use successful #660 as historical PR CI evidence. Preserve the first failed attempt; if the IME timeout recurs, inspect the test and emulator state before assigning root cause. Signed release verification is a separate gate.
+
+### Follow-up: PR #81, run #668
+
+The first API 34 attempt failed in `commandsAfterRotationRenderInTheBodyAndKeepTheExpandedHeader` with `rootHeight=100`, `bodyHeight=0`, `outputHeight=0`, `ime=true`, and expanded sheet state. Transcript and adapter both contained all seven rows. This distinguishes a viewport failure from lost output. The isolated rerun succeeded on unchanged head `8d749cbe`; it does not resolve the cause.
+
+Source review subsequently found that the controller's delayed IME-show retry could survive an already successful show or an explicit controller hide. PR #82 invalidates those obsolete callbacks. This is a concrete callback-lifecycle correction, **not proof that it explains all API 34 failures**. Retain the strict visible-row assertions and physical rotation scenario (#20).
 
 ### Historical Context
 
 From `DEVELOPMENT_STATUS.md`:
 > Issue #16: intermittent CI emulator Android API 26/34 UI wait timeouts. REV55 [CI #501] passed 336 JVM + 28/28 on each Android API 26/34, independent same-SHA API26 repeat PASS.
 
-Multiple instances of emulator flakiness documented. This is a **known limitation of CI infrastructure**, not code defects.
+Multiple intermittent failures are documented. Neither infrastructure nor application timing defects have been excluded by successful reruns.
 
 ---
 
