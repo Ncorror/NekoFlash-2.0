@@ -330,6 +330,38 @@ class TerminalAndImportAndroidTest {
         }
     }
 
+    @Test fun backAfterSuccessfulImeShowDoesNotReopenKeyboard() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+            waitUi(scenario, "terminal expanded with keyboard") { activity ->
+                expanded(activity) && ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            }
+            scenario.onActivity { activity ->
+                // Use the app's Back path. A raw InsetsController.hide while
+                // leaving the editor focused can independently trigger Android
+                // 8's implicit IME show and does not exercise controller hide.
+                val editor = activity.findViewById<EditText>(R.id.etCommand)
+                assertTrue(editor.hasFocus())
+                assertTrue((field(activity, "consoleDockController") as ConsoleDockController).handleBack())
+                assertFalse(editor.hasFocus())
+            }
+            waitUi(scenario, "keyboard hidden after successful show") { activity ->
+                ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) != true
+            }
+            // Observe beyond the controller's 180ms retry, not a larger timeout
+            // for the existing rotation/visible-output assertions.
+            Thread.sleep(350)
+            scenario.onActivity { activity ->
+                assertFalse("An obsolete show retry reopened the keyboard",
+                    ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                        ?.isVisible(WindowInsetsCompat.Type.ime()) == true)
+                assertTrue(expanded(activity))
+            }
+        }
+    }
+
     @Test fun commandsAfterRotationRenderInTheBodyAndKeepTheExpandedHeader() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }

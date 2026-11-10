@@ -1,10 +1,10 @@
 # NekoFlash 2.0 — Technical Audit Snapshot · 10 November 2026
 
-> **Evidence boundary:** The findings below document static/source review and CI. Negative claims (no leaks, races, crashes, or security issues) mean *not found by the checks described*, not guaranteed absent across runtime/device paths. The current audited PR CI [#660](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42841988556) finished SUCCESS. This is **not** approval of a production-signed release; final-SHA signing and smoke tests remain NOT RUN.
+> **Evidence boundary:** The findings below document static/source review and CI. Negative claims (no leaks, races, crashes, or security issues) mean *not found by the checks described*, not guaranteed absent across runtime/device paths. PR #81 CI [#668](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42871397519) finished SUCCESS after an isolated API 34 rerun on unchanged source. Its first attempt recorded `rootHeight=100, bodyHeight=0, ime=true` after rotation; a successful rerun does not establish a fix. PR #81 was subsequently merged as `b00484f`. This is **not** approval of a production-signed release; final-SHA signing and smoke tests remain NOT RUN.
 
 ## Executive Summary
 
-**Status: ✅ COMPLETE — No Critical Issues Found**
+**Status: historical source-review snapshot — terminal and hardware transport issues remain open**
 
 The audit author reports source review of the alpha11 candidate. Recent PRs addressed specific Sideload/Fastboot/Recovery regressions, while the tracked open issues listed below are unresolved. Code-quality assessments are review judgments rather than exhaustive field verification.
 

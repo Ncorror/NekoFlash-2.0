@@ -79,8 +79,22 @@ class AdbPacketDispatcher(
 
     fun take(timeoutMs: Int): Packet? {
         if (timeoutMs <= 0) return queue.poll()
+        val startedNs = System.nanoTime()
+        val budgetNs = TimeUnit.MILLISECONDS.toNanos(timeoutMs.toLong())
         return try {
-            queue.poll(timeoutMs.toLong(), TimeUnit.MILLISECONDS)
+            // A source failure cannot interrupt the consumer's blocking poll.
+            // Bound each wait so a terminated reader does not leave SYNC/shell
+            // waiting for its entire (potentially 30-second) command timeout.
+            while (true) {
+                queue.poll()?.let { return it }
+                if (!running.get()) return null
+                val remainingNs = budgetNs - (System.nanoTime() - startedNs)
+                if (remainingNs <= 0L) return null
+                queue.poll(minOf(remainingNs, TimeUnit.MILLISECONDS.toNanos(50L)), TimeUnit.NANOSECONDS)
+                    ?.let { return it }
+            }
+            @Suppress("UNREACHABLE_CODE")
+            null
         } catch (_: InterruptedException) {
             Thread.currentThread().interrupt()
             null
