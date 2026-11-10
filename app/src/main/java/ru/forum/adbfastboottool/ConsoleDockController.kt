@@ -216,8 +216,7 @@ internal class ConsoleDockController(
      * its top position. Without constraining the body to the currently visible
      * slice, the RecyclerView bottom and command bar stay below the window in
      * half-expanded state.
-     */
-    /**
+     *
      * One body remeasure per display frame even when BottomSheet callbacks,
      * root layout and IME insets arrive together. Height and bottom bar still
      * follow the actual current sheet top; no intermediate resize is discarded

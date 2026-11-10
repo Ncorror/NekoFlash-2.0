@@ -25,24 +25,4 @@ object ConsoleSheetPolicy {
         TRANSIENT,
     }
 
-    enum class BackAction {
-        HIDE_IME,
-        HALF_EXPAND,
-        COLLAPSE,
-        DELEGATE,
-    }
-
-    /**
-     * Resolves one Back press without depending on Android or Material classes.
-     * IME/focus always wins, followed by one stable sheet-state transition.
-     */
-    fun backAction(
-        imeOrCommandActive: Boolean,
-        state: StableState,
-    ): BackAction = when {
-        imeOrCommandActive -> BackAction.HIDE_IME
-        state == StableState.EXPANDED -> BackAction.HALF_EXPAND
-        state == StableState.HALF_EXPANDED -> BackAction.COLLAPSE
-        else -> BackAction.DELEGATE
-    }
 }
