@@ -1,4 +1,6 @@
-# NekoFlash 2.0 — Final Status Report · 10 November 2026
+# NekoFlash 2.0 — Audit Checkpoint · 10 November 2026
+
+> **Verified status correction (10 Nov 2026):** [PR CI #660](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42841988556) completed **SUCCESS**. This is a source/CI release candidate, **not a production-ready signed build**. The final-`main`-SHA signed APK and non-destructive device smoke test remain **NOT RUN**. The claims below about absence of leaks/races apply to reviewed paths, not exhaustive runtime verification. Earlier sections describing a pending #658 retry are historical snapshots.
 
 ## ✅ COMPREHENSIVE AUDIT COMPLETED
 
@@ -11,7 +13,7 @@ Full documentation and technical audit of NekoFlash 2.0 successfully completed.
 ### Repository State
 
 - **Branch:** `audit/claude-docs-20261110`
-- **Latest Commit:** `ffc28e1` (docs(ci): document API 34 emulator IME timing flakiness)
+- **Report drafting checkpoint:** `ffc28e1`; the reviewed PR head later advanced to `945591f` (check GitHub for current SHA)
 - **Application Baseline:** `6a13d8ed2ff8` (6.0.0-alpha11, versionCode 234)
 - **PR #78:** https://github.com/Ncorror/NekoFlash-2.0/pull/78 (OPEN, mergeable)
 
@@ -99,21 +101,21 @@ Full documentation and technical audit of NekoFlash 2.0 successfully completed.
 - Android API 34: ✅ 28/28 tests
 - Tester Kit: ✅ verified
 
-### Current Run — #42834675621 (in progress)
+### Prior intermittently failing run — #42834675621 (#658, ultimately SUCCESS)
 
 **Date:** 10 November 2026, 14:29 UTC  
 **Commit:** `ffc28e1`  
-**Current Status:** ⏳ RETRY IN PROGRESS
+**Final Result:** ✅ SUCCESS after the initial API34 test timeout and a passing retry
 
 - Build: ✅ SUCCESS
 - Android API 26: ✅ 28/28 tests
-- Android API 34: ⏳ IN PROGRESS (retry after intermittent failure)
+- Android API 34: ✅ SUCCESS after retry; later PR run #660 also SUCCESS
 
 **Initial Failure Analysis:**
 - Intermittent IME timing timeout on API 34 emulator
 - Known issue #16 (CI emulator instability)
 - NOT a code regression (docs-only changes since last success)
-- Retry initiated
+- Retry completed; the source of the transient timing failure was not conclusively established
 
 ---
 
@@ -161,18 +163,15 @@ Full documentation and technical audit of NekoFlash 2.0 successfully completed.
   - Multiple documented instances
   - Not a code defect
 
-**These are NOT blockers for alpha11 release.**
+**These are open backlog issues, separate from the mandatory signed-release gate. Their impact on a broader stable release requires field acceptance evidence.**
 
 ---
 
 ## Next Steps
 
-### Immediate (Waiting for CI)
+### Immediate (CI #660 verified)
 
-1. ⏳ **Wait for API 34 retry completion**
-   - Expected: ✅ PASS (historical pattern shows flakiness, not defect)
-   - If pass: Proceed to merge
-   - If fail again: Isolated rerun or proceed with evidence that code is correct
+1. ✅ **Review PR run #660 SUCCESS** (build/API26/API34/tester-kit). Keep initial #658 failure evidence; a passing retry does not conclusively prove the root cause.
 
 ### After CI Success
 
@@ -209,17 +208,17 @@ Full documentation and technical audit of NekoFlash 2.0 successfully completed.
 - Hardware evidence preserved
 - Audit reports comprehensive
 
-### CI Verification — ⏳ IN PROGRESS
+### CI Verification — ✅ PR run #660 SUCCESS
 
 - Build: ✅ SUCCESS
 - JVM Tests: ✅ 347/347
 - Lint: ✅ 0 findings
 - API 26: ✅ 28/28
-- API 34: ⏳ retry in progress (intermittent infrastructure issue)
+- API 34: ✅ successful rerun and subsequent #660
 
-### Blocker Status — ❌ NONE
+### Remaining publication gate — SIGNED APK AND DEVICE SMOKE NOT RUN
 
-**Assessment:** NekoFlash 2.0 alpha11 is **production ready**.
+**Assessment:** NekoFlash 2.0 alpha11 is a **source/CI candidate**. Permanent-key signing and final-SHA device smoke remain mandatory.
 
 Intermittent CI emulator issue is **infrastructure flakiness**, not code defect. Multiple successful runs on same code prove correctness.
 
@@ -236,15 +235,11 @@ Intermittent CI emulator issue is **infrastructure flakiness**, not code defect.
 2. Technical audit found no critical issues
 3. All previously reported issues addressed
 4. Code quality verified as HIGH
-5. Successful CI run #657 proves code correctness
+5. Successful CI #657 and #660 support regression confidence but do not prove every runtime path correct
 6. Current CI issue is documented infrastructure flakiness (#16)
 7. No code changes in this PR
 
-**When to Merge:**
-- ✅ Now: If retry passes (expected outcome)
-- ✅ Now: If retry fails again (with evidence that issue is infrastructure, not code)
-
-Do NOT block release for known emulator flakiness when code is verified correct.
+**When to Merge:** after review of the full diff and successful mandatory checks for the actual PR head. Keep intermittent failure evidence rather than assuming infrastructure was definitively responsible.
 
 ### For Alpha11 Release
 
@@ -269,19 +264,19 @@ Do NOT block release for known emulator flakiness when code is verified correct.
 ✅ **Complete technical audit** — 0 critical issues found  
 ✅ **All previously reported issues verified** — fixed in PR #74/#76  
 ✅ **Code quality verified** — HIGH  
-✅ **CI verification** — previous run ALL PASS, current retry in progress  
+✅ **CI verification** — PR run #660 SUCCESS; signed release NOT RUN  
 ✅ **Comprehensive audit reports created** — 3 new documents  
 ✅ **PR #78 updated** — ready for merge  
 
 ### What Remains
 
-⏳ **API 34 retry completion** — expected to pass  
+✅ **API 34 retry completed** — later run #660 SUCCESS  
 📋 **PR #78 merge** — approved, waiting for CI  
 🚀 **Alpha11 release** — ready to proceed after merge  
 
 ### Blocking Issues
 
-**NONE** ❌
+**Publication gate remains:** final-SHA signed artifact and non-destructive smoke test NOT RUN. Known issues #20/#46/#47/#48/#64/#72 remain tracked.
 
 All issues are either:
 - Already fixed (PR #74, #76)
@@ -292,6 +287,6 @@ All issues are either:
 
 **Report Date:** 10 November 2026  
 **Audit Duration:** Comprehensive full-stack review  
-**Final Assessment:** ✅ **PRODUCTION READY**
+**Final Assessment:** ✅ **SOURCE/CI CANDIDATE** · ⏳ **SIGNED RELEASE PENDING**
 
-**Next Action:** Await CI retry completion, then merge PR #78 and proceed with alpha11 release flow.
+**Next Action:** review final PR diff and required checks; integrate into main; verify main CI; generate and inspect permanent-key signed final-SHA APK and non-destructive smoke before publishing.

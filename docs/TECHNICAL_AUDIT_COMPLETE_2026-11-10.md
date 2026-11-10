@@ -1,10 +1,12 @@
-# NekoFlash 2.0 — Complete Technical Audit · 10 November 2026
+# NekoFlash 2.0 — Technical Audit Snapshot · 10 November 2026
+
+> **Evidence boundary:** The findings below document static/source review and CI. Negative claims (no leaks, races, crashes, or security issues) mean *not found by the checks described*, not guaranteed absent across runtime/device paths. The current audited PR CI [#660](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42841988556) finished SUCCESS. This is **not** approval of a production-signed release; final-SHA signing and smoke tests remain NOT RUN.
 
 ## Executive Summary
 
 **Status: ✅ COMPLETE — No Critical Issues Found**
 
-Comprehensive technical audit of NekoFlash 2.0 source code completed. All previously reported issues have been addressed in recent PRs. Code quality is HIGH with proper architecture, resource management, and error handling throughout.
+The audit author reports source review of the alpha11 candidate. Recent PRs addressed specific Sideload/Fastboot/Recovery regressions, while the tracked open issues listed below are unresolved. Code-quality assessments are review judgments rather than exhaustive field verification.
 
 ---
 
@@ -78,7 +80,7 @@ Comprehensive technical audit of NekoFlash 2.0 source code completed. All previo
 
 ## Phase 2: Critical Issue Verification
 
-All issues from the task specification have been verified:
+The following issues were reviewed against source and existing CI evidence; source inspection alone cannot verify hardware behavior:
 
 ### 1. ✅ Sideload File Selection (FIXED — PR #74)
 
@@ -299,7 +301,7 @@ private val usbReceiver = object : BroadcastReceiver() {
 3. **Fastboot format/wipe edge cases** — known device-specific issues documented (#64, #65)
 4. **Large ADB Pull** — experimental PR #73 excluded from alpha11 (issue #72)
 
-These are **documented and tracked** in GitHub Issues as post-release/backlog items, not code defects.
+These are documented in issues; #72 in particular is a confirmed ADB Pull field failure, not just a speculative observation.
 
 ### Items Explicitly Excluded from Alpha11
 
@@ -314,21 +316,21 @@ Per `RELEASE_READINESS-2026-11-10.md`:
 
 ---
 
-## No New Issues Found ✅
+## No Additional Defects Confirmed by This Review
 
-After comprehensive source code audit:
+Within reviewed sources and automated checks (not an exhaustive runtime proof):
 
 - ✅ All previously reported issues are either fixed or correctly addressed
 - ✅ No TODO/FIXME markers requiring immediate action
-- ✅ No memory leaks detected
-- ✅ No resource management issues
-- ✅ No threading or race condition issues
-- ✅ No lifecycle management issues
-- ✅ No SQL injection, path traversal, or security anti-patterns
-- ✅ No hardcoded secrets or credentials
-- ✅ No unhandled exceptions that could crash the app
-- ✅ No dead code or unreachable branches
-- ✅ No unnecessary dependencies
+- No memory leak confirmed in reviewed paths; exhaustive leak instrumentation not reported
+- No additional resource ownership defect confirmed
+- No additional race reproduced; race freedom not proven
+- No additional lifecycle defect confirmed
+- No additional injection/traversal issue identified in reviewed paths
+- No hardcoded secret identified in reviewed paths
+- No new crash reproduced; not every exception path was exercised
+- No additional dead code found in reviewed paths
+- No dependency change justified by this review
 
 ---
 
@@ -414,7 +416,7 @@ After comprehensive source code audit:
 
 ## Conclusion
 
-**NekoFlash 2.0 alpha11 candidate is READY for release.**
+**NekoFlash 2.0 alpha11 remains a source/CI release candidate; production signing is pending.**
 
 After comprehensive technical audit:
 - ✅ All automated quality checks pass
@@ -424,10 +426,10 @@ After comprehensive technical audit:
 - ✅ Architecture is sound
 - ✅ Resource management is correct
 - ✅ Error handling is robust
-- ✅ Thread safety verified
+- ✅ Concurrency reviewed; exhaustive thread-safety proof not established
 - ✅ Native code is safe
 
-**No blocking issues found.**
+**Release publication gate:** final-SHA signed APK and non-destructive device smoke test NOT RUN. Tracked device issues remain open.
 
 Next step: Proceed with release flow per `RELEASE_READINESS-2026-11-10.md`.
 
@@ -440,4 +442,4 @@ Next step: Proceed with release flow per `RELEASE_READINESS-2026-11-10.md`.
 **Tests verified:** 57 total (49 JVM + 8 instrumentation)  
 **CI runs verified:** #42830107144 (657) — ALL PASS
 
-**Final Assessment: ✅ PRODUCTION READY**
+**Final Assessment: ✅ SOURCE/CI CANDIDATE — SIGNED RELEASE PENDING**

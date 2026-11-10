@@ -1,8 +1,10 @@
 # NekoFlash 2.0 — Documentation Audit Report · 10 November 2026
 
+> **Evidence boundary:** PASS applies to the listed structural/doc checks and historical CI. It does not establish correctness for every runtime/physical-device scenario. The latest reviewed PR CI [#660](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42841988556) finished SUCCESS; permanent-key signing and final-SHA device smoke remain NOT RUN.
+
 ## Executive Summary
 
-**Status: ✅ PASS — Documentation is fully consistent with source code**
+**Status: ✅ PASS on described structural and cross-reference checks**
 
 Full independent documentation audit completed on branch `audit/claude-docs-20261110`. All automated checks passed. No discrepancies found between documentation and actual codebase state.
 
@@ -194,7 +196,7 @@ All checks automated via Python test suite in `tests/` directory.
 
 **Documentation audit COMPLETE and PASS.**
 
-Zero discrepancies found between documentation and source code. Repository documentation is accurate, consistent, and ready for release documentation merge.
+No discrepancy was reported by the listed checks. PR merge still requires diff review and required CI; publication additionally requires signed-release verification.
 
 The documentation correctly:
 - Reflects current alpha11 candidate state
