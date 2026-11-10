@@ -330,6 +330,36 @@ class TerminalAndImportAndroidTest {
         }
     }
 
+    @Test fun successfulImeShowDoesNotRetryAfterHideWhileEditorKeepsFocus() {
+        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
+            waitUi(scenario, "terminal expanded with keyboard") { activity ->
+                expanded(activity) && ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) == true
+            }
+            scenario.onActivity { activity ->
+                // Keep focus: IME hide does not imply editor blur. The old
+                // delayed retry used focus alone and could undo this request.
+                val editor = activity.findViewById<EditText>(R.id.etCommand)
+                assertTrue(editor.hasFocus())
+                WindowInsetsControllerCompat(activity.window, editor).hide(WindowInsetsCompat.Type.ime())
+            }
+            waitUi(scenario, "keyboard hidden after successful show") { activity ->
+                ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                    ?.isVisible(WindowInsetsCompat.Type.ime()) != true
+            }
+            // Observe beyond the controller's 180ms retry, not a larger timeout
+            // for the existing rotation/visible-output assertions.
+            Thread.sleep(350)
+            scenario.onActivity { activity ->
+                assertFalse("An obsolete show retry reopened the keyboard",
+                    ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
+                        ?.isVisible(WindowInsetsCompat.Type.ime()) == true)
+                assertTrue(expanded(activity))
+            }
+        }
+    }
+
     @Test fun commandsAfterRotationRenderInTheBodyAndKeepTheExpandedHeader() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
