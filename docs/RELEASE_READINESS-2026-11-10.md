@@ -1,5 +1,15 @@
 # NekoFlash 2.0 — Release readiness audit · 10 November 2026
 
+## Release preparation checkpoint — 11 November 2026
+
+**Scope:** publish/prepare an **Insiders hardware beta**, not an unverified signed production alpha11. The current confirmed `main` before this documentation update was [`faebd3a`](https://github.com/Ncorror/NekoFlash-2.0/commit/faebd3a338ecd695c9ec4a879fa6a8c92db79fba) with [Actions #42890625837 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42890625837), after PR #82 merged. [Exact baseline two-file debug tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42890625837/artifacts/13799940338). After this documentation commit, require CI success and use the matching newly produced `main` artifact; old APK hashes are *not* the updated SHA.
+
+**Open field compatibility:** [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) reproduces `USB_IN_FAILED`, and [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) isolates kernel `EPROTO=71` on POCO F7 `onyx` custom-kernel HOST to POCO X3 Pro `vayu` TARGET for large Pull. PR #83 remains **open/unmerged**, because errno capture is diagnostic, not a transport fix. Earlier small transfers and several ADB/Fastboot/Recovery paths have distinct PASS evidence, but that does not generalize to every phone/cable/kernel. The author additionally reports that flashing POCO F7 as a **target** worked with a Mi 8 host when other hosts gave errors; that reverse-direction pairing is unverified elsewhere and must not be treated as proven common root cause. Seek independent host/target/ROM/kernel and SHA evidence via Insiders; preserve diagnostic archives in private channels.
+
+**Integrated scope:** #79–#82 included in current main. #20/#46/#47/#48/#64/#72 remain open, with #72 explicitly a known limit for some large inbound ADB transfers. No destructive retests to re-check accepted historical evidence. Do not publish raw device identifiers. The existing `insiders-rev45` prerelease is a historical snapshot; `docs/insiders/campaign-tag.txt` is **not** changed in this preparation commit, so automatic prerelease publishing is not triggered.
+
+**Production release gate remains unchanged:** final tagged SHA → successful Android/JVM/lint/API26/34/tester kit CI → permanent-key signed APK and pinned certificate check → non-destructive smoke → then production publication. Until then: **INSIDERS BETA PREPARED / PRODUCTION SIGNED RELEASE PENDING**.
+
 ## Candidate identity
 
 - Repository: `Ncorror/NekoFlash-2.0`
