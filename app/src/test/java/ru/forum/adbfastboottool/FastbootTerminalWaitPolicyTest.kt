@@ -23,6 +23,17 @@ class FastbootTerminalWaitPolicyTest {
         assertEquals(2L, FastbootTerminalWaitPolicy.retryDelayMs(30_000_000L, 2L))
     }
 
+    @Test fun unansweredRebootIsUsbInNotUsbOutTimeout() {
+        assertTrue(FastbootTerminalWaitPolicy.isUnansweredTerminalCommand(
+            "Terminal Fastboot command timed out: reboot"
+        ))
+        assertTrue(FastbootTerminalWaitPolicy.isUnansweredTerminalCommand(
+            "Terminal Fastboot command timed out: erase:cache"
+        ))
+        assertTrue(!FastbootTerminalWaitPolicy.isUnansweredTerminalCommand("USB OUT write timeout"))
+        assertTrue(!FastbootTerminalWaitPolicy.isUnansweredTerminalCommand("short write 3/6"))
+    }
+
     @Test fun clockIsMonotonicAndTerminalBudgetUnchanged() {
         val start = 77_000_000_000L
         assertEquals(0L, FastbootTerminalWaitPolicy.elapsedMs(start, start))
