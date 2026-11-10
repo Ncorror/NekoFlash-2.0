@@ -133,6 +133,27 @@ class FastbootPlanExecutorTest {
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot"))) }
         assertEquals(listOf("erase:userdata"), mutations())
     }
+    @Test fun cacheEraseWithoutFinalReplyStopsAfterSuccessfulUserdataAndDoesNotTouchMetadata() {
+        // Physical vayu A-only capture, 2026-11-09: erase:userdata and flash:userdata
+        // confirmed OKAY; erase:cache received no final packet and was cancelled.
+        // Returning false models that terminal outcome, without sending any USB data.
+        variables["partition-type:cache"] = "ext4"
+        variables["partition-size:cache"] = "18000000"
+        variables["partition-type:metadata"] = "raw"
+        fail = "erase:cache"
+
+        val exception = assertThrows(IllegalStateException::class.java) {
+            executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot")))
+        }
+
+        assertTrue(exception.message.orEmpty().contains("erase:cache"))
+        assertEquals(listOf("erase:userdata", "flash:userdata", "erase:cache"), mutations())
+        assertEquals(1, events.count { it == "erase:cache" })
+        assertFalse(events.contains("flash:cache"))
+        assertFalse(events.contains("erase:metadata"))
+        assertFalse(events.contains("reboot"))
+    }
+
     @Test fun flashFailureStopsBeforeTheNextPartitionAndReboot() {
         variables["partition-type:cache"] = "raw"; fail = "flash:userdata"
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot"))) }

@@ -206,7 +206,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         val serial: String?,
         val createdAtMs: Long,
         val boundary: RecoveryLogBoundary?,
-        val transferFinished: Boolean
+        val transferFinished: Boolean,
+        val sourceRecovery: SideloadRecoveryTransitionPolicy.Identity?,
+        val recoveryTransitionObserved: Boolean
     )
 
     private data class PreparedRecoveryLog(
@@ -745,6 +747,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 _fastbootPartitionInventory.postValue(null)
                 _adbPeerMode.postValue(proto.peerMode)
                 verifyPendingSideloadIfReady(proto)
+                // Recovery installers can boot straight back into SIDELOAD, not RECOVERY.
+                // Record the switch as a postcondition; never infer ZIP install SUCCESS.
+                observePendingSideloadRecoveryTransition(proto)
                 if (proto.peerMode == AdbProtocol.PeerMode.RECOVERY) {
                     val serial = currentUsbSerial()
                     val boundary = if (serial != null) proto.captureRecoveryLogBoundary() else null
@@ -1783,9 +1788,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private fun sideloadVerificationPrefs() =
         getApplication<Application>().getSharedPreferences(SIDELOAD_VERIFY_PREFS, Context.MODE_PRIVATE)
 
-    private fun persistPendingSideloadVerification(source: FirmwareSource): PendingSideloadVerification {
+    private fun persistPendingSideloadVerification(source: FirmwareSource, proto: AdbProtocol): PendingSideloadVerification {
         val serial = currentUsbSerial()
         val now = System.currentTimeMillis()
+        val sourceRecovery = SideloadRecoveryTransitionPolicy.fromAdbBanner(
+            proto.currentDiagnostics().remoteBanner,
+            connectedUsbTarget?.device?.vendorId ?: -1,
+            connectedUsbTarget?.device?.productId ?: -1
+        )
         val prepared = preparedRecoveryLog
         preparedRecoveryLog = null // A boundary belongs to one accepted attempt only.
         val boundary = prepared?.takeIf {
@@ -1793,7 +1803,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }?.boundary
         val attempt = PendingSideloadVerification(
             UUID.randomUUID().toString(), source.displayName, source.sizeHint ?: -1L,
-            serial, now, boundary, false
+            serial, now, boundary, false, sourceRecovery, false
         )
         sideloadGuiAttemptId = attempt.attemptId
         @Suppress("UseKtx")
@@ -1807,6 +1817,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             .putLong(SIDELOAD_VERIFY_LOG_BYTES, boundary?.byteCount ?: -1L)
             .putString(SIDELOAD_VERIFY_LOG_HASH, boundary?.sha256)
             .putBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false)
+            .putString(SIDELOAD_VERIFY_RECOVERY_NAME, sourceRecovery?.productName)
+            .putString(SIDELOAD_VERIFY_RECOVERY_DEVICE, sourceRecovery?.deviceCodename)
+            .putInt(SIDELOAD_VERIFY_RECOVERY_VID, sourceRecovery?.vendorId ?: -1)
+            .putInt(SIDELOAD_VERIFY_RECOVERY_PID, sourceRecovery?.productId ?: -1)
+            .putBoolean(SIDELOAD_VERIFY_RECOVERY_CHANGED, false)
             .commit()
         if (!saved) log("⚠️ Could not save ADB Sideload attempt marker.")
         return attempt
@@ -1836,7 +1851,16 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 prefs.getLong(SIDELOAD_VERIFY_LOG_BYTES, -1L).toString(),
                 prefs.getString(SIDELOAD_VERIFY_LOG_HASH, null)
             ),
-            transferFinished = prefs.getBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false)
+            transferFinished = prefs.getBoolean(SIDELOAD_VERIFY_TRANSFER_FINISHED, false),
+            sourceRecovery = prefs.getString(SIDELOAD_VERIFY_RECOVERY_NAME, null)?.let { name ->
+                SideloadRecoveryTransitionPolicy.Identity(
+                    name,
+                    prefs.getString(SIDELOAD_VERIFY_RECOVERY_DEVICE, null).orEmpty(),
+                    prefs.getInt(SIDELOAD_VERIFY_RECOVERY_VID, -1),
+                    prefs.getInt(SIDELOAD_VERIFY_RECOVERY_PID, -1)
+                )
+            },
+            recoveryTransitionObserved = prefs.getBoolean(SIDELOAD_VERIFY_RECOVERY_CHANGED, false)
         )
     }
 
@@ -1888,6 +1912,46 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             )
         )
         persistSessionSummary()
+    }
+
+    /**
+     * A Recovery ZIP may replace the running Recovery and return directly to
+     * SIDELOAD mode. Strict same-boot /tmp/recovery.log validation must remain
+     * authoritative for installation SUCCESS/FAILED. Observe a verified
+     * environment switch separately, without replaying archived legacy logs.
+     */
+    private fun observePendingSideloadRecoveryTransition(proto: AdbProtocol) {
+        if (proto.peerMode != AdbProtocol.PeerMode.RECOVERY &&
+            proto.peerMode != AdbProtocol.PeerMode.SIDELOAD) return
+        val pending = readPendingSideloadVerification() ?: return
+        if (!pending.transferFinished || pending.recoveryTransitionObserved) return
+        val ageMs = System.currentTimeMillis() - pending.createdAtMs
+        if (pending.createdAtMs <= 0L || ageMs < 0L || ageMs > SIDELOAD_VERIFY_TIMEOUT_MS) return
+        val observed = SideloadRecoveryTransitionPolicy.fromAdbBanner(
+            proto.currentDiagnostics().remoteBanner,
+            connectedUsbTarget?.device?.vendorId ?: -1,
+            connectedUsbTarget?.device?.productId ?: -1
+        )
+        val transition = SideloadRecoveryTransitionPolicy.observe(
+            pending.sourceRecovery, observed,
+            sameUsbSerial = pending.serial != null && pending.serial == currentUsbSerial(),
+            transferFinished = pending.transferFinished
+        ) ?: return
+        val prefs = sideloadVerificationPrefs()
+        if (prefs.getString(SIDELOAD_VERIFY_ATTEMPT_ID, null) != pending.attemptId ||
+            prefs.getBoolean(SIDELOAD_VERIFY_RECOVERY_CHANGED, false)) return
+        @Suppress("UseKtx")
+        if (!prefs.edit().putBoolean(SIDELOAD_VERIFY_RECOVERY_CHANGED, true).commit()) {
+            logFileOnly("Could not persist observed Recovery transition for Sideload ${pending.attemptId}")
+            return
+        }
+        val detail = transition.detail(pending.packageName)
+        log("ℹ️ $detail")
+        publishSideloadRecoveryVerdict(
+            pending.attemptId,
+            detail,
+            OperationOutcomeKind.VERIFY_PENDING
+        )
     }
 
     private fun verifyPendingSideloadIfReady(proto: AdbProtocol) {
@@ -2027,7 +2091,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 failOperation(text(R.string.rev12_sideload_mode_inactive, proto.peerMode.name))
             }
             // Admission comes first: a rejected second click cannot clear an active marker.
-            val attempt = persistPendingSideloadVerification(source)
+            val attempt = persistPendingSideloadVerification(source, proto)
             var awaitingVerdict = false
             try {
                 when (val result = proto.sideloadZip(source, getApplication<Application>().contentResolver)) {
@@ -2346,6 +2410,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         private const val SIDELOAD_VERIFY_LOG_BYTES = "log_bytes"
         private const val SIDELOAD_VERIFY_LOG_HASH = "log_hash"
         private const val SIDELOAD_VERIFY_TRANSFER_FINISHED = "transfer_finished"
+        private const val SIDELOAD_VERIFY_RECOVERY_NAME = "source_recovery_name"
+        private const val SIDELOAD_VERIFY_RECOVERY_DEVICE = "source_recovery_device"
+        private const val SIDELOAD_VERIFY_RECOVERY_VID = "source_recovery_vid"
+        private const val SIDELOAD_VERIFY_RECOVERY_PID = "source_recovery_pid"
+        private const val SIDELOAD_VERIFY_RECOVERY_CHANGED = "recovery_transition_observed"
         private const val SIDELOAD_VERIFY_CREATED_AT = "created_at"
     }
 }
