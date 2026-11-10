@@ -40,6 +40,7 @@ internal class ConsoleDockController(
     private var imeVisible: Boolean = false
     private var lastPeekLine: String = ""
     private var bodyHeightUpdateQueued: Boolean = false
+    private var imeRequestGeneration: Long = 0
 
     /** True while the Console body is visible above its collapsed peek height. */
     var isExpanded: Boolean = false
@@ -266,6 +267,7 @@ internal class ConsoleDockController(
             // CoordinatorLayout. Some Android 14 emulator keyboards ignore the
             // first request during the sheet's expansion animation.
             commandInput.requestFocus()
+            val requestGeneration = ++imeRequestGeneration
             WindowInsetsControllerCompat(activity.window, commandInput).show(
                 WindowInsetsCompat.Type.ime(),
             )
@@ -274,6 +276,7 @@ internal class ConsoleDockController(
             // open and the command editor focused. Never reopen after Close.
             commandInput.postDelayed({
                 if (!activity.isFinishing && !activity.isDestroyed &&
+                    requestGeneration == imeRequestGeneration &&
                     behavior.state == BottomSheetBehavior.STATE_EXPANDED &&
                     commandInput.isShown && commandInput.hasFocus() &&
                     ViewCompat.getRootWindowInsets(root)?.isVisible(WindowInsetsCompat.Type.ime()) != true
@@ -296,6 +299,10 @@ internal class ConsoleDockController(
             val nextImeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
             if (nextImeVisible != imeVisible) {
                 imeVisible = nextImeVisible
+                // Once a show request has produced visible IME, its retry is
+                // obsolete. Otherwise a quick hide (Send/rotation/Back) can be
+                // undone by the delayed callback while the editor keeps focus.
+                if (nextImeVisible) imeRequestGeneration++
                 behavior.isDraggable = false
                 panel.requestLayout()
                 scheduleVisibleBodyHeightUpdate()
@@ -313,6 +320,7 @@ internal class ConsoleDockController(
     }
 
     private fun hideCommandIme() {
+        imeRequestGeneration++
         focusCommandWhenExpanded = false
         WindowInsetsControllerCompat(activity.window, root).hide(
             WindowInsetsCompat.Type.ime(),
