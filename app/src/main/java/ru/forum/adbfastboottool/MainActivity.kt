@@ -910,17 +910,40 @@ class MainActivity : AppCompatActivity() {
         modeSwitchHandler.removeCallbacks(modeSwitchRunnable)
     }
 
+    private fun usbScanEvidence(
+        devices: List<UsbDevice>,
+        candidates: List<UsbDeviceInspector.Candidate>
+    ): UsbScanDiagnostics.Evidence {
+        val adbCandidates = candidates.filter { it.mode == UsbDeviceInspector.Mode.ADB }
+        val permittedAdb = adbCandidates.map { it.device }.distinctBy { it.deviceId }
+            .count { device -> runCatching { usbManager.hasPermission(device) }.getOrDefault(false) }
+        return UsbScanDiagnostics.Evidence(
+            hostFeatureAvailable = packageManager.hasSystemFeature(android.content.pm.PackageManager.FEATURE_USB_HOST),
+            deviceCount = devices.size,
+            adbCandidateCount = adbCandidates.size,
+            fastbootCandidateCount = candidates.count { it.mode == UsbDeviceInspector.Mode.FASTBOOT },
+            permittedAdbDeviceCount = permittedAdb
+        )
+    }
+
     private fun scanForDevices() {
         cancelStartupUsbDiscovery()
         stopModeSwitchWatch()
+        val devices = try {
+            usbManager.deviceList.values.toList()
+        } catch (error: SecurityException) {
+            viewModel.log(DiagnosticLogPolicy.Level.ERROR, "USB enumeration denied by Android: ${error.message}")
+            return
+        }
         val candidates = UsbDeviceInspector.findAllCandidates(
-            usbManager.deviceList.values,
+            devices,
             includeGenericFastboot = true
         )
+        viewModel.log(UsbScanDiagnostics.explain(usbScanEvidence(devices, candidates)))
         when {
             candidates.isEmpty() -> {
                 viewModel.log(DiagnosticLogPolicy.Level.ERROR, "ERROR: no compatible ADB/Fastboot USB devices found")
-                logUsbInventoryForTroubleshooting()
+                logUsbInventoryForTroubleshooting(devices)
             }
             candidates.size == 1 -> {
                 val candidate = candidates.first()
@@ -969,8 +992,7 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
-    private fun logUsbInventoryForTroubleshooting() {
-        val devices = usbManager.deviceList.values
+    private fun logUsbInventoryForTroubleshooting(devices: Collection<UsbDevice>) {
         if (devices.isEmpty()) {
             viewModel.log("USB inventory: Android does not see any USB devices. Check OTG and the data cable.")
             return
@@ -4248,16 +4270,32 @@ class MainActivity : AppCompatActivity() {
                 append(getString(R.string.shell_usb_otg, tvOtgStatus?.text?.toString().orEmpty()))
                 append('\n')
                 val devices = try { usbManager.deviceList.values.toList() } catch (_: SecurityException) { emptyList() }
+                val candidates = UsbDeviceInspector.findAllCandidates(devices, includeGenericFastboot = true)
                 append(getString(R.string.shell_usb_devices_count, devices.size))
+                append("\n")
+                append(UsbScanDiagnostics.explain(usbScanEvidence(devices, candidates)))
                 devices.forEachIndexed { index, device ->
                     append("\n\n")
                     append(getString(R.string.shell_usb_device_entry, index + 1, device.vendorId, device.productId))
                     append("\n")
                     append(getString(R.string.shell_usb_permission,
-                        if (usbManager.hasPermission(device)) getString(R.string.shell_usb_yes)
-                        else getString(R.string.shell_usb_no)))
+                        if (runCatching { usbManager.hasPermission(device) }.getOrDefault(false))
+                            getString(R.string.shell_usb_yes) else getString(R.string.shell_usb_no)))
                     append("\n")
                     append(getString(R.string.shell_usb_interfaces, device.interfaceCount))
+                    for (i in 0 until device.interfaceCount) {
+                        val iface = device.getInterface(i)
+                        append("\n  interface[$i] class=${iface.interfaceClass}/${iface.interfaceSubclass}/${iface.interfaceProtocol} endpoints=${iface.endpointCount}")
+                    }
+                    val deviceCandidates = candidates.filter { it.device.deviceId == device.deviceId }
+                    if (deviceCandidates.isEmpty()) {
+                        append("\n  ADB/Fastboot bulk interface: not exposed")
+                    } else {
+                        deviceCandidates.forEach { candidate ->
+                            append("\n  ${candidate.mode.label} ${candidate.matchKind.label}: ")
+                            append(candidate.displaySubtitle())
+                        }
+                    }
                 }
             }
         }
