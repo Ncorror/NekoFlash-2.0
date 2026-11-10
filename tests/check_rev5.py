@@ -39,8 +39,10 @@ def run():
     texts = list(page.iter())
     ids = [el.attrib.get(AND + 'id', '') for el in texts]
     buttons = [el for el in texts if el.tag.endswith('MaterialButton')]
-    require(len(buttons) == 2, 'Sideload must show exactly two buttons')
-    for value in ['containerAdb', 'btnAdbSideload', 'btnSideloadImport', 'tvSideloadSelectedZip']:
+    # REV55: approved safety improvement adds an explicit START button;
+    # selection must not directly mutate the target.
+    require(len(buttons) == 3, 'Sideload must have separate Choose, Start and Import controls')
+    for value in ['containerAdb', 'btnAdbSideload', 'btnStartAdbSideload', 'btnSideloadImport', 'tvSideloadSelectedZip']:
         require(ids.count('@+id/' + value) == 1, 'Required UI ID not unique: ' + value)
     for res in ['values', 'values-ru']:
         strings = ET.parse(base / ('res/' + res + '/strings.xml')).getroot()
@@ -49,7 +51,14 @@ def run():
             require(found.count(key)==1, f'String {key} missing/duplicated in {res}')
     main = (base / 'java/ru/forum/adbfastboottool/MainActivity.kt').read_text(encoding='utf-8')
     require('R.id.tvSideloadSelectedZip' in main, 'Missing chosen-file UI binding')
-    require('viewModel.runSideload(source)' in main, 'Direct SAF Sideload action is disconnected')
+    require('viewModel.runSideload(source)' in main, 'Explicit SAF Sideload action is disconnected')
+    picker = main.split('private fun registerDirectSideloadLauncher()', 1)[1].split(
+        'private fun restoreSideloadSelection(', 1)[0]
+    require('viewModel.runSideload(source)' not in picker,
+            'Picking ZIP must never send ADB Sideload data')
+    require('startSelectedSideloadWithConfirmation()' in main and
+            'R.id.btnStartAdbSideload' in main,
+            'Separate explicit and confirmed Sideload launch is disconnected')
     require('R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main,
             'Explicit import fallback disappeared')
     require('R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }' in main, 'Import behavior changed')
@@ -57,7 +66,7 @@ def run():
     for tab in ['tabHome','tabFastboot','tabAdb','tabUnlock','tabSettings']:
         require(nav.count('android:id="@+id/' + tab + '"') == 1, 'Missing fifth-tab shell ID: ' + tab)
     require('Sideload' in (base/'res/values-ru/strings.xml').read_text(encoding='utf-8'), 'Sideload tab label missing')
-    print(f'PASS: {len(xmls)} XML resources parsed; Sideload REV3 2-button contract; RU/EN; original transport hashes; 5 tabs')
+    print(f'PASS: {len(xmls)} XML resources parsed; Sideload REV55 3-button safety contract; RU/EN; original transport hashes; 5 tabs')
 
 if __name__ == '__main__':
     run()

@@ -135,6 +135,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var workspacePath: File
     private lateinit var importFileLauncher: ActivityResultLauncher<Intent>
     private lateinit var sideloadZipLauncher: ActivityResultLauncher<Intent>
+    // Selection is independent from execution: picking a ZIP never sends ADB writes.
+    private var selectedSideloadSource: FirmwareSource.SafDocument? = null
     private lateinit var quickImageLauncher: ActivityResultLauncher<Intent>
     private lateinit var massImageLauncher: ActivityResultLauncher<Intent>
     private var pendingMassPartition: String? = null
@@ -306,6 +308,7 @@ class MainActivity : AppCompatActivity() {
         viewModel = DeviceSessionStore.attachUi(application)
         viewModelReady = true
         operationSessionId = viewModel.currentDiagnosticSessionSummary().sessionId
+        selectedSideloadSource = restoreSideloadSelection(savedInstanceState)
         // A non-null Bundle can also belong to a process Android has killed.
         // Only a screen recreated within the same execution session may keep
         // a live result visible; a disk-restored checkpoint stays in reports.
@@ -342,6 +345,7 @@ class MainActivity : AppCompatActivity() {
 
         viewModel.connectionState.observe(this) {
             refreshConnectionStatusLabel()
+            updateSideloadSelectionUi()
             updateDeviceOverview()
             if (selectedWindow == "unlock") buildUnlockPage()
         }
@@ -359,6 +363,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.adbPeerMode.observe(this) {
             // ADB transport один, но peer mode различается: system/recovery/sideload.
             refreshConnectionStatusLabel()
+            updateSideloadSelectionUi()
             updateDeviceOverview()
         }
         viewModel.transportSessionId.observe(this) { updateDeviceOverview() }
@@ -414,6 +419,7 @@ class MainActivity : AppCompatActivity() {
                 restoreBrightness()
             }
             updateDeviceOverview()
+            updateSideloadSelectionUi()
             renderOperationProgressUi(rawProgress)
         }
 
@@ -518,6 +524,11 @@ class MainActivity : AppCompatActivity() {
         outState.putInt("fastboot_section", selectedFastbootSection)
         outState.putString("mass_picker_partition", pendingMassPartition)
         if (::massQueueUi.isInitialized) outState.putBundle("mass_queue_ui", massQueueUi.saveFormState())
+        selectedSideloadSource?.let { source ->
+            outState.putString(STATE_SIDELOAD_URI, source.uri.toString())
+            outState.putString(STATE_SIDELOAD_NAME, source.displayName)
+            source.sizeHint?.let { outState.putLong(STATE_SIDELOAD_SIZE, it) }
+        }
         outState.putString(STATE_SELECTED_WINDOW, selectedWindow)
         outState.putString(STATE_OPERATION_SESSION_ID, operationSessionId)
         outState.putBoolean(STATE_HIDE_STORED_OPERATION_PROGRESS, operationStoredProgressHidden)
@@ -596,11 +607,15 @@ class MainActivity : AppCompatActivity() {
             showManualQuickFlashTargetDialog()
         }
 
-        // Единое меню Reboot (BottomSheet) — собирает все варианты перезагрузки.
+        // Selection and execution are separate: the picker is NEVER a flash trigger.
         findViewById<Button>(R.id.btnAdbSideload).setOnClickListener {
             // Direct SAF selection; no all-files workspace permission or copy.
             startDirectSideloadFilePicker()
         }
+        findViewById<Button>(R.id.btnStartAdbSideload).setOnClickListener {
+            startSelectedSideloadWithConfirmation()
+        }
+        updateSideloadSelectionUi()
         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
 
         findViewById<Button>(R.id.btnCancel).setOnClickListener {
@@ -1783,25 +1798,121 @@ class MainActivity : AppCompatActivity() {
                 viewModel.log(DiagnosticLogPolicy.Level.ERROR, getString(R.string.rev12_sideload_no_uri))
                 return@registerForActivityResult
             }
-            runCatching {
+            val display = WorkspaceImportNaming.sanitizeImportedFileName(
+                queryDisplayName(uri) ?: getString(R.string.rev12_sideload_unnamed)
+            )
+            // Extension is advisory only: professional ADB Sideload accepts arbitrary
+            // user-selected package names; Recovery decides whether bytes are valid.
+            if (!display.endsWith(".zip", ignoreCase = true)) {
+                viewModel.log(getString(R.string.layout_sideload_zip_required))
+            }
+            val size = queryFileSize(uri)
+            if (size != null && size <= 0L) {
+                Toast.makeText(this, R.string.layout_sideload_empty_zip, Toast.LENGTH_LONG).show()
+                return@registerForActivityResult
+            }
+            val persistentGrant = runCatching {
                 contentResolver.takePersistableUriPermission(
                     uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }.onFailure { error ->
                 viewModel.logFileOnly(
-                    "SAF document permission is transient: ${error.javaClass.simpleName}"
+                    "SAF selected ZIP has only temporary permission: ${error.javaClass.simpleName}"
                 )
+            }.isSuccess
+            val source = FirmwareSource.SafDocument(uri, display, size)
+            selectedSideloadSource = source
+            // Persist only if the SAF permission actually survives app restarts.
+            // Never restore a stale URI and accidentally choose a different ZIP.
+            val prefs = getSharedPreferences(SIDELOAD_SELECTION_PREFS, Context.MODE_PRIVATE)
+            prefs.edit {
+                clear()
+                if (persistentGrant) {
+                    putString(SIDELOAD_SELECTED_URI, uri.toString())
+                    putString(SIDELOAD_SELECTED_NAME, display)
+                    size?.let { putLong(SIDELOAD_SELECTED_SIZE, it) }
+                }
             }
-            val display = WorkspaceImportNaming.sanitizeImportedFileName(
-                queryDisplayName(uri) ?: getString(R.string.rev12_sideload_unnamed)
-            )
-            val source = FirmwareSource.SafDocument(uri, display, queryFileSize(uri))
-            findViewById<TextView>(R.id.tvSideloadSelectedZip).text =
-                getString(R.string.layout_sideload_selected_file, display)
+            updateSideloadSelectionUi()
             viewModel.log(getString(R.string.rev12_sideload_source_selected, display))
-            autoShowGuiOperation = true
-            viewModel.runSideload(source)
+            // Deliberately NO viewModel.runSideload(...) here.
         }
+    }
+
+    private fun restoreSideloadSelection(savedInstanceState: Bundle?): FirmwareSource.SafDocument? {
+        val prefs = getSharedPreferences(SIDELOAD_SELECTION_PREFS, Context.MODE_PRIVATE)
+        val savedUri = savedInstanceState?.getString(STATE_SIDELOAD_URI)
+            ?: prefs.getString(SIDELOAD_SELECTED_URI, null) ?: return null
+        val uri = runCatching { savedUri.toUri() }.getOrNull() ?: return null
+        val hasPersistentGrant = contentResolver.persistedUriPermissions.any {
+            it.uri == uri && it.isReadPermission
+        }
+        val sameActivityRecreation = savedInstanceState?.containsKey(STATE_SIDELOAD_URI) == true
+        if (!hasPersistentGrant && !sameActivityRecreation) {
+            prefs.edit { clear() }
+            return null
+        }
+        val display = (savedInstanceState?.getString(STATE_SIDELOAD_NAME)
+            ?: prefs.getString(SIDELOAD_SELECTED_NAME, null))
+            ?.takeIf { it.isNotBlank() } ?: return null
+        val size = when {
+            savedInstanceState?.containsKey(STATE_SIDELOAD_SIZE) == true ->
+                savedInstanceState.getLong(STATE_SIDELOAD_SIZE)
+            prefs.contains(SIDELOAD_SELECTED_SIZE) -> prefs.getLong(SIDELOAD_SELECTED_SIZE, 0L)
+            else -> null
+        }
+        return FirmwareSource.SafDocument(uri, display, size)
+    }
+
+    private fun updateSideloadSelectionUi() {
+        val source = selectedSideloadSource
+        val detail = if (source == null) {
+            getString(R.string.layout_sideload_no_file)
+        } else {
+            val formattedSize = source.sizeHint?.takeIf { it > 0L }?.let(::formatFileSize)
+            if (formattedSize == null) {
+                // Keep the original name-only label for SAF providers without a size.
+                getString(R.string.layout_sideload_selected_file, source.displayName)
+            } else {
+                getString(R.string.layout_sideload_selected_details, source.displayName, formattedSize)
+            }
+        }
+        findViewById<TextView>(R.id.tvSideloadSelectedZip).text = detail
+        val canStart = source != null && viewModel.operationActive.value != true &&
+            viewModel.connectionState.value == DeviceViewModel.ConnectionState.ADB &&
+            viewModel.adbPeerMode.value == AdbProtocol.PeerMode.SIDELOAD
+        findViewById<Button>(R.id.btnStartAdbSideload).isEnabled = canStart
+    }
+
+    private fun startSelectedSideloadWithConfirmation() {
+        val source = selectedSideloadSource ?: return
+        if (viewModel.operationActive.value == true ||
+            viewModel.connectionState.value != DeviceViewModel.ConnectionState.ADB ||
+            viewModel.adbPeerMode.value != AdbProtocol.PeerMode.SIDELOAD) {
+            viewModel.log(getString(R.string.rev12_sideload_mode_inactive,
+                viewModel.adbPeerMode.value?.name ?: "UNKNOWN"))
+            updateSideloadSelectionUi()
+            return
+        }
+        val size = source.sizeHint?.takeIf { it > 0L }?.let(::formatFileSize)
+            ?: getString(R.string.layout_sideload_size_unknown)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.layout_sideload_confirm_title)
+            .setMessage(getString(R.string.layout_sideload_confirm_message, source.displayName, size))
+            .setNegativeButton(R.string.cancel_upper, null)
+            .setPositiveButton(R.string.layout_sideload_start) { _, _ ->
+                // Re-check identity and state after the dialog, never reuse a replaced choice.
+                if (selectedSideloadSource != source ||
+                    viewModel.operationActive.value == true ||
+                    viewModel.adbPeerMode.value != AdbProtocol.PeerMode.SIDELOAD ||
+                    viewModel.connectionState.value != DeviceViewModel.ConnectionState.ADB) {
+                    updateSideloadSelectionUi()
+                    return@setPositiveButton
+                }
+                autoShowGuiOperation = true
+                viewModel.runSideload(source)
+            }
+            .show()
     }
 
     private fun startDirectSideloadFilePicker() {
@@ -4870,6 +4981,13 @@ class MainActivity : AppCompatActivity() {
         private const val PREFS_NAME = "settings"
         private const val PREF_LANGUAGE_TAG = "language_tag"
         private const val PREF_LAST_WINDOW = "last_window"
+        private const val SIDELOAD_SELECTION_PREFS = "sideload_selected_document"
+        private const val SIDELOAD_SELECTED_URI = "uri"
+        private const val SIDELOAD_SELECTED_NAME = "name"
+        private const val SIDELOAD_SELECTED_SIZE = "size"
+        private const val STATE_SIDELOAD_URI = "sideload_source_uri"
+        private const val STATE_SIDELOAD_NAME = "sideload_source_name"
+        private const val STATE_SIDELOAD_SIZE = "sideload_source_size"
         private const val STATE_SELECTED_WINDOW = "state_selected_window"
         private const val STATE_OPERATION_SESSION_ID = "state_operation_session_id"
         private const val STATE_OPERATION_STEPS_VISIBLE = "state_operation_steps_visible"
