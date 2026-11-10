@@ -2811,8 +2811,9 @@ class AdbProtocol(
         }
         val payload = if (header.dataLength > 0) {
             readDataDirect(header.dataLength) ?: return AdbPacketDispatcher.ReadResult.Failed(
-                AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,
-                "ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}"
+                directReadFailureCode ?: AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,
+                "ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}" +
+                    (directReadFailureMessage?.let { ": $it" } ?: "")
             )
         } else EMPTY_PAYLOAD
         return AdbPacketDispatcher.ReadResult.PacketReady(

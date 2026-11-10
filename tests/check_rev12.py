@@ -17,6 +17,16 @@ main = (base/'MainActivity.kt').read_text()
 # REV18 reviewed receive-file, listing and unique-block progress fixes.
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
+# Preserve the precise payload failure already recorded by readDataDirect.
+# Normalize only this reviewed diagnostic hunk; all legacy transport hashes
+# below still apply to the rest of AdbProtocol byte for byte.
+payload_failure_new = '''                directReadFailureCode ?: AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,
+                "ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}" +
+                    (directReadFailureMessage?.let { ": $it" } ?: "")'''
+payload_failure_old = '''                AdbPacketDispatcher.FailureCode.INVALID_PAYLOAD,
+                "ADB payload read/validation failed for cmd=0x${header.command.toString(16)}, bytes=${header.dataLength}"'''
+assert data.count(payload_failure_new.encode()) == 1
+data = data.replace(payload_failure_new.encode(), payload_failure_old.encode(), 1)
 # REV52 audits the exact diagnostic-only ADB revision. Convert only those
 # three reviewed log enhancements back to the REV51 binary source and
 # assert full original hash before legacy protocol-protection checks.
