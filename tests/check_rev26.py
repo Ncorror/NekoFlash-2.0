@@ -4,6 +4,7 @@ from pathlib import Path
 import subprocess
 root = Path(__file__).resolve().parents[1]
 subprocess.run(['python3', str(root/'tests/check_rev25.py')], cwd=root, check=True)
+subprocess.run(['python3', str(root/'tests/check_sideload_selection.py')], cwd=root, check=True)
 java = root/'app/src/main/java/ru/forum/adbfastboottool'
 main = (java/'MainActivity.kt').read_text()
 vm = (java/'DeviceViewModel.kt').read_text()

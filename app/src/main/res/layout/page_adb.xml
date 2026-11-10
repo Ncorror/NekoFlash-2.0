@@ -69,30 +69,31 @@
             android:insetBottom="0dp"
             android:text="@string/layout_choose_zip_sideload"
             android:textAllCaps="false"
-            android:textColor="#17100A"
+            android:textColor="@color/text_primary"
             android:textSize="15sp"
             android:textStyle="bold"
-            app:backgroundTint="@color/accent"
+            app:backgroundTint="@android:color/transparent"
+            app:strokeColor="@color/stroke"
+            app:strokeWidth="1dp"
             app:cornerRadius="11dp" android:minHeight="52dp" />
 
+        <!-- File selection is non-destructive; only this separate button can initiate ADB Sideload. -->
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/btnStartSideload"
+            android:id="@+id/btnStartAdbSideload"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:enabled="false"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            android:text="@string/layout_start_sideload"
+            android:text="@string/layout_sideload_start"
             android:textAllCaps="false"
-            android:textColor="@color/text_primary"
+            android:textColor="#17100A"
             android:textSize="15sp"
             android:textStyle="bold"
-            app:backgroundTint="@android:color/transparent"
+            app:backgroundTint="@color/accent"
             app:cornerRadius="11dp"
-            app:strokeColor="@color/accent"
-            app:strokeWidth="1dp"
-            android:minHeight="48dp" />
+            android:minHeight="52dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnSideloadImport"
