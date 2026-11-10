@@ -12,6 +12,15 @@ internal object FastbootTerminalWaitPolicy {
     const val MIN_EMPTY_READ_INTERVAL_MS = 100L
     const val COMMAND_DEADLINE_MS = 120_000L
 
+    /**
+     * A terminal command reaches the timed-out state only after the entire USB OUT
+     * command was accepted by bulkTransfer. A timeout here means the expected
+     * Fastboot OKAY/FAIL never arrived on USB IN, not an OUT/write failure.
+     * The device might already have acted on a reboot command.
+     */
+    fun isUnansweredTerminalCommand(reason: String): Boolean =
+        reason.startsWith("Terminal Fastboot command timed out:", ignoreCase = true)
+
     /** Elapsed values derive from a monotonic clock, not device wall time. */
     fun elapsedMs(startNs: Long, nowNs: Long): Long =
         ((nowNs - startNs).coerceAtLeast(0L) / 1_000_000L)

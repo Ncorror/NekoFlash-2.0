@@ -388,7 +388,7 @@ class FastbootProtocol(
             val elapsedMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, System.nanoTime())
             if (elapsedMs >= FastbootTerminalWaitPolicy.COMMAND_DEADLINE_MS) {
                 val message = "Terminal Fastboot command timed out: $clean"
-                onLog("❌ $message")
+                onLog("❌ $message. USB OUT completed; no final OKAY/FAIL was received. Device state is UNCONFIRMED; do not resend the command.")
                 markSessionBroken(message)
                 return@withLock false
             }
@@ -2057,7 +2057,8 @@ class FastbootProtocol(
             "native usbfs" in lower || "urb" in lower -> BrokenReasonCode.NATIVE_USBFS_FAILURE
             "short write" in lower || "ambiguous" in lower || ("sent" in lower && "/" in lower) -> BrokenReasonCode.SHORT_WRITE
             "short read" in lower -> BrokenReasonCode.SHORT_READ
-            "read failed" in lower || "response timeout" in lower || "wait" in lower -> BrokenReasonCode.USB_IN_TIMEOUT
+            FastbootTerminalWaitPolicy.isUnansweredTerminalCommand(reason) ||
+                "read failed" in lower || "response timeout" in lower || "wait" in lower -> BrokenReasonCode.USB_IN_TIMEOUT
             "write" in lower || "out" in lower -> BrokenReasonCode.USB_OUT_TIMEOUT
             "disconnect" in lower || "disconnect" in lower || "left the bus" in lower -> BrokenReasonCode.DEVICE_DISCONNECTED
             "interface" in lower || "interface" in lower -> BrokenReasonCode.INTERFACE_LOST
