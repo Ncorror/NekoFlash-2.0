@@ -2,11 +2,13 @@
 
 ## Актуальная релизная точка — 10 ноября 2026
 
-Текущая база Android-кода перед финальным документальным sync: [`6a13d8ed2ff806faf06d85e637f942e89eb6c4bf`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a13d8ed2ff806faf06d85e637f942e89eb6c4bf), `6.0.0-alpha11` / versionCode 234. [CI #653](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42804598658) полностью **SUCCESS**: 347 JVM, lint 0, Android API26/API34, tester kit и pinning.
+База после PR #81: [`b00484f`](https://github.com/Ncorror/NekoFlash-2.0/commit/b00484fbd415845649f5b07a781ed4e2193bc51a), `6.0.0-alpha11` / versionCode 234; [post-merge CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42883610515) **SUCCESS**. #79–#81 уже включают частичный wipe verdict, discovery diagnostics и классификацию unanswered Fastboot как USB IN. Следующий набор исправлений терминала/ADB — [PR #82](https://github.com/Ncorror/NekoFlash-2.0/pull/82). Для конкретной APK проверять её собственный CI и встроенный SHA, а не исторический #653.
 
 PR #74 уже слит: выбор ZIP для Sideload отделён от выполнения и сам по себе не отправляет данные. PR #76 тоже слит: fail-closed тест из #67 и консервативная фиксация смены Recovery из #68 уже находятся в `main` без ложного `INSTALL SUCCESS`; issue #20/#46/#47/#48/#64/#72 остаются post-release/backlog. Экспериментальный ADB Pull #73 закрыт без merge и не входит в alpha11.
 
-После документальной синхронизации `main` получит новый commit SHA даже без изменений Android-кода. Единственный обязательный технический релизный gate — собрать **подписанный Release APK на точном финальном SHA** через ручной `workflow_dispatch` с `sign_release=true`. Workflow сверяет постоянный сертификат с pinned SHA-256 и затем повторно проверяет подпись готового APK. До такого запуска нельзя утверждать, что alpha11 production artifact готов.
+Для релиза необходимы успешный CI на итоговом `main`, **подписанный Release APK на точном финальном SHA** через ручной `workflow_dispatch` с `sign_release=true` и согласованные smoke-проверки. Workflow сверяет постоянный сертификат с pinned SHA-256 и затем повторно проверяет подпись готового APK. До этих проверок нельзя утверждать, что alpha11 production artifact готов.
+
+**FIELD TEST PENDING / известные аппаратные ошибки:** #64 (erase:cache и отдельный reboot без финального ответа), #72 (Pull EPROTO), #20 (терминал/IME). Поздние данные #64 показывают Recovery после подтверждённых erase:metadata и format userdata: гипотеза FBE не является доказанным исправлением загрузки. Следующий шаг — чтение Recovery/fstab/mount/init/vold логов без нового wipe. Закрытые эксперименты #73, включая 4-КиБ URB и единый native header/payload, физически не устранили Pull; старые инструкции FIELD PENDING ниже — история конкретных кандидатов, не задания на повтор.
 
 [Полный release-readiness аудит](RELEASE_READINESS-2026-11-10.md). Разделы ниже сохраняют хронологию экспериментов и полевых доказательств; их старые слова `candidate/pending` относятся к своим датированным SHA и не заменяют этот актуальный блок.
 
