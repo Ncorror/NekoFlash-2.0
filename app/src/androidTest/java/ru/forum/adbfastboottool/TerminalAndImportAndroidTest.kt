@@ -330,7 +330,7 @@ class TerminalAndImportAndroidTest {
         }
     }
 
-    @Test fun successfulImeShowDoesNotRetryAfterHideWhileEditorKeepsFocus() {
+    @Test fun backAfterSuccessfulImeShowDoesNotReopenKeyboard() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { it.findViewById<View>(R.id.btnTerminalOpen).performClick() }
             waitUi(scenario, "terminal expanded with keyboard") { activity ->
@@ -338,11 +338,13 @@ class TerminalAndImportAndroidTest {
                     ?.isVisible(WindowInsetsCompat.Type.ime()) == true
             }
             scenario.onActivity { activity ->
-                // Keep focus: IME hide does not imply editor blur. The old
-                // delayed retry used focus alone and could undo this request.
+                // Use the app's Back path. A raw InsetsController.hide while
+                // leaving the editor focused can independently trigger Android
+                // 8's implicit IME show and does not exercise controller hide.
                 val editor = activity.findViewById<EditText>(R.id.etCommand)
                 assertTrue(editor.hasFocus())
-                WindowInsetsControllerCompat(activity.window, editor).hide(WindowInsetsCompat.Type.ime())
+                assertTrue((field(activity, "consoleDockController") as ConsoleDockController).handleBack())
+                assertFalse(editor.hasFocus())
             }
             waitUi(scenario, "keyboard hidden after successful show") { activity ->
                 ViewCompat.getRootWindowInsets(activity.findViewById(R.id.rootCoordinator))
