@@ -2889,6 +2889,10 @@ class AdbProtocol(
                 timeoutMs = timeoutMs
             )
             if (!native.success) {
+                // The dispatcher intentionally polls the ADB header reader in
+                // short slices. No data during one slice is normal idle, not a
+                // transport failure. Payload timeouts remain terminal.
+                if (native.isCleanNoDataTimeout) return null
                 directReadFailureCode = when {
                     native.disconnected || connection == null ->
                         AdbPacketDispatcher.FailureCode.DEVICE_DISCONNECTED

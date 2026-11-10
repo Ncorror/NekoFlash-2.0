@@ -32,6 +32,15 @@ internal object AdbNativeUsbfsIn {
 
         val timedOut: Boolean
             get() = errnoCode == ERRNO_ETIMEDOUT || kernelIoctlErrno == ERRNO_ETIMEDOUT
+
+        val isCleanNoDataTimeout: Boolean
+            get() = !success &&
+                timedOut &&
+                bytesTransferred == 0 &&
+                kernelIoctlErrno == 0 &&
+                urbStatus == 0 &&
+                actualLength == 0 &&
+                stage == NativeUsbfsBackend.STAGE_TIMEOUT
     }
 
     private val loadFailure: Throwable? = runCatching {

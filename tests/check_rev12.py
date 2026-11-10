@@ -31,6 +31,22 @@ rev54_adb_hash = '2f1d8fd57f2ac28f99e4bd79fb6885ec41dad2ed'
 # REV72: preserve the physically confirmed diagnostic provenance improvement.
 rev72_adb_hash = '7f826a1617b318543bbc1ac8590aa315cfa9835b'
 rev75_receive_adb_hash = '29d490d695e4a09c637d732a5070d3e0b40b987d'
+# REV78: field regression proved the dispatcher's 500 ms header poll slice
+# was misclassified as a fatal native timeout. Normalize only the exact idle
+# handling hunk back to REV77; payload timeout semantics stay unchanged.
+rev78_idle_header_adb_hash = 'de26bae1c95171b9ccf22400279c693eac5bddf2'
+normalized_from_rev78 = False
+if source_git_sha(data) == rev78_idle_header_adb_hash:
+    rev78_idle = "                // The dispatcher intentionally polls the ADB header reader in\n                // short slices. No data during one slice is normal idle, not a\n                // transport failure. Payload timeouts remain terminal.\n                if (native.isCleanNoDataTimeout) return null\n".encode("utf-8")
+    assert data.count(rev78_idle) == 1, 'Unreviewed REV78 idle-header timeout change'
+    native_wrapper = base/'AdbNativeUsbfsIn.kt'
+    native_test = root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt'
+    assert source_git_sha(native_wrapper.read_bytes()) == '0210501d140b215b0f8ecd712af147f80e1e45c1', 'Unreviewed REV78 native timeout classification'
+    assert source_git_sha(native_test.read_bytes()) == '15bfa21313b251734a835fda73e9bd0682e8c803', 'Unreviewed REV78 native timeout tests'
+    data = data.replace(rev78_idle, b'', 1)
+    assert source_git_sha(data) == 'e76676ddfa580e30032134dcca64b661dac826ec', 'REV78 touched unrelated ADB protocol code'
+    normalized_from_rev78 = True
+
 # REV77: current AOSP host receive semantics. Header and payload use one
 # native usbfs URB path; request buffers are rounded to endpoint packet
 # boundaries and failed URBs are terminal. Normalize only these exact hunks
@@ -203,10 +219,11 @@ if source_git_sha(data) == rev77_aosp_native_in_adb_hash:
     transfer_policy = root/'app/src/main/cpp/adb_usb_in_transfer_policy.h'
     native_test = root/'app/src/test/java/ru/forum/adbfastboottool/AdbNativeUsbfsInTest.kt'
     native_host_test_path = root/'tests/native_transfer_deadline_test.cpp'
-    assert source_git_sha(native_wrapper.read_bytes()) == 'e2bcc22cf03b1679dd8df793747da6324e25f7e6', 'Unreviewed REV77 native ADB IN Kotlin backend'
+    if not normalized_from_rev78:
+        assert source_git_sha(native_wrapper.read_bytes()) == 'e2bcc22cf03b1679dd8df793747da6324e25f7e6', 'Unreviewed REV77 native ADB IN Kotlin backend'
+        assert source_git_sha(native_test.read_bytes()) == '85dfe3f7a960259c848dae227d3bdcd9c52c213d', 'Unreviewed REV77 Kotlin native-IN tests'
     assert source_git_sha(native_cpp.read_bytes()) == 'e7de38ffa2f2bf57ea4061472b570706c04e4be3', 'Unreviewed REV77 native usbfs C++ backend'
     assert source_git_sha(transfer_policy.read_bytes()) == '0f65e1cf4ed433eba18d82a32283b7e60bd5eb61', 'Unreviewed REV77 single-transfer policy'
-    assert source_git_sha(native_test.read_bytes()) == '85dfe3f7a960259c848dae227d3bdcd9c52c213d', 'Unreviewed REV77 Kotlin native-IN tests'
     assert source_git_sha(native_host_test_path.read_bytes()) == '2a17aabfa54f2750f440604b3a700e2f129051cc', 'Unreviewed REV77 native host tests'
     assert not (root/'app/src/main/cpp/adb_usb_in_retry_policy.h').exists(), 'Obsolete REV76 retry policy still present'
     data = data.replace(rev77_header, rev76_header, 1)

@@ -88,16 +88,43 @@ class AdbNativeUsbfsInTest {
         }
     }
 
-    @Test fun timeoutRemainsTerminalWithoutSyntheticSuccess() {
+    @Test fun cleanZeroByteTimeoutIsRecognizedWithoutSyntheticSuccess() {
         val raw = LongArray(14)
         raw[2] = 110 // ETIMEDOUT
-        raw[5] = 15_000
+        raw[5] = 500
         raw[6] = NativeUsbfsBackend.STAGE_TIMEOUT.toLong()
-        val result = AdbNativeUsbfsIn.decodeForTest(raw, 16_384, 16_384)
+        raw[7] = 1
+        val result = AdbNativeUsbfsIn.decodeForTest(raw, 24, 512)
         assertFalse(result.success)
         assertEquals(110, result.errnoCode)
-        assertEquals(15_000L, result.elapsedMs)
+        assertEquals(500L, result.elapsedMs)
         assertFalse(result.disconnected)
         assertTrue(result.timedOut)
+        assertTrue(result.isCleanNoDataTimeout)
+    }
+
+    @Test fun timeoutWithUsbErrorOrPartialDataIsNotCleanIdle() {
+        val withStatus = LongArray(14)
+        withStatus[2] = 110
+        withStatus[3] = -71
+        withStatus[6] = NativeUsbfsBackend.STAGE_TIMEOUT.toLong()
+        assertFalse(AdbNativeUsbfsIn.decodeForTest(withStatus, 24, 512).isCleanNoDataTimeout)
+
+        val withBytes = LongArray(14)
+        withBytes[1] = 8
+        withBytes[2] = 110
+        withBytes[4] = 8
+        withBytes[6] = NativeUsbfsBackend.STAGE_TIMEOUT.toLong()
+        assertFalse(AdbNativeUsbfsIn.decodeForTest(withBytes, 24, 512).isCleanNoDataTimeout)
+
+        val payloadTimeout = LongArray(14)
+        payloadTimeout[2] = 110
+        payloadTimeout[5] = 15_000
+        payloadTimeout[6] = NativeUsbfsBackend.STAGE_TIMEOUT.toLong()
+        val result = AdbNativeUsbfsIn.decodeForTest(payloadTimeout, 16_384, 16_384)
+        assertFalse(result.success)
+        assertTrue(result.timedOut)
+        // Eligibility is consumed only by the header polling path.
+        assertTrue(result.isCleanNoDataTimeout)
     }
 }
