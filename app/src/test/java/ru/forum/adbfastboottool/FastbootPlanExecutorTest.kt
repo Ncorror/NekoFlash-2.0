@@ -28,8 +28,9 @@ class FastbootPlanExecutorTest {
         events += "generate:${spec.type}:${spec.sizeBytes}:${spec.options.sorted()}"
         File.createTempFile("fixture-", ".img", dir).also { it.writeBytes(ByteArray(100)) }
     }
-    private fun executor(generator: FilesystemFormatter = formatter, cancel: () -> Unit = {}) =
-        FastbootPlanExecutor(port, generator, temporary.root, cancel)
+    private fun executor(generator: FilesystemFormatter = formatter, cancel: () -> Unit = {},
+        log: (String) -> Unit = {}) =
+        FastbootPlanExecutor(port, generator, temporary.root, cancel, log)
     private fun mutations() = events.filter { it.startsWith("erase:") || it.startsWith("flash:") || it.startsWith("reboot") || it.startsWith("set_active:") || it.startsWith("oem ") }
 
     @Test fun formatBuildsFilesystemThenFlashesWithoutInventedWireFormatOrErase() {
@@ -37,6 +38,13 @@ class FastbootPlanExecutorTest {
         assertEquals(listOf("flash:userdata"), mutations())
         assertTrue(events.indexOfFirst { it.startsWith("generate:") } < events.indexOf("flash:userdata"))
         assertTrue(events.none { it.startsWith("format:") })
+    }
+    @Test fun standaloneUserdataFormatWarnsThatBootabilityAndMetadataAreNotVerified() {
+        val messages = mutableListOf<String>()
+        executor(log = messages::add).run(listOf(FastbootExecutionStep.Format("userdata")))
+        assertEquals(listOf("flash:userdata"), mutations())
+        assertTrue(messages.any { it.contains("format userdata recreates only /data") })
+        assertTrue(messages.any { it.contains("does not reset separate /metadata") })
     }
     @Test fun formatOverrideAndFsOptionsReachTheGenerator() {
         executor().run(listOf(FastbootExecutionStep.Format("userdata", "f2fs", "0x2000000", options = setOf("casefold", "projid"))))
@@ -141,12 +149,20 @@ class FastbootPlanExecutorTest {
         variables["partition-size:cache"] = "18000000"
         variables["partition-type:metadata"] = "raw"
         fail = "erase:cache"
+        val messages = mutableListOf<String>()
 
         val exception = assertThrows(IllegalStateException::class.java) {
-            executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot")))
+            executor(log = messages::add).run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot")))
         }
 
         assertTrue(exception.message.orEmpty().contains("erase:cache"))
+        val summary = messages.single { it.contains("Fastboot plan STOPPED") }
+        assertTrue(summary.contains("after 2/6 completed steps"))
+        assertTrue(summary.contains("Failed or unresolved: erase:cache (device may have changed)"))
+        assertTrue(summary.contains("Completed: erase:userdata -> flash userdata"))
+        assertTrue(summary.contains("Not attempted: flash cache"))
+        assertTrue(summary.contains("erase:metadata"))
+        assertTrue(summary.contains("No automatic retry"))
         assertEquals(listOf("erase:userdata", "flash:userdata", "erase:cache"), mutations())
         assertEquals(1, events.count { it == "erase:cache" })
         assertFalse(events.contains("flash:cache"))
