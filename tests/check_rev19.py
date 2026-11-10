@@ -20,8 +20,10 @@ start = vm.split('private fun startOperation(')[1]
 assert start.index('FastbootSerialSelection.matches') < start.index('context.block()')
 assert 'sideloadGuiAttemptId != attemptId' in vm
 sideload = vm.split('internal fun runSideload(source: FirmwareSource)')[1].split('private fun startOperation(')[0]
-assert sideload.index('startOperation(') < sideload.index('persistPendingSideloadVerification(source)')
-assert sideload.index('persistPendingSideloadVerification(source)') < sideload.index('proto.sideloadZip(')
+assert sideload.index('startOperation(') < sideload.index('persistPendingSideloadVerification(source, proto)')
+assert sideload.index('persistPendingSideloadVerification(source, proto)') < sideload.index('proto.sideloadZip(')
+assert 'sameUsbSerial = pending.serial != null && pending.serial == currentUsbSerial()' in vm
+assert 'OperationOutcomeKind.VERIFY_PENDING' in vm.split('private fun observePendingSideloadRecoveryTransition(')[1].split('private fun verifyPendingSideloadIfReady(')[0]
 assert 'pending.serial == null || pending.serial != currentUsbSerial()' in vm
 assert '!pending.transferFinished' in vm
 assert 'proto.inspectRecoveryInstallResult(pending.boundary)' in vm

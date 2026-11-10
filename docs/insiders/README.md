@@ -6,7 +6,7 @@
 
 **Sideload:** PR [#74](https://github.com/Ncorror/NekoFlash-2.0/pull/74) уже в `main`: **Choose ZIP** только выбирает документ, **Start Sideload** отдельно запускает подтверждённую передачу. Старые инструкции, где выбор файла сразу отправлял ZIP, больше не описывают текущий `main`.
 
-**Post-release scope:** #20, #46, #47, #48, #64 and #72 remain open by project decision; PRs #67, #68 and #73 are isolated post-release branches. They are not a reason to rerun the completed destructive campaign before alpha11.
+**Post-release scope:** #20, #46, #47, #48, #64 and #72 remain open by project decision. The fail-closed #67 regression and conservative Recovery-transition #68 logic are included in the alpha11 candidate via PR #76; experimental ADB Pull PR #73 remains excluded. None of this is a reason to rerun the completed destructive campaign.
 
 ## Correct kit / правильный комплект
 

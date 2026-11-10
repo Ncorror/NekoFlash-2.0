@@ -79,12 +79,12 @@ Open issues are intentionally post-release/backlog:
 - #64 — vayu-specific `fastboot -w` / `erase:cache` final-response compatibility;
 - #72 — large ADB Pull EPROTO.
 
-Open post-release PRs:
-- #67 — fail-closed fastboot-w regression test branch;
-- #68 — Recovery replacement observation without claiming installer success;
-- #73 — ADB Pull diagnostic branch.
+Release-hardening integration:
+- #67 fail-closed `fastboot -w` regression coverage is included in candidate PR #76;
+- #68 Recovery replacement observation is included in candidate PR #76 and remains `VERIFY_PENDING` without a proven installer result;
+- #73 ADB Pull diagnostics remain excluded from alpha11.
 
-None of those branches is merged into the candidate. Do not merge #73 for release.
+Do not merge #73 for release.
 
 ## Repository hygiene
 

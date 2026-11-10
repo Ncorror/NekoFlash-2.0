@@ -19,7 +19,7 @@ The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes 
 - Merged [PR #74](https://github.com/Ncorror/NekoFlash-2.0/pull/74): selecting a Sideload ZIP no longer starts transfer; execution is a separate confirmed action and the SAF selection can be reused.
 - Post-merge [CI #647](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42736593646) **SUCCESS**: 338/338 JVM tests, lint 0, installed Android API26/API34, verified two-file Insiders kit and pinning job.
 - Current hardware evidence remains valid; destructive Mass Flash/Recovery tests are not repeated solely for this documentation/release pass.
-- Issues #20/#46/#47/#48/#64/#72 and PRs #67/#68/#73 are explicitly post-release/backlog and are excluded from the candidate.
+- Issues #20/#46/#47/#48/#64/#72 remain post-release/backlog. The fail-closed #67 regression and conservative Recovery-transition #68 behavior are integrated into the alpha11 candidate through PR #76; experimental ADB Pull PR #73 remains excluded.
 - Production signing is structurally fail-closed: release packaging requires the permanent keystore, checks the pinned certificate SHA-256, verifies the final APK with `apksigner`, and rejects unsigned artifacts. **No signed alpha11 artifact has yet been produced on this exact main SHA.**
 - Release audit and final gate: [docs/RELEASE_READINESS-2026-11-10.md](docs/RELEASE_READINESS-2026-11-10.md).
 
