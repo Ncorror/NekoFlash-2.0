@@ -159,7 +159,7 @@ class FastbootPlanExecutorTest {
         val summary = messages.single { it.contains("Fastboot plan STOPPED") }
         assertTrue(summary.contains("after 3/6 completed steps"))
         assertTrue(summary.contains("Failed or unresolved: erase:cache (device may have changed)"))
-        assertTrue(summary.contains("Completed: erase:userdata -> flash userdata -> erase:metadata"))
+        assertTrue(summary.contains("Completed: erase:userdata -> flash userdata (100 bytes) -> erase:metadata"))
         assertTrue(summary.contains("Not attempted: flash cache"))
         assertTrue(summary.contains("No automatic retry"))
         assertEquals(listOf("erase:userdata", "flash:userdata", "erase:metadata", "erase:cache"), mutations())
