@@ -24,7 +24,7 @@ assert 'override fun downloadLimitBytes() = proto.hostDownloadLimitBytes()' in p
 assert 'internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock { effectiveMaxDownloadSizeBytes() }' in (java / 'FastbootProtocol.kt').read_text()
 assert executor.index('val prepared =') < executor.index('prepared.forEachIndexed')
 assert 'FastbootDownloadSizePolicy.validate(' in executor
-assert 'listOf("userdata", "cache", "metadata")' in executor
+assert 'listOf("userdata", "metadata", "cache")' in executor
 assert 'SuperEmptyImage.load(' in executor
 assert 'ProcessBuilder(args)' in (java / 'FastbootFilesystemFormatter.kt').read_text()
 assert 'output.fill(0, (aligned - offset) / blockSize)' in (java / 'AndroidSparseImage.kt').read_text()
