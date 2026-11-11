@@ -35,5 +35,11 @@ for name in ('AndroidSparseImageTest', 'SuperEmptyImageTest', 'FastbootPlanExecu
              'FastbootFilesystemFormatterTest', 'FastbootHostSyntaxTest', 'FastbootTerminalPlanTest'):
     assert (root / f'app/src/test/java/ru/forum/adbfastboottool/{name}.kt').is_file()
 for workflow in ('build.yml', 'release.yml'):
-    assert 'apt-get install -y e2fsprogs f2fs-tools' in (root / '.github/workflows' / workflow).read_text()
+    # Hosted Ubuntu source mirror selection moved into a shared helper. Keep
+    # the same mandatory host filesystem packages in both release paths.
+    content = (root / '.github/workflows' / workflow).read_text()
+    assert 'bash scripts/ci-install-filesystem-deps.sh e2fsprogs f2fs-tools' in content
+installer = (root / 'scripts/ci-install-filesystem-deps.sh').read_text()
+assert 'sudo apt-get install -y --no-install-recommends' in installer
+assert '"$@"' in installer and 'archive.ubuntu.com' in installer
 print('PASS REV21: one serial-bound plan, real host format/wipe/super images, no fake wire aliases, existing transport retained')
