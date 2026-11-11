@@ -374,6 +374,8 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <!-- NekoFlash 2.0 / approved Sideload REV3 -->
     <string name="layout_sideload_page_title">Sideload</string>
     <string name="layout_sideload_no_file">ZIP file not selected</string>
+    <string name="layout_sideload_clear_selection">Clear</string>
+    <string name="layout_sideload_selection_cleared">Sideload ZIP selection cleared; the file was not changed.</string>
     <string name="layout_sideload_selected_file">File: %1$s</string>
     <string name="layout_sideload_selected_details">Selected ZIP: %1$s\nSize: %2$s</string>
     <string name="layout_sideload_size_unknown">size unknown</string>

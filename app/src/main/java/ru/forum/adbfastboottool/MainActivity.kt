@@ -615,6 +615,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<Button>(R.id.btnStartAdbSideload).setOnClickListener {
             startSelectedSideloadWithConfirmation()
         }
+        findViewById<Button>(R.id.btnClearSideloadSelection).setOnClickListener {
+            clearSideloadSelection()
+        }
         updateSideloadSelectionUi()
         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
 
@@ -1886,6 +1889,16 @@ class MainActivity : AppCompatActivity() {
         return FirmwareSource.SafDocument(uri, display, size)
     }
 
+    // Clear only the app's stored choice. Never delete the original SAF ZIP or
+    // revoke its document permission: other screens may still reference this URI.
+    private fun clearSideloadSelection() {
+        if (selectedSideloadSource == null || viewModel.operationActive.value == true) return
+        selectedSideloadSource = null
+        getSharedPreferences(SIDELOAD_SELECTION_PREFS, Context.MODE_PRIVATE).edit { clear() }
+        updateSideloadSelectionUi()
+        viewModel.log(getString(R.string.layout_sideload_selection_cleared))
+    }
+
     private fun updateSideloadSelectionUi() {
         val source = selectedSideloadSource
         val detail = if (source == null) {
@@ -1900,6 +1913,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         findViewById<TextView>(R.id.tvSideloadSelectedZip).text = detail
+        findViewById<Button>(R.id.btnClearSideloadSelection).apply {
+            visibility = if (source == null) View.GONE else View.VISIBLE
+            isEnabled = source != null && viewModel.operationActive.value != true
+        }
         val canStart = source != null && viewModel.operationActive.value != true &&
             viewModel.connectionState.value == DeviceViewModel.ConnectionState.ADB &&
             viewModel.adbPeerMode.value == AdbProtocol.PeerMode.SIDELOAD
