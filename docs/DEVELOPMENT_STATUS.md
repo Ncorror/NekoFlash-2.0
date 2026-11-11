@@ -1,5 +1,15 @@
 # NekoFlash 2.0 · интеграционная точка и фактическая квалификация, 8 ноября 2026
 
+## Актуальный выпуск для тестировщиков — 11 ноября 2026
+
+**Insiders REV50 опубликован:** [ZIP с APK и TestBook](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev50/NekoFlash-Insiders-REV50.zip), [страница релиза](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50). Исходный `main`: [`e7dde419`](https://github.com/Ncorror/NekoFlash-2.0/commit/e7dde419fc66f4be8427d7be002fd239e5d06446); `6.0.0-alpha11`, versionCode 234. [CI #682](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42930623047) **SUCCESS** по сборке, API26/API34 и двухфайловому комплекту. SHA-256 опубликованного ZIP = `df36aacd679b8fd040136ab8fb18b329eb0ebb8ba0e3ca56d89101fb1a700073`, совпадает с digest артефакта CI.
+
+Это **Debug/Insiders beta**, не постоянная production-подпись. Участки #79–#82 интегрированы, [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) остаётся отдельной неслитой диагностикой. Аппаратные проблемы [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) (большой ADB Pull) и [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) (Fastboot wipe/cache/reboot) остаются открытыми. Логи не удалять; destructive тесты повторно без отдельного основания не проводить. Production gate: CI на точном финальном SHA, постоянная подпись/сертификат и неразрушающий smoke на подписанном APK — **PENDING**.
+
+[Релизные критерии и инструкция](RELEASE_READINESS-2026-11-10.md). Нижние разделы журнала — датированные исторические наблюдения, не текущий релизный вердикт.
+
+---
+
 ## Актуальная релизная точка — 10 ноября 2026
 
 База после PR #81: [`b00484f`](https://github.com/Ncorror/NekoFlash-2.0/commit/b00484fbd415845649f5b07a781ed4e2193bc51a), `6.0.0-alpha11` / versionCode 234; [post-merge CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42883610515) **SUCCESS**. #79–#81 уже включают частичный wipe verdict, discovery diagnostics и классификацию unanswered Fastboot как USB IN. Следующий набор исправлений терминала/ADB — [PR #82](https://github.com/Ncorror/NekoFlash-2.0/pull/82). Для конкретной APK проверять её собственный CI и встроенный SHA, а не исторический #653.
