@@ -525,18 +525,37 @@ jobs:
             python3 tests/collect_android_ui.py --output android-interface-ui
             python3 -c "from pathlib import Path; s=Path('android-mkfs-tests.txt').read_text(); assert 'OK (29 tests)' in s and 'FAILURES' not in s, s"
             python3 tests/verify_android_filesystems.py --output android-mkfs-images
+      # The filesystem regression creates thousands of 16 KiB parts.
+      # Uploading them individually can hit artifact-service timeouts.
+      # Keep the complete evidence, including partially produced failure logs,
+      # in one lossless archive with a separate SHA-256 checksum.
+      - name: Bundle Android filesystem evidence
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          paths=()
+          for path in android-mkfs-tests.txt android-instrumentation-logcat.txt android-mkfs-images android-source-ui android-interface-ui; do
+            if [[ -e "$path" ]]; then paths+=("$path"); fi
+          done
+          if (( ${#paths[@]} == 0 )); then
+            echo "::error::No Android filesystem evidence produced"
+            exit 1
+          fi
+          archive="android-filesystem-evidence-api${{ matrix.api }}.tar.gz"
+          tar -cf - "${paths[@]}" | gzip -1 > "$archive"
+          sha256sum "$archive" > "${archive}.sha256"
+          ls -lh "$archive" "${archive}.sha256"
       - name: Upload Android filesystem evidence
         if: always()
         uses: actions/upload-artifact@v6
         with:
           name: NekoFlash-${{ github.sha }}-mkfs-api${{ matrix.api }}
           path: |
-            android-mkfs-tests.txt
-            android-instrumentation-logcat.txt
-            android-mkfs-images/
-            android-source-ui/
-            android-interface-ui/
-          if-no-files-found: ignore
+            android-filesystem-evidence-api${{ matrix.api }}.tar.gz
+            android-filesystem-evidence-api${{ matrix.api }}.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
           retention-days: 30
 
 
