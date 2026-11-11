@@ -4,8 +4,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#050505">
-<meta name="description" content="Offline RU/EN NekoFlash 2.0 REV49 hardware field-test book, original BIN logs and ZIP reports.">
-<title>NekoFlash 2.0 · Insiders Hardware Testbook REV49</title>
+<meta name="description" content="Offline RU/EN NekoFlash 2.0 REV50 hardware field-test book, original BIN logs and ZIP reports.">
+<title>NekoFlash 2.0 · Insiders Hardware Testbook REV50</title>
 <style>
 :root {
   color-scheme: dark;
@@ -539,9 +539,9 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 <main class="page">
   <header class="top">
     <div>
-      <div class="eyebrow">NekoFlash · Insiders · REV49</div>
+      <div class="eyebrow">NekoFlash · Insiders · REV50</div>
       <h1 id="appTitle">Тестбук NekoFlash 2.0</h1>
-      <p class="muted" id="subline">Полевые тесты DEV REV49 · HOST → TARGET · исходные логи в ZIP · офлайн.</p>
+      <p class="muted" id="subline">Полевые тесты DEV REV50 · HOST → TARGET · исходные логи в ZIP · офлайн.</p>
       <p id="kitStart">Установи APK из этого ZIP на телефон-хост и выбери первую проверку ниже.</p>
       <a id="testerGroup" href="https://t.me/+NR_FiUmvXlViOTUy" target="_blank" rel="noopener noreferrer">Группа тестировщиков в Telegram ↗</a>
     </div>
@@ -583,7 +583,7 @@ h3 { font-size: 15px; margin: 0 0 8px; }
 
 
   <section class="card" id="buildStatus" style="border-color:#82430d">
-    <h2>REV49 · Hardware testing / Аппаратные испытания</h2>
+    <h2>REV50 · Hardware testing / Аппаратные испытания</h2>
     <p>Сверь сборку и SHA-256 APK ниже. Запиши результаты с твоего HOST и TARGET.</p>
     <p>Check the build and APK SHA-256 below. Record what you observe on your host and target.</p>
     <p><a id="ciLink">GitHub Actions</a> · <code id="buildRef"></code></p>
@@ -720,7 +720,7 @@ const T = {
     zipReady: 'ZIP собран в памяти браузера. Нажми «Скачать» или «Поделиться» и проверь, что файл действительно сохранился.',
     zipDownload: '⬇ Скачать ZIP-отчёт',
     rounds: {today:'Сегодня — диагностика без записи разделов',extended:'Расширенный тест на запасном TARGET',lab:'Лаборатория — отдельное разрешение',all:'Все проверки'},
-    sub: 'Полевые тесты DEV REV49 · HOST → TARGET · исходные логи в ZIP · офлайн.',
+    sub: 'Полевые тесты DEV REV50 · HOST → TARGET · исходные логи в ZIP · офлайн.',
     progress: 'Результаты тестов',
     steps: 'Отмечено шагов',
     kitStart: 'Установи APK из этого ZIP на телефон-хост и выбери первую проверку ниже.',
@@ -807,7 +807,7 @@ const T = {
     save: 'Сохранить прогресс JSON',
     load: 'Загрузить прогресс',
     reportHint: 'ZIP: report.txt, progress.json, evidence-manifest.json, свежие исходные логи (если разрешён доступ) и ручные вложения. ZIP без сжатия: точные байты исходных файлов. В Telegram отправляй как документ.',
-    footer: 'Офлайн-тестбук REV49 · без аналитики, сервера и автоматической отправки · профессиональные логи без потерь · Black & Orange 2.0.',
+    footer: 'Офлайн-тестбук REV50 · без аналитики, сервера и автоматической отправки · профессиональные логи без потерь · Black & Orange 2.0.',
     filesSelected: n => `Ручных вложений: ${n}. После перезагрузки потребуется выбрать их заново.`,
     zipCreating: 'Собираю ZIP-отчёт…',
     zipDone: 'ZIP подготовлен; проверь результат скачивания в Chrome.',
@@ -828,7 +828,7 @@ const T = {
     zipReady: 'ZIP was prepared in browser memory. Tap Download or Share and confirm the file was actually saved.',
     zipDownload: '⬇ Download report ZIP',
     rounds: {today:'Today — read-only / disposable data',extended:'Extended tests on spare TARGET',lab:'Lab — separate authorization required',all:'All checks'},
-    sub: 'REV49 DEV hardware checks, original binary logs and offline ZIP reporting.',
+    sub: 'REV50 DEV hardware checks, original binary logs and offline ZIP reporting.',
     progress: 'Test results',
     steps: 'Steps checked',
     kitStart: 'Install the APK from this ZIP on the host phone, then choose your first check below.',
@@ -915,7 +915,7 @@ const T = {
     save: 'Export progress JSON',
     load: 'Import progress',
     reportHint: 'ZIP includes report.txt, progress.json, evidence-manifest.json, fresh original logs (with folder permission), and manual files. No compression or redaction. Send as a Telegram document.',
-    footer: 'Offline REV49 checklist · no analytics, backend or automatic upload · full professional diagnostics · Black & Orange 2.0.',
+    footer: 'Offline REV50 checklist · no analytics, backend or automatic upload · full professional diagnostics · Black & Orange 2.0.',
     filesSelected: n => `${n} manual file(s). Reselect them after reopening the page.`,
     zipCreating: 'Creating ZIP report…',
     zipDone: 'ZIP is ready; check whether Chrome saved it.',
@@ -928,7 +928,7 @@ const T = {
   }
 };
 
-const KIT = {"revision": "REV49", "referenceRevision": "REV45", "sourceCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "testArtifactCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "runId": "41438797886", "apkFilename": "NekoFlash-6.0.0-alpha11-debug.apk", "apkSha256": "74de7c2751cfa3d37c2490888f09788414c4e6b6c97a5940a7c4b72fd5ef1078"};
+const KIT = {"revision": "REV50", "referenceRevision": "REV45", "sourceCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "testArtifactCommit": "a31dedadd4adcf08691ece82c7574f05286078f3", "runId": "41438797886", "apkFilename": "NekoFlash-6.0.0-alpha11-debug.apk", "apkSha256": "74de7c2751cfa3d37c2490888f09788414c4e6b6c97a5940a7c4b72fd5ef1078"};
 const BUILD_LABEL = (KIT.referenceRevision || KIT.revision) + " / " + KIT.sourceCommit.slice(0, 12) + " / CI " + KIT.runId;
 const TESTS = [
   {id:'SETUP-01',group:'basic',ru:'Установка и проверка APK',en:'Installation and APK verification',intro:{ru:'На HOST. Устанавливай APK только из текущего успешного CI-комплекта, сверь SHA-256 и build ID. Старую DEV не удаляй до экспорта логов и прогресса.',en:'On HOST, install APK only from this exact successful CI kit. Verify SHA-256 and build ID; export existing DEV logs/progress before replacing an old install.'},steps:[
@@ -1690,7 +1690,7 @@ function renderReportText(data) {
     isRu ? 'ОБЩИЕ ПРЕДЛОЖЕНИЯ' : 'GENERAL FEEDBACK',
     data.meta.suggestions || '—',
     '',
-    'NekoFlash Insiders • REV49 • Generated locally; no automatic upload; raw evidence is unchanged.'
+    'NekoFlash Insiders • REV50 • Generated locally; no automatic upload; raw evidence is unchanged.'
   );
   return lines.join('\r\n') + '\r\n';
 }
@@ -2032,7 +2032,7 @@ $('copyReportBtn').addEventListener('click', () => {
 
 $('exportJson').addEventListener('click', () => {
   const json = JSON.stringify(snapshot(), null, 2);
-  downloadBlob(new Blob([json], { type: 'application/json' }), 'NekoFlash_REV49_progress.json');
+  downloadBlob(new Blob([json], { type: 'application/json' }), 'NekoFlash_REV50_progress.json');
   toast(t().preparedJson);
 });
 $('shareZip').addEventListener('click', () => { void shareFile(readyZipBlob, readyZipName); });
