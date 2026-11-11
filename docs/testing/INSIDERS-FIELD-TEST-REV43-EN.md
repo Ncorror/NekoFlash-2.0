@@ -6,8 +6,8 @@
 
 ## Downloads
 
-- [Standalone offline RU/EN REV43 testbook](../insiders/testbook.html) — checklists, PASS / FAIL / BLOCKED / NOT TESTED, editable notes, saved JSON progress and original binary AutoLogs ZIP report.
-- [Direct HTML download from main](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html). The GitHub Actions beta build also publishes a separately downloadable `NekoFlash-Insiders-Testbook-REV43-…` artifact.
+- [Standalone offline RU/EN REV43 testbook](https://github.com/Ncorror/NekoFlash-2.0/blob/e7dde419fc66f4be8427d7be002fd239e5d06446/docs/insiders/testbook.html) — checklists, PASS / FAIL / BLOCKED / NOT TESTED, editable notes, saved JSON progress and original binary AutoLogs ZIP report.
+- [Direct HTML download from main](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/e7dde419fc66f4be8427d7be002fd239e5d06446/docs/insiders/testbook.html). The GitHub Actions beta build also publishes a separately downloadable `NekoFlash-Insiders-Testbook-REV43-…` artifact.
 - [REV43 debug APK artifact (ZIP)](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171): Android application ID `ru.forum.adbfastboottool.dev`, version `6.0.0-alpha11-dev`, versionCode 234. **Do not uninstall the original NekoFlash app.** Compute your own APK SHA-256 from the downloaded file; the REV29 checksum must not be reused.
 
 **Source:** exact tested REV43 PR SHA `27ab796d100387b3530bd88a6faf28e48d1c717c`; merged DEV `bd0d1fbf0ff5ba69634df5281fa87e2ff1289bf5`.

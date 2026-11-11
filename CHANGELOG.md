@@ -65,7 +65,7 @@ Historical **actual destructive tests** predate this code: unlocked POCO X7 Pro 
 - REV41: cancellable Fastboot post-DATA final-response polling (30 s overall, 2 s slices); [PR #34](https://github.com/Ncorror/NekoFlash-2.0/pull/34).
 - REV42: generic ADB `A_WRTE` respects negotiated peer maxdata, including SYNC data frames; [PR #35](https://github.com/Ncorror/NekoFlash-2.0/pull/35).
 - REV43: lazy recursive `adb push -r` with all-directory-before-file order and cancellation retained across nested file writes; [PR #37](https://github.com/Ncorror/NekoFlash-2.0/pull/37).
-- REV44 documentation/test tooling: [offline RU/EN testbook](docs/insiders/testbook.html) with eight additional field checks, original AutoLogs BIN ZIP/export, [RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) field manuals and CI HTML validation/artifact publication.
+- REV44 documentation/test tooling: [historical offline RU/EN testbook](https://github.com/Ncorror/NekoFlash-2.0/blob/e7dde419fc66f4be8427d7be002fd239e5d06446/docs/insiders/testbook.html) with eight additional field checks, original AutoLogs BIN ZIP/export, [RU](docs/testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN](docs/testing/INSIDERS-FIELD-TEST-REV43-EN.md) field manuals and CI HTML validation/artifact publication.
 
 **Evidence limits:** [REV43 PR CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391) passed build, API26 and API34. The [merged DEV CI](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147) passed build and API34 but **failed API26 on two UI wait timeouts**. Physical DEV REV43 HOST→TARGET validation has not yet been recorded as PASS; older alpha10 tests do not count. See [current status](docs/DEVELOPMENT_STATUS.md).
 
