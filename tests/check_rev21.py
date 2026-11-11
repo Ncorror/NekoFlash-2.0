@@ -25,14 +25,15 @@ assert 'internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock 
 assert executor.index('val prepared =') < executor.index('prepared.forEachIndexed')
 assert 'FastbootDownloadSizePolicy.validate(' in executor
 assert 'listOf("userdata", "metadata", "cache")' in executor
-assert 'if (target == "userdata" && type == "f2fs") options + "projid"' in executor
 assert 'SuperEmptyImage.load(' in executor
-assert 'ProcessBuilder(args)' in (java / 'FastbootFilesystemFormatter.kt').read_text()
+formatter = (java / 'FastbootFilesystemFormatter.kt').read_text()
+assert 'ProcessBuilder(args)' in formatter
+assert 'FastbootF2fs.image(request)' in formatter
 assert 'output.fill(0, (aligned - offset) / blockSize)' in (java / 'AndroidSparseImage.kt').read_text()
 layout = ET.parse(root / 'app/src/main/res/layout/page_fastboot.xml').getroot()
 ids = [x.get('{http://schemas.android.com/apk/res/android}id') for x in layout.iter()]
 assert ids.count('@+id/btnToolFormat') == 1
-for name in ('AndroidSparseImageTest', 'SuperEmptyImageTest', 'FastbootPlanExecutorTest',
+for name in ('AndroidSparseImageTest', 'FastbootF2fsTest', 'SuperEmptyImageTest', 'FastbootPlanExecutorTest',
              'FastbootFilesystemFormatterTest', 'FastbootHostSyntaxTest', 'FastbootTerminalPlanTest'):
     assert (root / f'app/src/test/java/ru/forum/adbfastboottool/{name}.kt').is_file()
 for workflow in ('build.yml', 'release.yml'):
