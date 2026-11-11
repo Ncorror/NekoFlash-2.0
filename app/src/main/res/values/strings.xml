@@ -308,6 +308,8 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_unlock_data_warning">⚠ Unlocking erases user data. Back up important files before you continue.</string>
     <string name="mi_unlock_account_section">MI ACCOUNT</string>
     <string name="mi_unlock_sign_in_hint">Sign in to continue with Xiaomi authorization.</string>
+    <string name="mi_unlock_exchange_loading">Checking Xiaomi authorization…</string>
+    <string name="mi_unlock_exchange_failed">Could not complete Xiaomi authorization. Please sign in again.</string>
     <string name="mi_unlock_authorized">✅ Authorized · ID %1$s</string>
     <string name="mi_unlock_region_zone">Region: %1$s · dataCenterZone: %2$s (%3$s)</string>
     <string name="mi_unlock_zone_title">Xiaomi data center</string>
