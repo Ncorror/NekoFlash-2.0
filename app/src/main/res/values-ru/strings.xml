@@ -312,6 +312,8 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_unlock_data_warning">⚠ Разблокировка удалит пользовательские данные. Сохраните важные файлы перед продолжением.</string>
     <string name="mi_unlock_account_section">MI-АККАУНТ</string>
     <string name="mi_unlock_sign_in_hint">Войдите в аккаунт для авторизации Xiaomi.</string>
+    <string name="mi_unlock_exchange_loading">Проверяем авторизацию Xiaomi…</string>
+    <string name="mi_unlock_exchange_failed">Не удалось завершить авторизацию Xiaomi. Войди ещё раз.</string>
     <string name="mi_unlock_authorized">✅ Авторизовано · ID %1$s</string>
     <string name="mi_unlock_region_zone">Регион: %1$s · dataCenterZone: %2$s (%3$s)</string>
     <string name="mi_unlock_zone_title">Центр обработки данных Xiaomi</string>
