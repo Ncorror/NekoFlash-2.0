@@ -1,14 +1,30 @@
 # NekoFlash 2.0 — Release readiness audit · 10 November 2026
 
-## Release preparation checkpoint — 11 November 2026
+## Verified Insiders REV50 release — 11 November 2026
 
-**Scope:** publish/prepare an **Insiders hardware beta**, not an unverified signed production alpha11. The current confirmed `main` before this documentation update was [`faebd3a`](https://github.com/Ncorror/NekoFlash-2.0/commit/faebd3a338ecd695c9ec4a879fa6a8c92db79fba) with [Actions #42890625837 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42890625837), after PR #82 merged. [Exact baseline two-file debug tester kit](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42890625837/artifacts/13799940338). After this documentation commit, require CI success and use the matching newly produced `main` artifact; old APK hashes are *not* the updated SHA.
+**Publication type:** Android-to-Android hardware testing **prerelease/debug**. **NOT** production-ready signed alpha11. Published [Insiders REV50](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50) from the exact `main` source [`e7dde419`](https://github.com/Ncorror/NekoFlash-2.0/commit/e7dde419fc66f4be8427d7be002fd239e5d06446), `6.0.0-alpha11` / versionCode `234`.
 
-**Open field compatibility:** [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) reproduces `USB_IN_FAILED`, and [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) isolates kernel `EPROTO=71` on POCO F7 `onyx` custom-kernel HOST to POCO X3 Pro `vayu` TARGET for large Pull. PR #83 remains **open/unmerged**, because errno capture is diagnostic, not a transport fix. Earlier small transfers and several ADB/Fastboot/Recovery paths have distinct PASS evidence, but that does not generalize to every phone/cable/kernel. The author additionally reports that flashing POCO F7 as a **target** worked with a Mi 8 host when other hosts gave errors; that reverse-direction pairing is unverified elsewhere and must not be treated as proven common root cause. Seek independent host/target/ROM/kernel and SHA evidence via Insiders; preserve diagnostic archives in private channels.
+**Verified chain of custody:**
+- [GitHub Actions #682](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42930623047) completed **SUCCESS** on `e7dde419fc66f4be8427d7be002fd239e5d06446`: build, Android API26, Android API34, verified Insiders kit packaging and prerelease publishing all succeeded.
+- The published asset [`NekoFlash-Insiders-REV50.zip`](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev50/NekoFlash-Insiders-REV50.zip) has GitHub SHA-256 digest `df36aacd679b8fd040136ab8fb18b329eb0ebb8ba0e3ca56d89101fb1a700073` — **identical** to workflow artifact `NekoFlash-Insiders-Tester-Kit` (artifact `13816517910`). The workflow verifier requires exactly an APK and `testbook.html`, bound to the same commit/run and APK checksum.
+- `docs/insiders/campaign-tag.txt` was advanced to `insiders-rev50` by existing commit `e7dde419`. Keep that tag **unchanged** for ordinary documentation updates. The older `insiders-rev45` release is historical, not a current build.
+- The release also includes the separate `filesystem-tools-source.tar.gz` source archive for compliance; it is **not** an extra file inside the two-file tester kit.
+- PRs #79–#82 are already integrated. [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) remains **open and excluded**: its errno discriminator is diagnostic and has no field-proven ADB Pull transport fix.
 
-**Integrated scope:** #79–#82 included in current main. #20/#46/#47/#48/#64/#72 remain open, with #72 explicitly a known limit for some large inbound ADB transfers. No destructive retests to re-check accepted historical evidence. Do not publish raw device identifiers. The existing `insiders-rev45` prerelease is a historical snapshot; `docs/insiders/campaign-tag.txt` is **not** changed in this preparation commit, so automatic prerelease publishing is not triggered.
+**Known limitations and truth in labeling:**
+- [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72): large inbound ADB Pull can fail on the POCO F7 HOST → POCO X3 Pro TARGET pair; no complete source/destination SHA-256 evidence, **FIELD FAIL / FIX PENDING**. Ordinary ADB Shell/Push successes do not qualify Pull.
+- [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64): `fastboot -w` / `erase:cache` and unanswered bootloader `reboot` require further target-specific evidence. Fastboot confirmed `OKAY` for some erase/format commands but bootability is separate.
+- [#20](https://github.com/Ncorror/NekoFlash-2.0/issues/20), [#47](https://github.com/Ncorror/NekoFlash-2.0/issues/47), [#48](https://github.com/Ncorror/NekoFlash-2.0/issues/48): UI/force-stop/DocumentsUI field follow-up. [#46](https://github.com/Ncorror/NekoFlash-2.0/issues/46) visual Operation Center work remains explicitly deferred.
+- Only the original tested hardware pair and observed firmware/kernel combinations can be described as FIELD PASS; no universal claim of USB compatibility.
 
-**Production release gate remains unchanged:** final tagged SHA → successful Android/JVM/lint/API26/34/tester kit CI → permanent-key signed APK and pinned certificate check → non-destructive smoke → then production publication. Until then: **INSIDERS BETA PREPARED / PRODUCTION SIGNED RELEASE PENDING**.
+**Safe release handoff / non-destructive smoke on a real Android host:**
+1. Download only the tagged REV50 ZIP above, confirm its ZIP SHA-256, extract the matching debug APK and `testbook.html`, and check the embedded APK digest. Keep the previous DEV logs/TestBook progress; never uninstall or clear data without backing them up.
+2. Install/launch the debug `ru.forum.adbfastboottool.dev` build and inspect version/build ID. Check Home, terminal input/rotation/IME, operation visibility, diagnostic export, and opening TestBook in Chrome.
+3. With a consenting spare target and USB debugging authorized, verify USB enumeration and non-destructive `adb shell getprop ro.product.model`. Check detach/reconnect and report transport status. Do **not** flash/erase/format/wipe/unlock/sideload merely to clear release checkboxes.
+4. Capture target/host Android versions, kernel/ROM and private diagnostic export for failures. For issue #72, use one separately agreed non-destructive Pull of an existing file and match source/destination SHA-256 before calling the Pull fixed.
+5. Record real-device smoke result as **FIELD PASS / FAIL / NOT RUN**; GitHub CI success alone is insufficient.
+
+**Production publication gate (still PENDING):** choose a final `main` SHA, require its complete CI; build a **permanent-key signed** release APK via protected `nekoflash-release`, verify the pinned cert `b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e` and APK signature, perform a non-destructive smoke on **that exact signed build**, then authorize a version tag/`v*` publishing workflow. No production release tag or signed-production claim has been made as part of this Insiders handoff.
 
 ## Candidate identity
 

@@ -12,6 +12,14 @@ English
 
 The released history below is preserved. **Unreleased NekoFlash 2.0 DEV changes are not published APK releases.** The technical REV number is independent of `versionName` / `versionCode`; see [development status](docs/DEVELOPMENT_STATUS.md). Historical build/release statements refer to the source snapshot in which they were recorded.
 
+## Published Insiders REV50 hardware beta — 11 November 2026
+
+- **Artifact:** [NekoFlash-Insiders-REV50.zip](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev50/NekoFlash-Insiders-REV50.zip) · [release](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50), source [`e7dde419`](https://github.com/Ncorror/NekoFlash-2.0/commit/e7dde419fc66f4be8427d7be002fd239e5d06446), `6.0.0-alpha11` / versionCode 234.
+- **CI qualification:** [main workflow #682](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42930623047) **SUCCESS** for build, JVM/lint/native gates, Android API 26 and 34, kit verification and release pin. The exact CI archive digest matches the published ZIP (`df36aacd679b8fd040136ab8fb18b329eb0ebb8ba0e3ca56d89101fb1a700073`).
+- **Integrated improvements:** confirmed Sideload start after ZIP selection (PR #74); conservative Recovery/partial-wipe reporting (PRs #76 and #79); improved USB/ADB discovery (PR #80); correct Fastboot missing-final-reply classification (PR #81); terminal IME lifecycle and ADB reader failure signaling with accurate USB IN byte-offset diagnostics (PR #82).
+- **Unresolved physical compatibility:** large ADB Pull USB IN failure [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72), vayu wipe/cache/reboot no-final-reply [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64). [Diagnostic PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) is excluded. These are not fixed by a green CI.
+- **Distribution:** debug/Insiders prerelease only; permanent-key signed production alpha11 and exact-build device smoke remain pending. Hardware writes are not part of release smoke tests.
+
 ## Release-candidate readiness — 10 November 2026
 
 **Current application-code baseline before final docs sync:** [`6a13d8ed2ff8`](https://github.com/Ncorror/NekoFlash-2.0/commit/6a13d8ed2ff806faf06d85e637f942e89eb6c4bf), `versionName=6.0.0-alpha11`, `versionCode=234`. PR #76 is merged. The documentation-only sync may advance `main` without changing Android source. The release remains unreleased until the permanent-key signed APK is built and verified on the final tagged SHA.
