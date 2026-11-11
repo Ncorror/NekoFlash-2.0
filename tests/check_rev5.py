@@ -41,16 +41,29 @@ def run():
     buttons = [el for el in texts if el.tag.endswith('MaterialButton')]
     # REV55: approved safety improvement adds an explicit START button;
     # selection must not directly mutate the target.
-    require(len(buttons) == 3, 'Sideload must have separate Choose, Start and Import controls')
-    for value in ['containerAdb', 'btnAdbSideload', 'btnStartAdbSideload', 'btnSideloadImport', 'tvSideloadSelectedZip']:
+    require(len(buttons) == 4, 'Sideload must have separate Choose, Clear, Start and Import controls')
+    clear_button = next(el for el in buttons if el.attrib.get(AND + 'id') == '@+id/btnClearSideloadSelection')
+    require(clear_button.attrib.get(AND + 'visibility') == 'gone',
+            'Clear button must be hidden until a ZIP is selected')
+    for value in ['containerAdb', 'btnAdbSideload', 'btnClearSideloadSelection', 'btnStartAdbSideload', 'btnSideloadImport', 'tvSideloadSelectedZip']:
         require(ids.count('@+id/' + value) == 1, 'Required UI ID not unique: ' + value)
     for res in ['values', 'values-ru']:
         strings = ET.parse(base / ('res/' + res + '/strings.xml')).getroot()
         found = [s.attrib['name'] for s in strings.findall('string')]
-        for key in ['layout_sideload_page_title','layout_sideload_no_file','layout_sideload_selected_file','layout_sideload_verdict_note']:
+        for key in ['layout_sideload_page_title','layout_sideload_no_file','layout_sideload_selected_file','layout_sideload_clear_selection','layout_sideload_selection_cleared','layout_sideload_verdict_note']:
             require(found.count(key)==1, f'String {key} missing/duplicated in {res}')
     main = (base / 'java/ru/forum/adbfastboottool/MainActivity.kt').read_text(encoding='utf-8')
     require('R.id.tvSideloadSelectedZip' in main, 'Missing chosen-file UI binding')
+    clear_handler = main.split('private fun clearSideloadSelection()', 1)[1].split(
+        'private fun updateSideloadSelectionUi()', 1)[0]
+    require('selectedSideloadSource = null' in clear_handler,
+            'Clear must reset in-memory Sideload selection')
+    require('SIDELOAD_SELECTION_PREFS' in clear_handler and '.edit { clear() }' in clear_handler,
+            'Clear must remove the remembered ZIP preference')
+    require('viewModel.runSideload(' not in clear_handler,
+            'Clearing ZIP must never start a flash')
+    require('R.id.btnClearSideloadSelection).setOnClickListener' in main,
+            'Clear action is not wired to its button')
     require('viewModel.runSideload(source)' in main, 'Explicit SAF Sideload action is disconnected')
     picker = main.split('private fun registerDirectSideloadLauncher()', 1)[1].split(
         'private fun restoreSideloadSelection(', 1)[0]
@@ -66,7 +79,7 @@ def run():
     for tab in ['tabHome','tabFastboot','tabAdb','tabUnlock','tabSettings']:
         require(nav.count('android:id="@+id/' + tab + '"') == 1, 'Missing fifth-tab shell ID: ' + tab)
     require('Sideload' in (base/'res/values-ru/strings.xml').read_text(encoding='utf-8'), 'Sideload tab label missing')
-    print(f'PASS: {len(xmls)} XML resources parsed; Sideload REV55 3-button safety contract; RU/EN; original transport hashes; 5 tabs')
+    print(f'PASS: {len(xmls)} XML resources parsed; Sideload 4-button explicit Choose/Clear/Start/Import safety contract; RU/EN; original transport hashes; 5 tabs')
 
 if __name__ == '__main__':
     run()
