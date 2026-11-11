@@ -17,7 +17,7 @@ permissions:
   contents: read
 
 env:
-  EXPECTED_RELEASE_CERT_SHA256: "b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e"
+  EXPECTED_RELEASE_CERT_SHA256: "3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2"
 
 jobs:
   build:

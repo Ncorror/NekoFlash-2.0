@@ -6,6 +6,15 @@ ROOT = Path(__file__).resolve().parents[1]
 release = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
 build = (ROOT / ".github/workflows/build.yml").read_text(encoding="utf-8")
 owners = (ROOT / ".github/CODEOWNERS").read_text(encoding="utf-8")
+# The two release paths must accept only the same approved replacement certificate.
+import re
+expected_cert = "3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2"
+for workflow_name, workflow in (("build.yml", build), ("release.yml", release)):
+    pins = re.findall("EXPECTED_RELEASE_CERT_SHA256: \"([0-9a-f]{64})\"", workflow)
+    assert pins == [expected_cert], f"{workflow_name}: unexpected signing fingerprint"
+    assert "Actual certificate:" in workflow
+    assert "Expected certificate:" in workflow
+
 
 assert "  tag-provenance:" in release
 preflight = release.split("  tag-provenance:", 1)[1].split("\n  release:", 1)[0]

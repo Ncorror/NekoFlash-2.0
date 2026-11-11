@@ -1,5 +1,15 @@
 # NekoFlash 2.0 — Release readiness audit · 10 November 2026
 
+## Signing identity recovery checkpoint — 11 November 2026
+
+**State: new local signing key GENERATED, NOT YET BACKED UP / SECRETS NOT SET / SIGNED APK NOT VERIFIED.** The owner generated a 4096-bit RSA key pair using Termux `keytool`, keystore file `$HOME/.nekoflash-signing/release.jks` (PKCS12 container), alias `nekoflash_release`. Public certificate SHA-256: `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2` (provided by owner via `keytool -list -v`). No private key or password is stored in this repository.
+
+Manual signed build [Actions #687](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43022237591) failed at `Require and verify release signing key`: all four GitHub Actions secrets were empty, starting with `Missing NEKOFLASH_KEYSTORE_BASE64`. The preceding 358 JVM tests, lint and regular Debug build passed. This is a **release-secret provisioning failure**, not an app source regression. **Do not rerun the signed workflow until encrypted offline backups are verified and environment secrets exist.**
+
+The previous release certificate pin `b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e` is **historical**; the owner reports its private key is unavailable. The replacement `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2` is now the only permitted future signing certificate for both workflow paths. Since Android package `ru.forum.adbfastboottool` was previously distributed under another signature, the new key cannot perform an in-place upgrade of that prior installation. **Keep the existing app ID and prior installs untouched until the maintainer explicitly chooses the migration/coexistence strategy.** A fresh install / new application ID are different behaviors and must not be silently conflated. Debug/Insiders `.dev` remains a separate install.
+
+**Gate before signed publication:** preserve the new keystore in at least two independent, encrypted, restore-tested locations; scope all four secret names to protected `nekoflash-release` environment with owner review; use the new public certificate pin; run an explicit main-only `sign_release=true` workflow, check certificate before and after APK signing; safely install on a compatible test device with no conflicting installed signature and perform non-destructive smoke. **No `v*` production tag while gate pending.**
+
 ## Verified Insiders REV50 release — 11 November 2026
 
 **Publication type:** Android-to-Android hardware testing **prerelease/debug**. **NOT** production-ready signed alpha11. Published [Insiders REV50](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50) from the exact `main` source [`e7dde419`](https://github.com/Ncorror/NekoFlash-2.0/commit/e7dde419fc66f4be8427d7be002fd239e5d06446), `6.0.0-alpha11` / versionCode `234`.
@@ -24,7 +34,7 @@
 4. Capture target/host Android versions, kernel/ROM and private diagnostic export for failures. For issue #72, use one separately agreed non-destructive Pull of an existing file and match source/destination SHA-256 before calling the Pull fixed.
 5. Record real-device smoke result as **FIELD PASS / FAIL / NOT RUN**; GitHub CI success alone is insufficient.
 
-**Production publication gate (still PENDING):** choose a final `main` SHA, require its complete CI; build a **permanent-key signed** release APK via protected `nekoflash-release`, verify the pinned cert `b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e` and APK signature, perform a non-destructive smoke on **that exact signed build**, then authorize a version tag/`v*` publishing workflow. No production release tag or signed-production claim has been made as part of this Insiders handoff.
+**Production publication gate (still PENDING):** choose a final `main` SHA, require its complete CI; build a **permanent-key signed** release APK via protected `nekoflash-release`, verify the pinned cert `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2` and APK signature, perform a non-destructive smoke on **that exact signed build**, then authorize a version tag/`v*` publishing workflow. No production release tag or signed-production claim has been made as part of this Insiders handoff.
 
 ## Candidate identity
 
@@ -77,7 +87,7 @@ The static TestBook still carries the historical campaign label `REV49` / `insid
 The source is fail-closed for production release packaging:
 - `assembleRelease/packageRelease/bundleRelease` fail if the permanent signing inputs are absent;
 - manual Actions signing runs only on `main` with `workflow_dispatch` + `sign_release=true`;
-- the keystore certificate is checked against pinned SHA-256 `b122576dcaa5b1ceebd977545314bd515432f9e3fa50733fa8153a1e48a6c19e`;
+- the keystore certificate is checked against pinned SHA-256 `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2`;
 - the completed APK is independently verified by `apksigner`;
 - the APK certificate digest is checked again against the same pinned fingerprint;
 - the release artifact refuses filenames containing `unsigned`.
