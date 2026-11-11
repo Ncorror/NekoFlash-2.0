@@ -1,5 +1,21 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+## 12.11.2026 — Sideload post-fix, final field acceptance; stop repeating the same flash test
+
+**Private evidence:** `NekoFlash-diagnostics-1794431912155.zip` (keep outside public GitHub). **Build:** `6.0.0-alpha11+b1e7e9c399f9.43093621939`. Host: POCO F7 `onyx`, Android 16; target: unlocked POCO X3 Pro `vayu`, OrangeFox Recovery.
+
+- ZIP: `CONSISTENT_SNAPSHOT`; CRC PASS, all **27/27** manifest entries match byte length and SHA-256. No unverified assumption about missing app-private logs.
+- Actual UI screenshots at 00:17: operation center shows **«Нужна проверка»**, text: Recovery disconnected around 100%; **not the old misleading «Отменено»**. Current session summary: `operations.started=3`, `succeeded=1`, `cancelled=1`, `verificationPending=1`, `failed=0`, `lastOutcome=VERIFY_PENDING`, `messages.errors=0`. The historical cancellation in the same session is **not** silently rewritten as a PASS.
+- USB snapshots show ADB SYSTEM → Recovery → Sideload → Recovery and reconnection. Recovery `/tmp/recovery.log` inspection has a temporary shell `exit_code=1`, followed by `exit_code=0` on a fresh Recovery boot; no reliable installer SUCCESS was captured through the missing `DONEDONE`.
+- Earlier physical test (11 Nov) confirmed OrangeFox countdown, automatic reboot and new OrangeFox welcome screen. Therefore **hardware Recovery update and near-complete USB delivery FIELD PASS**, while **ZIP installer protocol verdict remains unverified**, correctly presented as `VERIFY_PENDING`.
+- **Accepted resolution:** keep the current status handling as-is; do **not** copy legacy Sideload or request another destructive/redundant flash just to turn `VERIFY_PENDING` into SUCCESS. Legacy comparison is unnecessary without a new independently reproduced regression.
+- Commits already on `main`: `b46c826` (Sideload detach verdict), `b1e7e9c` (exact source guard review), `4b4693d` (pack emulator evidence before artifact upload). Run `43093621939`: Android build, JVM, lint, API26/API34 installed-app tests PASS; workflow overall failed on separate evidence upload. Run `43097502422` was queued at the time of this ledger entry; **do not call the new full workflow green before it actually finishes**.
+- Branch review: `cleanup/remove-insiders-testbook-20261111`, `docs/insiders-rev50-release-handoff-20261111`, `fix/mi-login-exchange-loading-ui-20261111`, `fix/release-key-identity-20261111`, `fix/sideload-clear-selected-zip-20261111` all have `ahead=0` versus `main`: **already incorporated; no merge needed**. No branches removed. PR [#83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) on `agent/nekoflash-astra` is ahead=2, diverged, and field pending for [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) — deliberately **not merged**. [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) and #72 remain separate decisions.
+- **Next step:** finish Insiders APK delivery/CI infrastructure independently; keep Sideload fixed/accepted unless real new field evidence contradicts it. Do not resurrect solved rotation, hanging overlay or earlier ADB/Fastboot tests.
+
+---
+
+
 ## 11.11.2026 — ADB → Fastboot → Android → OrangeFox Sideload (FIELD)
 
 **Архив:** `NekoFlash-diagnostics-1794426663937.zip` (локальный, не публиковать). **Build:** `6.0.0-alpha11+c50ca5520bff.43079328778`. Цель: разблокированный Poco X3 Pro `vayu`, хост по OTG.
@@ -269,4 +285,4 @@
 
 ## Правила для TestBook и следующей кампании
 
-**Рабочий план тестов строить от этого реестра, а не от оставшихся 43 исторических карточек.** Не удалять TestBook или JSON прошлых отчётов без отдельного решения автора. Нынешний HTML — инструмент отметок, но не самостоятельный источник того, что тест ранее НЕ выполнен. Следующий список тестов согласовать в чате, исключив уже доказанные однотипные проверки. Сырые ZIP/USB trace/уникальные серийники/ключи остаются в доверенном приватном канале и не попадают в публичный репозиторий.
+**Рабочий план тестов строить от этого реестра, а не от 43 исторических карточек TestBook.** TestBook удалён из актуального Insiders APK-only процесса (main, PR #89); HTML больше не является действующим инструментом тестирования. Старые подтверждённые результаты и архивы не терять; повторять уже доказанные операции не нужно. Следующие тесты назначать непосредственно в чате, исключая закрытые сценарии. Сырые ZIP/USB trace/уникальные серийники/ключи остаются в доверенном приватном канале и не попадают в публичный репозиторий.
