@@ -2287,6 +2287,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             val outcome = when {
                 task.startupFailure != null -> OperationOutcome.Failed(requireNotNull(task.startupFailure))
                 task.serviceLost -> OperationOutcome.Interrupted(text(R.string.rev20_service_lost))
+                // A Recovery-triggered USB detach can cancel this job after the
+                // near-complete stream closure was observed. Keep VERIFY_PENDING,
+                // never turn it into SUCCESS without installer evidence.
+                reported is OperationOutcome.VerifyPending -> reported
                 cause is CancellationException -> OperationOutcome.Cancelled(text(R.string.operation_cancelled))
                 cause != null -> OperationOutcome.Failed(cause.message ?: cause.javaClass.simpleName)
                 else -> reported

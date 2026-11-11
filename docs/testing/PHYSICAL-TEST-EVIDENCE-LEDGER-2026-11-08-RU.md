@@ -1,5 +1,19 @@
 # NekoFlash 2.0 — единый реестр реально выполненных проверок
 
+## 11.11.2026 — ADB → Fastboot → Android → OrangeFox Sideload (FIELD)
+
+**Архив:** `NekoFlash-diagnostics-1794426663937.zip` (локальный, не публиковать). **Build:** `6.0.0-alpha11+c50ca5520bff.43079328778`. Цель: разблокированный Poco X3 Pro `vayu`, хост по OTG.
+
+- `fastboot reboot` → OKAY в 22:47:31; ADB `device` повторно авторизован в 22:47:59, PASS.
+- `adb reboot recovery` отправлен в 22:48:20; Recovery `18D1:D001` в 22:48:41; затем sideload `2717:D001` в 22:48:55, PASS.
+- `OrangeFox-R11.3-vayu.zip`, 73 757 208 байт: передача начата 22:49:24, ≈95% в 22:49:33, затем `USB detach`/закрытие потока около ≈100% в 22:49:43, **без `DONEDONE`**.
+- Неправильный итог приложения: `CANCELLED` (7/8 операций SUCCESS, 1 CANCELLED), хотя пользователь подтвердил обратный отсчёт, автоматическую перезагрузку и появление экрана приветствия нового OrangeFox. Это **FIELD PASS фактической загрузки нового Recovery**, но не протокольное подтверждение ZIP installer SUCCESS.
+- Первопричина статуса: при безопасном завершении USB Job и `AdbProtocol.cancelled` перекрывали уже зафиксированный near-complete close; затем `finishServiceOperation` отдавал приоритет `CancellationException` вместо `VerifyPending`. Исправление сохраняет неопределённый итог как `VERIFY_PENDING` без ложного SUCCESS и без ослабления двухфазной остановки USB.
+- **Новый APK:** аппаратная регрессия обновлённой классификации ещё не выполнена; повторная прошивка ради проверки статуса не требуется.
+
+---
+
+
 ## #72 — 16-КиБ URB стабильно EPROTO; AOSP-style 4-КиБ кандидат
 
 **Архив:** `NekoFlash-diagnostics-1794266433382.zip` — CRC PASS, CONSISTENT_SNAPSHOT, 5/5 manifest size+SHA-256 PASS, 2/2 JSON parse. **Build:** `6.0.0-alpha11+d42621bc0c30.42715598717`.

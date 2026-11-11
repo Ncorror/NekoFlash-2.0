@@ -475,6 +475,9 @@ class AdbProtocol(
 
         cancelled = false
         var terminalState = SideloadTerminalState.RUNNING
+        // Recovery can close the stream at near-100% while USB shutdown
+        // concurrently cancels its service job. Preserve that evidence.
+        var nearCompleteClosure: SideloadResult.TransferClosedBeforeDoneDone? = null
         onLog("Starting ADB Sideload: ${source.displayName} ($fileSize bytes)")
         onProgress(0, "ADB Sideload · waiting for recovery requests")
 
@@ -520,7 +523,7 @@ class AdbProtocol(
                         totalBytes = fileSize,
                         percent = percent,
                         message = detail
-                    )
+                    ).also { nearCompleteClosure = it }
                 } else {
                     fail(kind, message)
                 }
@@ -660,6 +663,7 @@ class AdbProtocol(
 
             when {
                 terminalState == SideloadTerminalState.TRANSFER_COMPLETE -> SideloadResult.TransferComplete
+                nearCompleteClosure != null -> requireNotNull(nearCompleteClosure)
                 cancelled -> {
                     terminalState = SideloadTerminalState.CANCELLED
                     onLog("⚠️ ADB Sideload cancelled")
@@ -673,6 +677,8 @@ class AdbProtocol(
         } catch (e: Exception) {
             if (terminalState == SideloadTerminalState.TRANSFER_COMPLETE) {
                 SideloadResult.TransferComplete
+            } else if (nearCompleteClosure != null) {
+                requireNotNull(nearCompleteClosure)
             } else if (cancelled) {
                 terminalState = SideloadTerminalState.CANCELLED
                 SideloadResult.Cancelled
