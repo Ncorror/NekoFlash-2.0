@@ -17,6 +17,39 @@ main = (base/'MainActivity.kt').read_text()
 # REV18 reviewed receive-file, listing and unique-block progress fixes.
 # Original USB transport and direct SAF expectations remain guarded.
 data = adb_file.read_bytes()
+# REV57: exact reviewed Sideload-only result classification change. Recovery
+# may close USB at near-100% before DONEDONE; preserve VERIFY_PENDING evidence
+# even when generic safe transport shutdown concurrently sets cancelled.
+def raw_source_git_sha(payload):
+    return hashlib.sha1(b'blob ' + str(len(payload)).encode() + b'\0' + payload).hexdigest()
+
+rev57_sideload_adb_hash = '2d1d0b416c4473f584323a88d22b71fc5b67343b'
+if raw_source_git_sha(data) == rev57_sideload_adb_hash:
+    rev57_hunks = [
+        (
+            b'        // Recovery can close the stream at near-100% while USB shutdown\n'
+            b'        // concurrently cancels its service job. Preserve that evidence.\n'
+            b'        var nearCompleteClosure: SideloadResult.TransferClosedBeforeDoneDone? = null\n',
+            b''
+        ),
+        (
+            b'                    ).also { nearCompleteClosure = it }',
+            b'                    )'
+        ),
+        (
+            b'                nearCompleteClosure != null -> requireNotNull(nearCompleteClosure)\n',
+            b''
+        ),
+        (
+            b'            } else if (nearCompleteClosure != null) {\n'
+            b'                requireNotNull(nearCompleteClosure)\n',
+            b''
+        ),
+    ]
+    for revised, previous in rev57_hunks:
+        assert data.count(revised) == 1, 'Unreviewed REV57 Sideload result change'
+        data = data.replace(revised, previous, 1)
+    assert raw_source_git_sha(data) == '44e6a983d96219a9f4e9314e40e1042041a841f3', 'REV57 modified unrelated ADB code'
 # Preserve the precise payload failure already recorded by readDataDirect.
 # Normalize only this reviewed diagnostic hunk; all legacy transport hashes
 # below still apply to the rest of AdbProtocol byte for byte.

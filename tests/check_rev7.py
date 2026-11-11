@@ -35,22 +35,25 @@ rev55_recovery_transition_vm_blob = '34c22e904c731594084ccd725ffeb6516f235aa7'
 # Narrow reviewed 11 Nov addition: non-destructive, connection-scoped Android
 # release metadata fetch. Complete new blob remains pinned here.
 rev56_android_release_vm_blob = '1c2f535d8a4b99baf9e30df180e5e75e1dd2eb36'
-if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob):
+# REV57: preserve near-complete Sideload verification when Recovery USB detach
+# races with the generic transport-shutdown cancellation path.
+rev57_sideload_verdict_vm_blob = '9029971de3792a2a4ef04760e29b20fa8c5f412b'
+if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob):
     journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
     assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body
     assert 'if (duplicate)' not in journal_body
     assert 'recordDuplicateSuppressed()' not in journal_body
-    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob):
+    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob):
         admission = vm.split('private fun startOperation(')[1].split('val gen = operationGeneration.incrementAndGet()')[0]
         assert 'UsbOperationAdmission.allowed(' in admission
         assert 'FlashOperationService.submit' not in admission
         assert 'No connected ADB/Fastboot device' in admission
         assert 'requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT' in vm
-        if git_blob_sha(raw_vm) in (rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob):
+        if git_blob_sha(raw_vm) in (rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob):
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT') == 12
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.ADB') == 7
             assert vm.count('startOperation(') == 20  # 19 call sites and the function declaration
-    if git_blob_sha(raw_vm) in (rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob):
+    if git_blob_sha(raw_vm) in (rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob):
         policy_path = root/'app/src/main/java/ru/forum/adbfastboottool/SideloadRecoveryTransitionPolicy.kt'
         policy = policy_path.read_text()
         # Ensure the reviewed recovery switch cannot be promoted into a false
@@ -63,12 +66,16 @@ if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev
         assert 'before.productName.equals(after.productName, true)' in policy
         assert 'transferFinished' in policy
         assert 'fun sideloadZip(' in (root/'app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt').read_text()
-    if git_blob_sha(raw_vm) == rev56_android_release_vm_blob:
+    if git_blob_sha(raw_vm) in (rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob):
         assert vm.count('proto.captureShellCommand("getprop ro.build.version.release")') == 1
         assert 'proto.peerMode == AdbProtocol.PeerMode.DEVICE' in vm
         assert 'generation == connectionGeneration.get()' in vm
         assert vm.count('_adbAndroidRelease.postValue(null)') >= 3
         assert '_adbAndroidRelease.postValue(release)' in vm
+    if git_blob_sha(raw_vm) == rev57_sideload_verdict_vm_blob:
+        finish = vm.split('private fun finishServiceOperation(')[1].split('private fun releaseOperationWakeLock(')[0]
+        assert 'reported is OperationOutcome.VerifyPending -> reported' in finish
+        assert finish.index('reported is OperationOutcome.VerifyPending -> reported') < finish.index('cause is CancellationException')
 elif git_blob_sha(raw_vm) != expected_blob:
     reviewed_change = (
         b'                keyDirectory = adbKeyDir,\n'
