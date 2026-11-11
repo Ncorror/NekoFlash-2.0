@@ -312,6 +312,8 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_unlock_data_warning">⚠ Разблокировка удалит пользовательские данные. Сохраните важные файлы перед продолжением.</string>
     <string name="mi_unlock_account_section">MI-АККАУНТ</string>
     <string name="mi_unlock_sign_in_hint">Войдите в аккаунт для авторизации Xiaomi.</string>
+    <string name="mi_unlock_exchange_loading">Проверяем авторизацию Xiaomi…</string>
+    <string name="mi_unlock_exchange_failed">Не удалось завершить авторизацию Xiaomi. Войди ещё раз.</string>
     <string name="mi_unlock_authorized">✅ Авторизовано · ID %1$s</string>
     <string name="mi_unlock_region_zone">Регион: %1$s · dataCenterZone: %2$s (%3$s)</string>
     <string name="mi_unlock_zone_title">Центр обработки данных Xiaomi</string>
@@ -378,6 +380,8 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <!-- NekoFlash 2.0 / approved Sideload REV3 -->
     <string name="layout_sideload_page_title">Sideload</string>
     <string name="layout_sideload_no_file">ZIP-файл не выбран</string>
+    <string name="layout_sideload_clear_selection">Очистить</string>
+    <string name="layout_sideload_selection_cleared">Выбор ZIP для Sideload очищен. Исходный файл не изменён.</string>
     <string name="layout_sideload_selected_file">Файл: %1$s</string>
     <string name="layout_sideload_selected_details">Выбран ZIP: %1$s\nРазмер: %2$s</string>
     <string name="layout_sideload_size_unknown">размер неизвестен</string>

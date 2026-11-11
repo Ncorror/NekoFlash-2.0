@@ -3,6 +3,7 @@ package ru.forum.adbfastboottool
 import android.app.Activity
 import android.view.ContextThemeWrapper
 import android.view.LayoutInflater
+import android.view.View
 import android.widget.Button
 import android.widget.TextView
 import org.junit.Assert.*
@@ -25,10 +26,14 @@ class SideloadSelectionUiTest {
             val start = root.findViewById<Button>(R.id.btnStartAdbSideload)
             val imported = root.findViewById<Button>(R.id.btnSideloadImport)
             val selected = root.findViewById<TextView>(R.id.tvSideloadSelectedZip)
+            val clear = root.findViewById<Button>(R.id.btnClearSideloadSelection)
             assertNotNull(chooser)
             assertNotNull(start)
             assertNotNull(imported)
             assertNotNull(selected)
+            assertNotNull(clear)
+            assertEquals("Clear must stay hidden when no ZIP is selected", View.GONE, clear.visibility)
+            assertEquals(themed.getString(R.string.layout_sideload_clear_selection), clear.text.toString())
             assertTrue("Choosing a ZIP must remain available independently", chooser.isEnabled)
             assertFalse("Sending may not start before selection and valid SIDELOAD mode", start.isEnabled)
             assertEquals(themed.getString(R.string.layout_choose_zip_sideload), chooser.text.toString())

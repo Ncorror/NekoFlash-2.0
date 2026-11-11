@@ -86,6 +86,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val _connectionState   = MutableLiveData(ConnectionState.NONE)
     val connectionState: LiveData<ConnectionState> = _connectionState
 
+    // Per-connection informational metadata. Never persist it across USB generations.
+    private val _adbAndroidRelease = MutableLiveData<String?>(null)
+    val adbAndroidRelease: LiveData<String?> = _adbAndroidRelease
+
     private val _operationActive   = MutableLiveData(false)
     val operationActive: LiveData<Boolean> = _operationActive
 
@@ -590,6 +594,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             if (viewModelCleared.get()) return
             val generation = connectionGeneration.incrementAndGet()
             pendingUsbTargetKey = candidate.stableKey
+            _adbAndroidRelease.postValue(null)
             _fastbootDiagnostics.postValue(null)
             _fastbootPartitionInventory.postValue(null)
             _adbPeerMode.postValue(null)
@@ -724,6 +729,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             proto.onTransportFailure = { code, message ->
                 if (!viewModelCleared.get() && generation == connectionGeneration.get()) {
                     diagnosticSessionTracker.recordTermination("ADB_READER_${code.name}")
+                    _adbAndroidRelease.postValue(null)
                     diagnosticSessionTracker.recordMilestone("adb.reader.failure", 0L)
                     persistSessionSummary()
                     _connectionState.postValue(ConnectionState.ERROR)
@@ -763,6 +769,24 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 diagnosticSessionTracker.recordConnection("ADB", connectedDeviceInfo)
                 persistSessionSummary()
                 logConnectionStatus()
+                if (proto.peerMode == AdbProtocol.PeerMode.DEVICE) {
+                    // Informational read only, on the IO scope and a separate ADB stream.
+                    // Never block ADB readiness or repeat on Activity rotation.
+                    transportScope.launch {
+                        val result = runCatching {
+                            proto.captureShellCommand("getprop ro.build.version.release")
+                        }.getOrNull()
+                        val release = result?.let {
+                            AndroidReleaseMetadataPolicy.parse(it.stdout, it.success, it.exitCode)
+                        }
+                        if (!viewModelCleared.get() &&
+                            generation == connectionGeneration.get() &&
+                            adbProtocol === proto && proto.isConnected &&
+                            proto.peerMode == AdbProtocol.PeerMode.DEVICE) {
+                            _adbAndroidRelease.postValue(release)
+                        }
+                    }
+                }
             } finally {
                 if (!published || generation != connectionGeneration.get() || viewModelCleared.get()) {
                     if (adbProtocol === proto) adbProtocol = null
@@ -859,6 +883,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         activeTransportSessionId = null
         _transportSessionId.postValue(null)
         _connectionInfo.postValue(null)
+        _adbAndroidRelease.postValue(null)
         _fastbootDiagnostics.postValue(null)
         _fastbootPartitionInventory.postValue(null)
         _adbPeerMode.postValue(null)

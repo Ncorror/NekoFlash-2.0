@@ -351,6 +351,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         viewModel.connectionInfo.observe(this) { updateDeviceOverview() }
+        viewModel.adbAndroidRelease.observe(this) { updateDeviceOverview() }
         viewModel.fastbootDiagnostics.observe(this) {
             // Диагностика приходит после connectionState — переобновим точный режим.
             refreshConnectionStatusLabel()
@@ -614,6 +615,9 @@ class MainActivity : AppCompatActivity() {
         }
         findViewById<Button>(R.id.btnStartAdbSideload).setOnClickListener {
             startSelectedSideloadWithConfirmation()
+        }
+        findViewById<Button>(R.id.btnClearSideloadSelection).setOnClickListener {
+            clearSideloadSelection()
         }
         updateSideloadSelectionUi()
         findViewById<View>(R.id.btnSideloadImport).setOnClickListener { startImportFilePicker() }
@@ -1886,6 +1890,16 @@ class MainActivity : AppCompatActivity() {
         return FirmwareSource.SafDocument(uri, display, size)
     }
 
+    // Clear only the app's stored choice. Never delete the original SAF ZIP or
+    // revoke its document permission: other screens may still reference this URI.
+    private fun clearSideloadSelection() {
+        if (selectedSideloadSource == null || viewModel.operationActive.value == true) return
+        selectedSideloadSource = null
+        getSharedPreferences(SIDELOAD_SELECTION_PREFS, Context.MODE_PRIVATE).edit { clear() }
+        updateSideloadSelectionUi()
+        viewModel.log(getString(R.string.layout_sideload_selection_cleared))
+    }
+
     private fun updateSideloadSelectionUi() {
         val source = selectedSideloadSource
         val detail = if (source == null) {
@@ -1900,6 +1914,10 @@ class MainActivity : AppCompatActivity() {
             }
         }
         findViewById<TextView>(R.id.tvSideloadSelectedZip).text = detail
+        findViewById<Button>(R.id.btnClearSideloadSelection).apply {
+            visibility = if (source == null) View.GONE else View.VISIBLE
+            isEnabled = source != null && viewModel.operationActive.value != true
+        }
         val canStart = source != null && viewModel.operationActive.value != true &&
             viewModel.connectionState.value == DeviceViewModel.ConnectionState.ADB &&
             viewModel.adbPeerMode.value == AdbProtocol.PeerMode.SIDELOAD
@@ -2062,22 +2080,29 @@ class MainActivity : AppCompatActivity() {
             if (activityResult.resultCode != Activity.RESULT_OK) {
                 val reason = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_LOGIN_ERROR)?.trim().orEmpty()
                 if (reason.isBlank()) {
+                    miAuthExchangeState = MiAuthExchangeState.IDLE
                     viewModel.log("Mi Account sign-in cancelled by user")
                 } else {
+                    miAuthExchangeState = MiAuthExchangeState.ERROR
                     viewModel.log("❌ Mi Account sign-in did not complete: $reason")
                 }
+                buildUnlockPage()
                 return@registerForActivityResult
             }
             val passToken = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_PASS_TOKEN)
             val deviceId = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_DEVICE_ID)
             val userId = activityResult.data?.getStringExtra(MiLoginActivity.EXTRA_USER_ID)
             if (passToken.isNullOrEmpty() || deviceId.isNullOrEmpty() || userId.isNullOrEmpty()) {
+                miAuthExchangeState = MiAuthExchangeState.ERROR
                 viewModel.log("❌ Mi Account sign-in: authorization data was not received")
+                buildUnlockPage()
                 return@registerForActivityResult
             }
             viewModel.log("🔑 Signed in. Getting unlockApi session...")
             miAuthExchangeJob?.cancel()
             miAuthExchangeState = MiAuthExchangeState.LOADING
+            // Network unlockApi exchange is asynchronous; show its state immediately.
+            buildUnlockPage()
             miAuthExchangeJob = lifecycleScope.launch {
                 val exchangeResult = withContext(Dispatchers.IO) {
                     runCatching { MiAccountClient.exchangeToken(passToken, userId, deviceId) }
@@ -2094,6 +2119,7 @@ class MainActivity : AppCompatActivity() {
                     miAuthExchangeState = MiAuthExchangeState.ERROR
                     viewModel.log("❌ Token retrieval error: ${error.message ?: error.javaClass.simpleName}")
                     viewModel.log("💡 If you use a VPN, disable it and try again.")
+                    buildUnlockPage()
                 }
             }
         }
@@ -2890,6 +2916,7 @@ class MainActivity : AppCompatActivity() {
                 val screen = screenRef.get()
                 if (screen == null || screen.isFinishing || screen.isDestroyed) return@runMiUnlock
                 screen.miAuth = null
+                screen.miAuthExchangeState = MiAuthExchangeState.IDLE
                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                 screen.buildUnlockPage()
                 Toast.makeText(screen, screen.getString(R.string.mi_unlock_session_expired), Toast.LENGTH_LONG).show()
@@ -2961,17 +2988,30 @@ class MainActivity : AppCompatActivity() {
         val auth = miAuth
         if (auth == null) {
             container.addView(card().apply {
-                addView(body(getString(R.string.mi_unlock_sign_in_hint), "#F3F6FA"))
-                addView(MaterialButton(this@MainActivity).apply {
-                    minHeight = dp(48)
-                    cornerRadius = dp(12)
-                    setPadding(dp(16), dp(8), dp(16), dp(8))
-                    text = getString(R.string.mi_unlock_sign_in_button)
-                    isAllCaps = false
-                    setTextColor("#080D13".toColorInt())
-                    backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_primary_action_background)
-                    setOnClickListener { startMiLogin() }
-                })
+                val exchanging = miAuthExchangeState == MiAuthExchangeState.LOADING
+                val statusMessage = when (miAuthExchangeState) {
+                    MiAuthExchangeState.LOADING -> R.string.mi_unlock_exchange_loading
+                    MiAuthExchangeState.ERROR -> R.string.mi_unlock_exchange_failed
+                    MiAuthExchangeState.IDLE, MiAuthExchangeState.SUCCESS -> R.string.mi_unlock_sign_in_hint
+                }
+                addView(body(getString(statusMessage), if (exchanging) "#F2B766" else "#F3F6FA"))
+                if (exchanging) {
+                    addView(ProgressBar(this@MainActivity).apply {
+                        isIndeterminate = true
+                        contentDescription = getString(R.string.mi_unlock_exchange_loading)
+                    })
+                } else {
+                    addView(MaterialButton(this@MainActivity).apply {
+                        minHeight = dp(48)
+                        cornerRadius = dp(12)
+                        setPadding(dp(16), dp(8), dp(16), dp(8))
+                        text = getString(R.string.mi_unlock_sign_in_button)
+                        isAllCaps = false
+                        setTextColor("#080D13".toColorInt())
+                        backgroundTintList = androidx.appcompat.content.res.AppCompatResources.getColorStateList(context, R.color.nf_primary_action_background)
+                        setOnClickListener { startMiLogin() }
+                    })
+                }
             })
             container.addView(title(getString(R.string.mi_unlock_bootloader_section)))
             container.addView(card().apply {
@@ -3042,6 +3082,7 @@ class MainActivity : AppCompatActivity() {
                             .setNegativeButton(getString(R.string.cancel_upper), null)
                             .setPositiveButton(getString(R.string.mi_unlock_sign_out)) { _, _ ->
                                 miAuth = null
+                                miAuthExchangeState = MiAuthExchangeState.IDLE
                                 android.webkit.CookieManager.getInstance().removeAllCookies(null)
                                 buildUnlockPage()
                             }
@@ -4069,7 +4110,13 @@ class MainActivity : AppCompatActivity() {
         val adbBanner = activeAdb?.currentDiagnostics()?.remoteBanner
         val actualCodename = adbBanner?.let { adbBannerProperty(it, "ro.product.device") }
             ?: if (viewModel.fastbootProtocol?.isConnected == true) product.takeUnless { it == "—" } else null
-        val actualAndroid = adbBanner?.let { adbBannerProperty(it, "ro.build.version.release") }
+        val actualAndroid = if (
+            activeAdb?.peerMode == AdbProtocol.PeerMode.DEVICE &&
+            viewModel.connectionState.value == DeviceViewModel.ConnectionState.ADB
+        ) {
+            viewModel.adbAndroidRelease.value
+                ?: adbBanner?.let { adbBannerProperty(it, "ro.build.version.release") }
+        } else null
         findViewById<TextView>(R.id.tvHomeCodename).text = actualCodename?.let {
             getString(R.string.home_codename_value, it)
         } ?: getString(R.string.home_codename_unknown)
