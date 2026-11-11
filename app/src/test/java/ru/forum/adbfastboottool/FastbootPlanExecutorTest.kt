@@ -61,7 +61,7 @@ class FastbootPlanExecutorTest {
         variables["partition-type:cache"] = "ext4"; variables["partition-size:cache"] = "800000"
         variables["partition-type:metadata"] = "raw"
         executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot")))
-        assertEquals(listOf("erase:userdata", "flash:userdata", "erase:cache", "flash:cache", "erase:metadata", "reboot"), mutations())
+        assertEquals(listOf("erase:userdata", "flash:userdata", "erase:metadata", "erase:cache", "flash:cache", "reboot"), mutations())
         assertTrue(events.indexOfLast { it.startsWith("generate:") } < events.indexOf("erase:userdata"))
     }
     @Test fun missingOptionalPartitionsAreSkippedWithoutInventingEraseTargets() {
@@ -141,7 +141,7 @@ class FastbootPlanExecutorTest {
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Raw("reboot"))) }
         assertEquals(listOf("erase:userdata"), mutations())
     }
-    @Test fun cacheEraseWithoutFinalReplyStopsAfterSuccessfulUserdataAndDoesNotTouchMetadata() {
+    @Test fun cacheEraseWithoutFinalReplyHappensAfterUserdataAndMetadataReset() {
         // Physical vayu A-only capture, 2026-11-09: erase:userdata and flash:userdata
         // confirmed OKAY; erase:cache received no final packet and was cancelled.
         // Returning false models that terminal outcome, without sending any USB data.
@@ -157,16 +157,15 @@ class FastbootPlanExecutorTest {
 
         assertTrue(exception.message.orEmpty().contains("erase:cache"))
         val summary = messages.single { it.contains("Fastboot plan STOPPED") }
-        assertTrue(summary.contains("after 2/6 completed steps"))
+        assertTrue(summary.contains("after 3/6 completed steps"))
         assertTrue(summary.contains("Failed or unresolved: erase:cache (device may have changed)"))
-        assertTrue(summary.contains("Completed: erase:userdata -> flash userdata"))
+        assertTrue(summary.contains("Completed: erase:userdata -> flash userdata (100 bytes) -> erase:metadata"))
         assertTrue(summary.contains("Not attempted: flash cache"))
-        assertTrue(summary.contains("erase:metadata"))
         assertTrue(summary.contains("No automatic retry"))
-        assertEquals(listOf("erase:userdata", "flash:userdata", "erase:cache"), mutations())
+        assertEquals(listOf("erase:userdata", "flash:userdata", "erase:metadata", "erase:cache"), mutations())
         assertEquals(1, events.count { it == "erase:cache" })
+        assertTrue(events.contains("erase:metadata"))
         assertFalse(events.contains("flash:cache"))
-        assertFalse(events.contains("erase:metadata"))
         assertFalse(events.contains("reboot"))
     }
 
