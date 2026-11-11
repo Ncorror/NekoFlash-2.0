@@ -2,37 +2,17 @@
 
 # NekoFlash 2.0
 
-**Опубликован Insiders REV50 — 11 ноября 2026:** [скачать точный ZIP с APK и TestBook](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev50/NekoFlash-Insiders-REV50.zip) · [страница релиза](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50). Зафиксированный исходный код [`e7dde419`](https://github.com/Ncorror/NekoFlash-2.0/commit/e7dde419fc66f4be8427d7be002fd239e5d06446), `6.0.0-alpha11` / versionCode 234; [CI `main` #682 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42930623047) (сборка, Android API26/34, проверка двухфайлового комплекта и публикация). Это **отладочная аппаратная бета**, а **не production-сборка с постоянной подписью**. Большой ADB Pull с USB IN [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) и зависание `fastboot -w`/cache на vayu [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) пока не исправлены. Диагностический [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) **не входит** в REV50. Разрушающие тесты повторять не требуется; перед production-выпуском нужны проверенная постоянная подпись на финальном SHA и безопасный smoke-тест.
+**Последняя проверенная точка main:** `7273b014`, `6.0.0-alpha11`; [CI #698 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43068208355): JVM, Lint, Android API 26 и 34. Следующий комплект Insiders содержит **только debug APK** с проверенной контрольной суммой. Тесты и результаты теперь ведём **в чате команды**, без отдельного HTML-трекера. Полные диагностические ZIP экспортируем из NekoFlash.
 
-**Безопасный Sideload уже в `main`.** PR [#74](https://github.com/Ncorror/NekoFlash-2.0/pull/74) слит: выбор ZIP ничего не отправляет; передача начинается только отдельной кнопкой **Start Sideload** и после подтверждения. SAF-документ сохраняется для повтора, если Android выдал постоянный доступ. Старые упоминания PR #71 ниже — исторические снимки, а не текущее поведение.
+**Ранее опубликованный Insiders REV50** ([историческая страница релиза](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50)) собран из предыдущего коммита. Это не новая main и не production APK с постоянной подписью; старые материалы не перепаковываем.
 
-**Граница релиза:** оставшиеся открытые задачи уже вынесены после релиза/в backlog: крайние UI-сценарии терминала [#20](https://github.com/Ncorror/NekoFlash-2.0/issues/20), дизайн Operation Center [#46](https://github.com/Ncorror/NekoFlash-2.0/issues/46), полевая перепроверка force-stop [#47](https://github.com/Ncorror/NekoFlash-2.0/issues/47), плавающий DocumentsUI [#48](https://github.com/Ncorror/NekoFlash-2.0/issues/48), специфичный для vayu `fastboot -w`/cache [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) и большой ADB Pull EPROTO [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72). Fail-closed регрессия Fastboot из #67 и консервативная фиксация смены Recovery из #68 включены в этот alpha11-кандидат через PR #76. PR #73 с экспериментами большого ADB Pull по-прежнему явно исключён. Уже принятые разрушительные Mass Flash/Recovery/USB тесты повторять ради старых галочек не нужно.
+**Новые исправления:** «Очистить» выбранный ZIP в Sideload без удаления файла, индикатор авторизации Mi-аккаунта, версия Android после подключения ADB SYSTEM. Отдельно от релиза оставляем [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) ADB Pull EPROTO и [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) Fastboot `-w`/cache. Экспериментальный [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) не сливаем.
 
-**Историческая проверенная Insiders-сборка:** Actions #653 / artifact `13757708292`, SHA-256 APK `46230d199aa4eba93cb219b878c6395de9fd41ca1bfa2c042d096b663410f677` — прежний baseline. Бери **последний успешный tester kit из `main`** по ссылке ниже: каждый комплект содержит собственные SHA APK и исходников. См. [релизный аудит](docs/RELEASE_READINESS-2026-11-10.md).
+Русский · [English](README.md)
 
-**Тестировщикам:** брать только **успешный актуальный [комплект APK + testbook.html из одного `main` CI](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess)** и сверять SHA-256/run ID. До смены DEV сохранять старые ZIP диагностики и JSON отметок. **Публикация REV45** и её скриншоты ниже — исторические, не новый тестовый APK. Отдельный HTML прямо в `main` может содержать старые reference SHA: точные данные нового APK находятся в HTML из соответствующего CI ZIP.
+NekoFlash работает с ADB и Fastboot с одного Android-телефона по OTG на другом. Хост: Android 8+, USB Host, кабель данных. Root необязателен.
 
-[English](README.md) · Русский
-
-NekoFlash позволяет с одного Android-телефона обслуживать второй по USB OTG через ADB и Fastboot. На телефоне-хосте нужен Android 8.0 или новее, поддержка USB Host и кабель с передачей данных. Root на хосте не требуется.
-
-**Опубликованный контрольный набор REV45 (архивный)**
-
-Ссылка на опубликованный ниже набор ведёт на старую DEV-сборку REV45, а не на исходники REV55. Тестовая APK ставится рядом с оригинальным NekoFlash. Работа OTG, переподключение и запись разделов на этой сборке ещё требуют проверки на телефонах.
-
-**[Скачать комплект тестировщика Insiders (ZIP)](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [Сборки на GitHub Actions](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
-
-Распакуй ZIP на телефоне-**хосте**. Установи debug APK и открой `testbook.html` в браузере. В ZIP два файла. Инструкция RU/EN, SHA-256 приложения и ссылка на Telegram-группу находятся в тестбуке. Чтобы взять снимок более свежей main для отдельного теста, войди в GitHub, открой успешный запуск main и выбери **NekoFlash-Insiders-Tester-Kit** в разделе Artifacts.
-
-[Инструкция тестировщика](docs/insiders/FIELD-GUIDE-RU.md) · [Offline testbook RU/EN](docs/insiders/testbook.html)
-
-Для одного раунда раздай всем один и тот же ZIP. У старой REV43 и контрольной REV45 разные ключи debug-подписи. Если уже стоит прежняя DEV, сохрани её журналы и экспортируй прогресс тестбука до переустановки.
-
-## Первый тест
-
-Сначала проверь интерфейс и клавиатуру. Затем подключи второй телефон, подтверди на нём разрешение ADB и выполни `adb devices` и `adb shell getprop ro.product.model`. Запиши обе модели, версии Android, build ID и фактический результат. ZIP с исходными логами передай тестовой команде в личном канале.
-
-> Прошивка, стирание, форматирование и разблокировка могут удалить данные и лишить TARGET возможности загрузиться. Для записи нужен отдельный согласованный тест, запасное устройство, резервная копия и проверенный способ восстановления.
+**Сборки тестировщикам:** [зелёные CI main](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) · [история реальных тестов](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). Бери APK из точного CI, указывай build ID и отправляй скриншоты с полным диагностическим ZIP. Уже проверенные прошивки и поворот терминала не повторяем.
 
 ## Интерфейс приложения
 
@@ -52,7 +32,7 @@ NekoFlash позволяет с одного Android-телефона обслу
 
 Сборка для сверки и скриншотов — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`a31dedadd4ad`](https://github.com/Ncorror/NekoFlash-2.0/commit/a31dedadd4adcf08691ece82c7574f05286078f3). [CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886/artifacts/13139380119).
 
-Прошли 308 JVM-тестов и по 20 инструментальных тестов на API 26 и 34. Lint завершился без замечаний. В каждом новом комплекте точный коммит и SHA-256 его APK записаны в `testbook.html`.
+Прошли 308 JVM-тестов и по 20 инструментальных тестов на API 26 и 34. Lint завершился без замечаний. Точный SHA-256 APK и исходный коммит подтверждаются в соответствующем CI.
 
 [Audit / Аудит](docs/insiders/AUDIT-2026-11-02.md) · [Hardware](docs/HARDWARE_VALIDATION.md) · [USB OTG](docs/USB_CONNECTION_TROUBLESHOOTING.md) · [Privacy](PRIVACY.md)
 
