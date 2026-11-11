@@ -33,11 +33,20 @@ class FastbootPlanExecutorTest {
         FastbootPlanExecutor(port, generator, temporary.root, cancel, log)
     private fun mutations() = events.filter { it.startsWith("erase:") || it.startsWith("flash:") || it.startsWith("reboot") || it.startsWith("set_active:") || it.startsWith("oem ") }
 
-    @Test fun formatBuildsFilesystemThenFlashesWithoutInventedWireFormatOrErase() {
+    @Test fun formatBuildsAndroidCompatibleUserdataF2fsThenFlashesWithoutInventedWireFormatOrErase() {
+        variables["partition-type:userdata"] = "f2fs"
         executor().run(listOf(FastbootExecutionStep.Format("userdata")))
         assertEquals(listOf("flash:userdata"), mutations())
+        assertTrue(events.any { it.startsWith("generate:f2fs:") && it.endsWith(":[projid]") })
         assertTrue(events.indexOfFirst { it.startsWith("generate:") } < events.indexOf("flash:userdata"))
         assertTrue(events.none { it.startsWith("format:") })
+    }
+
+    @Test fun nonUserdataF2fsDoesNotInventAndroidUserdataFeatures() {
+        variables["partition-type:system"] = "f2fs"
+        variables["partition-size:system"] = "1000000"
+        executor().run(listOf(FastbootExecutionStep.Format("system")))
+        assertTrue(events.any { it.startsWith("generate:f2fs:") && it.endsWith(":[]") })
     }
     @Test fun standaloneUserdataFormatWarnsThatBootabilityAndMetadataAreNotVerified() {
         val messages = mutableListOf<String>()

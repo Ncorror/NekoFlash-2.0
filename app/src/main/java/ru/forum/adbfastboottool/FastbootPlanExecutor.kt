@@ -169,10 +169,20 @@ internal class FastbootPlanExecutor(
             val value = runCatching { FastbootHostSyntax.hexSize(raw) }.getOrDefault(0)
             return value.takeIf { it > 0 && it and (it - 1) == 0L } ?: 0
         }
+        val effectiveOptions =
+            if (target == "userdata" && type == "f2fs") options + "projid"
+            else options
+        if (effectiveOptions != options) {
+            log("Format $target: enabling Android userdata F2FS project quota (project_quota,extra_attr)")
+        }
         checkCancelled()
         log("Preparing $type filesystem for $target ($size bytes)")
         onProgress("Preparing $type filesystem for $target ($size bytes)")
-        return formatter.generate(FilesystemSpec(type, size, block("erase-block-size"), block("logical-block-size"), options), directory, checkCancelled)
+        return formatter.generate(
+            FilesystemSpec(type, size, block("erase-block-size"), block("logical-block-size"), effectiveOptions),
+            directory,
+            checkCancelled
+        )
     }
 
     /** liblp SLOT_SUFFIXED must work even when the bootloader has-slot query says no. */

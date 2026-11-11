@@ -25,6 +25,7 @@ assert 'internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock 
 assert executor.index('val prepared =') < executor.index('prepared.forEachIndexed')
 assert 'FastbootDownloadSizePolicy.validate(' in executor
 assert 'listOf("userdata", "metadata", "cache")' in executor
+assert 'if (target == "userdata" && type == "f2fs") options + "projid"' in executor
 assert 'SuperEmptyImage.load(' in executor
 assert 'ProcessBuilder(args)' in (java / 'FastbootFilesystemFormatter.kt').read_text()
 assert 'output.fill(0, (aligned - offset) / blockSize)' in (java / 'AndroidSparseImage.kt').read_text()
