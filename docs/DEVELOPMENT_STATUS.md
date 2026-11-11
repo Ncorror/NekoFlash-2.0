@@ -185,13 +185,13 @@ Kernel-аудит xHCI показывает, что USB transaction error на n
 | PR CI REV43 | [Run #41247325391](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391): **BUILD/JVM/lint/API26/API34 PASS** |
 | Повторный CI объединённого DEV | [Run #41248168147](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147): BUILD PASS, API34 PASS, **API26 FAIL (2 UI timeouts)** |
 | Тестовая Debug APK | [GitHub Actions artifact REV43](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41247325391/artifacts/13060555171), пакет `ru.forum.adbfastboottool.dev`, versionCode 234, `6.0.0-alpha11-dev` |
-| Тестбук | [Offline RU/EN HTML](insiders/testbook.html), [инструкция RU](testing/INSIDERS-FIELD-TEST-REV43-RU.md), [EN](testing/INSIDERS-FIELD-TEST-REV43-EN.md) |
+| Тестбук | [Архивный HTML (не используется)](https://github.com/Ncorror/NekoFlash-2.0/blob/e7dde419fc66f4be8427d7be002fd239e5d06446/docs/insiders/testbook.html), [инструкция RU](testing/INSIDERS-FIELD-TEST-REV43-RU.md), [EN](testing/INSIDERS-FIELD-TEST-REV43-EN.md) |
 | Физический HOST → TARGET для REV43 | **Тестовая кампания начинается, новые PASS пока не подтверждены** |
 | Публикация | `main` используется как **публичная тестовая база**, релизный тег/подписанный release не создавался |
 
 ## Где скачать тестбук
 
-[**Скачать автономный REV43 HTML прямо из main**](https://raw.githubusercontent.com/Ncorror/NekoFlash-2.0/main/docs/insiders/testbook.html). Он поддерживает RU/EN, этапы, чекбоксы, статусы и свободные замечания, JSON-прогресс, ZIP-отчёт с исходными `log-*`, `trace-*.bin`, `session-summary-*` и фотографиями. Он не отправляет файлы на сервер и требует ручного разрешения на папку логов. Каждый успешный build CI также экспортирует тестбук как отдельный скачиваемый GitHub Actions artifact. Тестовая Telegram-группа: **[NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy)** (ссылка предоставлена автором проекта).
+**Устаревший REV43:** HTML TestBook удалён из актуального `main`; проверки теперь ведутся в чате, а CI комплект содержит только APK. [Архив исходного HTML](https://github.com/Ncorror/NekoFlash-2.0/blob/e7dde419fc66f4be8427d7be002fd239e5d06446/docs/insiders/testbook.html) сохранён для аудита истории. Telegram: [NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy).
 
 **Внимание:** GitHub Actions artifact APK — отдельный ZIP; не путать с архивом отчёта. SHA-256 старой REV29 APK не относится к REV43: проверь новый APK самостоятельно. Не удаляй установленную стабильную версию NekoFlash.
 

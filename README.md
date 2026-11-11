@@ -2,37 +2,17 @@
 
 # NekoFlash 2.0
 
-**Published Insiders REV50 — 11 Nov 2026:** [download the exact APK + TestBook ZIP](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev50/NekoFlash-Insiders-REV50.zip) · [release page](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50). Pinned source [`e7dde419`](https://github.com/Ncorror/NekoFlash-2.0/commit/e7dde419fc66f4be8427d7be002fd239e5d06446), `6.0.0-alpha11` / versionCode 234; [main CI #682 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/42930623047) (build, Android API26/34, two-file kit and release publication). This is the **debug/Insiders hardware beta**, **not a permanent-key signed production release**. [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) large ADB Pull USB IN errors and [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) vayu `fastboot -w`/cache final-response problems remain unresolved. [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) is a separate diagnostic experiment **not included** in REV50. No automatic destructive retests; signed alpha11 publication still requires final-SHA signing/certificate verification and non-destructive device smoke.
+**Latest accepted main baseline:** `7273b014`, `6.0.0-alpha11`; [GitHub Actions #698 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43068208355) (JVM, Lint, Android API 26 and 34). The next Insiders build distributes **only the debug APK**, with source provenance checked in CI. Hardware test instructions and results are now handled **in the team chat**, not a browser checklist. Raw diagnostic ZIPs are exported from NekoFlash itself.
 
-**Sideload safety is now in `main`.** PR [#74](https://github.com/Ncorror/NekoFlash-2.0/pull/74) is merged: choosing a ZIP is non-mutating; transfer requires a separate enabled **Start Sideload** action and confirmation. The selected SAF document is retained for retry when Android grants persistent access. Older README text and historical PR #71 snapshots below are evidence only, not the current behavior.
+**Previous published Insiders REV50** ([release history](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50)) is an archived debug prerelease from an older source commit, not the latest main or signed production APK. Existing published assets remain historical.
 
-**Release scope:** the remaining open items are explicitly post-release/backlog: terminal edge UI [#20](https://github.com/Ncorror/NekoFlash-2.0/issues/20), Operation Center redesign [#46](https://github.com/Ncorror/NekoFlash-2.0/issues/46), force-stop field confirmation [#47](https://github.com/Ncorror/NekoFlash-2.0/issues/47), intermittent DocumentsUI [#48](https://github.com/Ncorror/NekoFlash-2.0/issues/48), device-specific vayu `fastboot -w` cache response [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64), and large ADB Pull EPROTO [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72). The fail-closed Fastboot regression from #67 and conservative Recovery-transition evidence from #68 are integrated into this alpha11 candidate through PR #76. PR #73 (large ADB Pull diagnostics) remains explicitly excluded. Do not rerun already accepted destructive Mass Flash/Recovery/USB campaigns just to clear old checkboxes.
-
-**Historical audited Insiders artifact:** Actions #653 / artifact `13757708292`, APK SHA-256 `46230d199aa4eba93cb219b878c6395de9fd41ca1bfa2c042d096b663410f677`, is an older baseline. Use the **latest successful `main` tester kit** below: each kit records its own APK hash and source SHA. See the [release-readiness audit](docs/RELEASE_READINESS-2026-11-10.md).
-
-**Tester download:** use a **successful latest `main` GitHub Actions [two-file kit](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess)** containing its exact matching APK and `testbook.html`; verify embedded SHA-256 and run ID, and preserve old DEV diagnostics/progress. The published **REV45** ZIP/screenshots below are *historical*, not the current build. The standalone repository HTML may embed historical reference metadata; only the CI-packaged HTML matches the current APK.
+**New improvements:** Clear chosen Sideload ZIP without deleting it, show Xiaomi account authorization progress, and display Android version from the connected ADB SYSTEM device. Outstanding [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) inbound Pull EPROTO and [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) Fastboot wipe/cache reply remain separate hardware investigations; experimental [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) is not included.
 
 English · [Русский](README_ru.md)
 
-Run ADB and Fastboot from one Android phone to service a second phone over USB OTG. The host needs Android 8.0+ and USB Host support. Use a data-capable cable. Root is optional on the host.
+NekoFlash operates ADB and Fastboot between Android phones via USB OTG. Host Android 8+, USB Host and a data cable required. Root on the host is optional.
 
-**Published reference kit · REV45 (historical)**
-
-The release-linked download below is the older REV45 development build, not the current REV55 source. The debug app installs alongside the original NekoFlash. Physical OTG, reconnect and partition-write results are still pending for this build.
-
-**[Download the Insiders tester kit (ZIP)](https://github.com/Ncorror/NekoFlash-2.0/releases/download/insiders-rev45/NekoFlash-Insiders-REV45.zip)** · [Official GitHub Actions downloads](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [NekoFlash Insiders · Telegram](https://t.me/+NR_FiUmvXlViOTUy)
-
-Open the ZIP on the **host** phone. Install the included debug APK, then open `testbook.html` in a browser. The ZIP contains two files. The offline testbook includes RU/EN instructions, the APK checksum and the Telegram group link. For a newer CI snapshot, sign in to GitHub, open a successful main run and choose **NekoFlash-Insiders-Tester-Kit** under Artifacts.
-
-[Field guide](docs/insiders/FIELD-GUIDE-EN.md) · [Offline testbook RU/EN](docs/insiders/testbook.html)
-
-For one test round, distribute the same downloaded ZIP to everyone. The previous REV43 and reference REV45 APKs have different debug signing certificates. Back up DEV logs and export testbook progress before replacing a conflicting DEV installation.
-
-## First test
-
-Start with the interface and keyboard. Then connect a second phone, authorize ADB on the target and try `adb devices` and `adb shell getprop ro.product.model`. Record both models, Android versions, build ID and the observed result. Share the report ZIP privately with the test team.
-
-> Flashing, erasing, formatting or unlocking can wipe the target or leave it unable to boot. Test writes only in an agreed lab session with a spare target, a backup and a verified recovery path.
+**Testing downloads:** [successful main CI artifacts](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) · [historical hardware evidence](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). Download the APK for the exact tested commit, record build ID and send screenshots + full diagnostic export privately. Previously completed flashing and terminal rotation are not assigned again.
 
 ## Inside the app
 
@@ -52,7 +32,7 @@ English interface of the published REV45 APK on an Android 14 emulator (API 34).
 
 Reference APK and gallery — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`a31dedadd4ad`](https://github.com/Ncorror/NekoFlash-2.0/commit/a31dedadd4adcf08691ece82c7574f05286078f3). [CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886/artifacts/13139380119).
 
-308 JVM tests passed. Android API 26 and 34 passed 20 instrumentation tests each. Lint reported zero findings. Each new tester kit records its own commit and APK hash in `testbook.html`.
+308 JVM tests passed. Android API 26 and 34 passed 20 instrumentation tests each. Lint reported zero findings. The APK SHA-256 and source commit are tracked by the exact CI run.
 
 [Audit / Аудит](docs/insiders/AUDIT-2026-11-02.md) · [Hardware](docs/HARDWARE_VALIDATION.md) · [USB OTG](docs/USB_CONNECTION_TROUBLESHOOTING.md) · [Privacy](PRIVACY.md)
 

@@ -77,8 +77,8 @@ tap("btnMassSelectImage")
 tap(text="NekoFlash workspace")
 tap(text="sample-boot.img")
 capture("mass-queue", text="sample-boot.img")
-tap("btnFastbootSectionTools")
-capture("portrait-tools", resource="btnToolGetvar", text="Read getvar")
+# The legacy Fastboot Tools tab is intentionally hidden in the current UI.
+# Do not make CI require or programmatically tap this unavailable tab.
 tap("tabAdb")
 capture("portrait-sideload", resource="btnSideloadImport", text="Import file")
 tap("tabHome")

@@ -1,74 +1,7 @@
-> **ИСТОРИЧЕСКАЯ ИНСТРУКЦИЯ REV45/46, НЕ НОВЫЙ ПЛАН ИСПЫТАНИЙ.** Реальные USB 1023/1024/1025, 512-file Push/Pull, 16 МиБ, реальная Recovery/Fastbootd и старые Sideload уже проверялись на указанных устройствах/сборках. Перед дальнейшими действиями смотри [реестр выполненных тестов](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md) и [текущую страницу Insiders](README.md). Команды ниже не запускать повторно поверх старых QA-файлов. LAB-разрушительные проверки не проводятся на заблокированном TARGET и требуют отдельного согласованного плана восстановления. TestBook/прогресс сохраняем; новые задачи выберем в чате по неподтверждённой дельте.
+# NekoFlash Insiders — инструкции по тестированию
 
-# Полевые тесты NekoFlash 2.0 · Insiders REV45
+Тесты, готовые команды и отчёты теперь ведём **непосредственно в чате**. Актуальный [CI main](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) выдаёт комплект только с APK.
 
-## Короткий раунд — 6 заданий (REV46, изменение тестирования)
+Сейчас проверяем новые элементы: очистку выбранного ZIP, поле версии Android после ADB SYSTEM и индикатор ожидания Mi-аккаунта. Укажи HOST/TARGET, build ID, результат, скриншот и полный ZIP диагностики из NekoFlash. Логи не удаляем и не обрезаем.
 
-В TestBook по умолчанию показываются только шесть основных заданий: **установка APK, интерфейс, терминал, USB/OTG, безопасный ADB и подготовка отчёта**. Не нужно проходить все 43 сценария. Кнопка «Показать все 43 проверки» открывает старые расширенные сценарии без удаления прежних отметок. Результаты двух прошлых проходов не объявлять новой аппаратной проверкой — их можно сохранить отдельными отчётами.
-
-Новая APK сохраняет журналы в каталоге приложения, даже когда отсутствует разрешение на общую папку Download. Для передачи через Android выбери **Логи или Отчёты → Экспорт всех логов в ZIP**, сохрани файл системным диалогом и прикрепи его к HTML-отчёту кнопкой вложений. Не нужно создавать /Download/NekoFlash вручную. Если старый APK уже накопил журналы в Download/NekoFlash/logs, их также можно приложить старым способом выбора папки. ZIP содержит оригинальные журналы без очистки; отправлять только в доверенную команду. При создании отчёта HTML покажет явную ссылку «Скачать ZIP-отчёт», поскольку Chrome может блокировать автоматическое скачивание после асинхронной сборки.
-
-На Android file:// Chrome иногда не сохраняет localStorage между открытиями HTML из разных путей. Кнопка «Сохранить прогресс JSON» остаётся резервным вариантом; нельзя обещать сохранность браузерных галочек без проверки на самом телефоне. **Не сбрасывай существующие отметки ради нового интерфейса.**
-
-Распакуй ZIP, установи APK на HOST и открой testbook.html в браузере. В разделе сборки указаны коммит, запуск CI и SHA-256 APK. Для сохранения прогресса используй экспорт JSON.
-
-[Telegram · NekoFlash Insiders](https://t.me/+NR_FiUmvXlViOTUy)
-
-## Подготовка
-
-**HOST** — телефон, на котором работает NekoFlash; **TARGET** — подключаемый телефон. Заряд обоих устройств, исправный кабель данных/OTG, разрешение USB в Android. Для ADB включи отладку на TARGET и подтверди RSA. Для Fastboot используй запасной TARGET, уже разблокированный по требованиям сценария.
-
-На первом раунде **не запускай** `erase`, `format`, `flash`, `unlock`, `wipe-super`, Fastboot DATA/download или запись реальных разделов. Ими занимается отдельный согласованный лабораторный этап после резервной копии, проверки точной разметки и возможности восстановления. Во время реальной записи прошивки не отключай OTG.
-
-## Три раунда
-
-1. **Сегодня — безопасная диагностика.** Установка и версия APK; UI и масштаб шрифта, поворот с Gboard; открытие/закрытие терминала; русские символы/emoji; копирование вывода; USB permission/USB роли; безвредные `adb devices`, `adb shell getprop ro.product.model`, `adb shell id`; чтение `fastboot getvar` на запасном TARGET. Воспроизвести <https://github.com/Ncorror/NekoFlash-2.0/issues/20> при возможности.
-2. **Расширенный HOST → TARGET.** Одноразовые `adb push/pull`, хеши, каталог из 512 файлов (`adb push -r` REV43), Stop посреди передачи, USB detach и reconnect **только во время ADB**, проверка неполных файлов, замеры памяти/длительности. Если у TARGET нет старого `maxdata`, пометь тест REV42 **BLOCKED**, не выдумывай результат.
-3. **Лаборатория — только по отдельному разрешению.** Реальные Fastboot download/flash/format/sideload, работа со слотами и ошибки транспорта. Без подготовленного восстановления и разрешения — NOT TESTED/BLOCKED.
-
-## Базовые команды (не выполнять разрушительных операций)
-
-В терминале NekoFlash, когда TARGET подключён и авторизован:
-
-```text
-adb devices
-adb shell getprop ro.product.model
-adb shell getprop ro.product.device
-adb shell getprop ro.build.version.release
-adb shell id
-adb shell echo NEKOFLASH_TEST_OK
-```
-
-Тестовые файлы создаются **в Termux на HOST**:
-
-```bash
-termux-setup-storage
-mkdir -p ~/storage/downloads/NekoFlashQA/tree
-dd if=/dev/urandom of=~/storage/downloads/NekoFlashQA/probe.bin bs=1M count=16
-for i in $(seq 1 512); do
-  d="part-$((i/32))"
-  mkdir -p ~/storage/downloads/NekoFlashQA/tree/"$d"
-  printf 'probe-%s\n' "$i" > ~/storage/downloads/NekoFlashQA/tree/"$d"/"file-$i.txt"
-done
-sha256sum ~/storage/downloads/NekoFlashQA/probe.bin
-```
-
-В терминале **NekoFlash**:
-
-```text
-adb shell mkdir -p /sdcard/Download/NekoFlashQA
-adb push /sdcard/Download/NekoFlashQA/probe.bin /sdcard/Download/NekoFlashQA/probe.bin
-adb pull /sdcard/Download/NekoFlashQA/probe.bin /sdcard/Download/NekoFlashQA/probe-return.bin
-adb push /sdcard/Download/NekoFlashQA/tree /sdcard/Download/NekoFlashQA/
-adb shell find /sdcard/Download/NekoFlashQA/tree -type f
-```
-
-Сравни SHA-256 исходного и возвращённого файла **в Termux HOST**. Для Stop/отключения используй только тестовые файлы и зафиксируй момент действия. Не удаляй пользовательские данные TARGET.
-
-## Как сдать отчёт
-
-В HTML укажи обе модели/Android, USB-кабель, точный build ID, статус **каждого** выполненного теста, воспроизведение ошибки, скриншоты и предложения. Подключи `/Download/NekoFlash/logs` кнопкой выбора папки; HTML **не может** читать её автоматически без твоего разрешения. Если браузер выдаёт только разовый снимок папки, перед ZIP ещё раз нажми обновление.
-
-ZIP включает `report.txt`, `progress.json`, `evidence-manifest.json`, исходные `log-*`, `trace-*.bin`, `session-summary-*` и выбранные фото/видео. **Байты логов не очищаются, не маскируются и не сокращаются**. Экспорт использует ZIP32; при архиве больше ~4 ГиБ он выдаст ошибку, а исходные файлы останутся на месте. Для больших сессий разделяй архивы, не удаляй оригиналы.
-
-Отправляй готовый ZIP в **доверенный личный чат/закрытую тестовую группу** как документ и кратко напиши «HOST, TARGET, build, симптом, шаги воспроизведения, время». Не размещай сырые логи, серийные номера, RSA, токены Mi или другие секреты в публичных GitHub Issues. **Тестбук ничего сам не отправляет в сеть**.
+Ранее пройденные аппаратные тесты: [реестр](../testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) и [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) оставляем для отдельного исследования; никакого повторного wipe/flash для галочек.

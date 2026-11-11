@@ -62,16 +62,8 @@ jobs:
           python3 tests/check_rev26.py
           python3 tests/check_i18n.py
           python3 tests/check_docs.py
-          python3 tests/check_insiders_testbook.py
+          python3 tests/check_insiders_apk_kit.py
           python3 tests/check_diagnostic_zip_verifier.py
-
-      - name: Publish standalone offline Insiders testbook
-        uses: actions/upload-artifact@v6
-        with:
-          name: NekoFlash-Insiders-Testbook-REV45-reference-${{ github.sha }}
-          path: docs/insiders/testbook.html
-          if-no-files-found: error
-          retention-days: 90
 
       - name: Native transfer deadline regression tests
         run: |
@@ -561,10 +553,10 @@ jobs:
         with:
           name: NekoFlash-${{ github.sha }}-debug
           path: kit-input
-      - name: Stage and verify offline kit
+      - name: Stage and verify APK-only kit
         run: |
           python3 scripts/package_insiders.py kit-input tester-kit --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
-          python3 scripts/verify_insiders_kit.py tester-kit --commit "$GITHUB_SHA"
+          python3 scripts/verify_insiders_kit.py tester-kit --source-artifact kit-input --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@v6
         id: upload
         with:
@@ -598,10 +590,8 @@ jobs:
           marker=docs/insiders/campaign-tag.txt
           tag=$(cat "$marker")
           [[ "$tag" =~ ^insiders-rev([1-9][0-9]*)$ ]]
+          # Do not rewrite or repack previously published releases.
           if git diff --quiet "$PREVIOUS" "$GITHUB_SHA" -- "$marker"; then
-            if ! git diff --quiet "$PREVIOUS" "$GITHUB_SHA" -- scripts/package_insiders.py; then
-              bash scripts/repack_insiders_release.sh "$tag"
-            fi
             exit 0
           fi
           revision=REV${BASH_REMATCH[1]}
@@ -617,4 +607,4 @@ jobs:
           gh run download "$GITHUB_RUN_ID" --name "NekoFlash-$GITHUB_SHA-debug" --dir debug-source
           gh release create "$tag" "$archive" debug-source/filesystem-tools-source.tar.gz --target "$GITHUB_SHA" --prerelease --latest=false \
             --title "NekoFlash Insiders $revision · hardware beta" \
-            --notes "Android field-testing kit. Extract the ZIP, install the APK and open testbook.html. [Telegram tester group](https://t.me/+NR_FiUmvXlViOTUy). CI: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. ZIP SHA-256: ${ARTIFACT_DIGEST#sha256:}."
+            --notes "Android field-testing kit. Extract the ZIP, install the APK. Test steps and reports are handled in chat. [Telegram tester group](https://t.me/+NR_FiUmvXlViOTUy). CI: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID. ZIP SHA-256: ${ARTIFACT_DIGEST#sha256:}."

@@ -1,4 +1,4 @@
-> **АРХИВ REV9.** Для текущих реальных испытаний REV43 бери [Insiders тестбук](../insiders/testbook.html), [инструкцию REV43](INSIDERS-FIELD-TEST-REV43-RU.md) и [статус DEV](../DEVELOPMENT_STATUS.md). Исторические инструкции REV9 ниже сохранены, но не подтверждают новых аппаратных PASS.
+> **АРХИВ REV9.** Для текущих реальных испытаний REV43 бери [Текущая инструкция Insiders](../insiders/README.md), [инструкцию REV43](INSIDERS-FIELD-TEST-REV43-RU.md) и [статус DEV](../DEVELOPMENT_STATUS.md). Исторические инструкции REV9 ниже сохранены, но не подтверждают новых аппаратных PASS.
 
 # NekoFlash 2.0 — большой аппаратный тест REV9
 
