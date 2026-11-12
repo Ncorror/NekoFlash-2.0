@@ -35,10 +35,33 @@ class FastbootTerminalPlanTest {
     }
     @Test fun trailingWipeFlagWorksWithQuotedFlashFile() {
         val file = image(); val request = parse("flash boot '${file.path}' --slot=b -w")!!
-        assertEquals(listOf(FastbootExecutionStep.Wipe(), FastbootExecutionStep.Flash("boot", file, "b")), steps(request))
+        assertEquals(listOf(FastbootExecutionStep.Flash("boot", file, "b"), FastbootExecutionStep.Wipe()), steps(request))
     }
     @Test fun standaloneWipeWorksWithoutAPrimaryCommand() {
         assertEquals(listOf(FastbootExecutionStep.Wipe()), steps(parse("--wipe")!!))
+    }
+
+    @Test fun explicitEraseFormatAndFlashRunBeforeGlobalWipe() {
+        val file = image()
+        assertEquals(
+            listOf(FastbootExecutionStep.PartitionCommand("erase", "userdata", null), FastbootExecutionStep.Wipe()),
+            steps(parse("-w erase userdata")!!)
+        )
+        assertEquals(
+            listOf(FastbootExecutionStep.Format("userdata"), FastbootExecutionStep.Wipe()),
+            steps(parse("-w format userdata")!!)
+        )
+        assertEquals(
+            listOf(FastbootExecutionStep.Flash("userdata", file, null), FastbootExecutionStep.Wipe()),
+            steps(parse("-w flash userdata '${file.path}'")!!)
+        )
+    }
+
+    @Test fun forceWipeCarriesSnapshotCancellationIntent() {
+        assertEquals(
+            listOf(FastbootExecutionStep.Wipe(force = true)),
+            steps(parse("--force -w")!!)
+        )
     }
     @Test fun formatOverridesAndGlobalOptionsAreNormalizedTogether() {
         val request = parse("--fs-options=projid --slot=all format:f2fs:8000000 userdata --fs-options casefold")!!
@@ -96,7 +119,7 @@ class FastbootTerminalPlanTest {
     }
     @Test fun activeSlotOptionNoLongerDisappearsWhenPairedWithFlash() {
         val file = image()
-        assertEquals(listOf(FastbootExecutionStep.SetActive("b"), FastbootExecutionStep.Flash("boot", file, null)), steps(parse("--set-active=b flash boot '${file.path}'")!!))
+        assertEquals(listOf(FastbootExecutionStep.Flash("boot", file, null), FastbootExecutionStep.SetActive("b")), steps(parse("--set-active=b flash boot '${file.path}'")!!))
     }
     @Test fun trailingCommandsCannotBeSilentlyDroppedFromAWipePlan() {
         val file = image()
