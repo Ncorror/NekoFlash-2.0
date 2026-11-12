@@ -18,7 +18,12 @@ class FastbootPlanExecutorTest {
             events += "targets:$partition:$slot"
             return when (slot) { "all" -> listOf("${partition}_a", "${partition}_b"); null -> listOf(partition); else -> listOf("${partition}_$slot") }
         }
-        override fun command(command: String): Boolean { events += command; return command != fail }
+        override fun command(command: String): Boolean {
+            events += command
+            val ok = command != fail
+            if (ok && command == "snapshot-update:cancel") variables["snapshot-update-status"] = "none"
+            return ok
+        }
         override fun flash(partition: String, file: File) { events += "flash:$partition"; check("flash:$partition" != fail) }
         override fun download(file: File, command: String) { events += "download:$command" }
         override fun fetch(partition: String, file: File) { events += "fetch:$partition" }
@@ -243,5 +248,18 @@ class FastbootPlanExecutorTest {
         executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))
         assertFalse(events.contains("snapshot-update:cancel"))
         assertTrue(events.contains("erase:userdata"))
+    }
+
+    @Test fun explicitSnapshotCancelBeforeForcedWipeIsNotRepeatedFromStalePreflightState() {
+        variables["snapshot-update-status"] = "merging"
+        executor().run(
+            listOf(
+                FastbootExecutionStep.Raw("snapshot-update:cancel"),
+                FastbootExecutionStep.Wipe(force = true)
+            )
+        )
+        assertEquals(1, events.count { it == "snapshot-update:cancel" })
+        assertTrue(events.indexOf("snapshot-update:cancel") < events.indexOf("get:snapshot-update-status"))
+        assertTrue(events.indexOf("get:snapshot-update-status") < events.indexOf("erase:userdata"))
     }
 }
