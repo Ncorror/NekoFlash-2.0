@@ -91,9 +91,29 @@ internal class FastbootPlanExecutor(
     private fun prepare(step: FastbootExecutionStep): List<Prepared> = when (step) {
         is FastbootExecutionStep.Raw -> listOf(command(step.command))
         is FastbootExecutionStep.SetActive -> {
-            val slot = step.slot ?: port.getVar("current-slot")?.trim()?.removePrefix("_")
+            fun slotCount(): Int = port.getVar("slot-count")?.trim()?.toIntOrNull()
+                ?.takeIf { it in 1..26 } ?: error("Cannot determine slot count for --set-active")
+            fun currentOrNull(): String? = port.getVar("current-slot")?.trim()?.removePrefix("_")
                 ?.takeIf { it.matches(Regex("[a-z]")) }
-                ?: error("Cannot determine current slot for --set-active")
+            val slot = when (step.slot) {
+                null -> currentOrNull() ?: run {
+                    log("--set-active: current-slot is unavailable; desktop fastboot would skip set-active")
+                    return emptyList()
+                }
+                "all" -> {
+                    slotCount()
+                    "a"
+                }
+                "other" -> {
+                    val count = slotCount()
+                    require(count > 1) { "No other slot for --set-active" }
+                    val current = currentOrNull() ?: error("Cannot determine current slot for --set-active=other")
+                    val index = current[0] - 'a'
+                    require(index in 0 until count) { "Current slot is outside reported slot count" }
+                    ('a' + (index + 1) % count).toString()
+                }
+                else -> step.slot
+            }
             require(slot.matches(Regex("[a-z]")))
             plannedActive = slot
             listOf(command("set_active:$slot"))

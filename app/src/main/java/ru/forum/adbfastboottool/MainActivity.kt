@@ -1247,12 +1247,12 @@ class MainActivity : AppCompatActivity() {
                 }
                 lower.startsWith("--set-active=") -> {
                     setActiveRequested = true
-                    setActive = normalizeFastbootSlot(token.substringAfter('='))?.takeUnless { it == "all" || it == "other" } ?: return null
+                    setActive = normalizeFastbootSlot(token.substringAfter('=')) ?: return null
                 }
                 lower.startsWith("-a") && token.length > 2 -> {
                     setActiveRequested = true
                     val attached = token.substring(2).removePrefix("=")
-                    setActive = normalizeFastbootSlot(attached)?.takeUnless { it == "all" || it == "other" } ?: return null
+                    setActive = normalizeFastbootSlot(attached) ?: return null
                 }
                 lower == "--disable-verity" || lower == "--disable-verification" -> {
                     viewModel.log(
@@ -1349,7 +1349,7 @@ class MainActivity : AppCompatActivity() {
             else -> error("Unexpected ADB action in Fastboot parser")
         }
         val active = if (parsedOptions.setActiveRequested) {
-            parsedOptions.setActive ?: parsedOptions.slot?.takeUnless { it == "all" || it == "other" }
+            parsedOptions.setActive ?: parsedOptions.slot
         } else null
         val plan = FastbootHostSyntax.compose(
             steps,

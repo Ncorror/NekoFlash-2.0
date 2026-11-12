@@ -243,6 +243,23 @@ class FastbootPlanExecutorTest {
         assertTrue(events.indexOf("get:current-slot") < events.indexOf("set_active:b"))
     }
 
+    @Test fun globalSetActiveWithoutSlotIsSkippedWhenCurrentSlotIsUnavailable() {
+        variables.remove("current-slot")
+        executor().run(FastbootHostSyntax.compose(emptyList(), false, emptySet(), null, activeRequested = true))
+        assertTrue(mutations().isEmpty())
+    }
+
+    @Test fun globalSetActiveOtherAndAllMatchDesktopSlotResolution() {
+        variables["current-slot"] = "a"
+        variables["slot-count"] = "2"
+        executor().run(listOf(FastbootExecutionStep.SetActive("other")))
+        assertEquals(listOf("set_active:b"), mutations())
+
+        events.clear()
+        executor().run(listOf(FastbootExecutionStep.SetActive("all")))
+        assertEquals(listOf("set_active:a"), mutations())
+    }
+
     @Test fun forcedWipeCancelsAnActiveSnapshotBeforeTheFirstErase() {
         variables["snapshot-update-status"] = "merging"
         executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))

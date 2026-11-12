@@ -146,6 +146,17 @@ class FastbootTerminalPlanTest {
             steps(parse("--slot=b --set-active reboot")!!)
         )
     }
+
+    @Test fun setActiveOptionPreservesDesktopAllAndOtherResolutionRequests() {
+        assertEquals(
+            listOf(FastbootExecutionStep.SetActive("other"), FastbootExecutionStep.Raw("reboot")),
+            steps(parse("--set-active=other reboot")!!)
+        )
+        assertEquals(
+            listOf(FastbootExecutionStep.SetActive("all"), FastbootExecutionStep.Raw("reboot")),
+            steps(parse("--slot=all --set-active reboot")!!)
+        )
+    }
     @Test fun trailingCommandsCannotBeSilentlyDroppedFromAWipePlan() {
         val file = image()
         for (command in listOf("-w flash boot '${file.path}' reboot", "-w erase userdata reboot", "-w boot '${file.path}' reboot", "update-super '${file.path}' super ignored")) {
