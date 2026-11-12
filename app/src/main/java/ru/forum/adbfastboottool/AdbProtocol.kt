@@ -873,6 +873,43 @@ class AdbProtocol(
     }
 
     private fun pullFileSingle(remotePath: String, localFile: File, expectedSize: Long?): Boolean {
+        val size = expectedSize ?: return pullFileSingleSync(remotePath, localFile, expectedSize)
+        if (!AdbCheckpointedPullPolicy.shouldUse(
+                isDeviceMode = peerMode == PeerMode.DEVICE,
+                supportsShellV2 = supportsShellV2,
+                fileSize = size
+            )) {
+            return pullFileSingleSync(remotePath, localFile, expectedSize)
+        }
+
+        val stableStat = statRemotePath(remotePath, logMissing = false)
+        if (stableStat == null) {
+            if (!isConnected) return false
+            onLog("ℹ️ adb pull: checkpoint preflight unavailable; using standard SYNC")
+            return pullFileSingleSync(remotePath, localFile, expectedSize)
+        }
+        if (!stableStat.isRegularFile || stableStat.size != size) {
+            onLog("❌ adb pull: source changed during checkpoint preflight")
+            return false
+        }
+
+        if (!checkpointedPullRangeToolAvailable()) {
+            if (!isConnected) return false
+            onLog("ℹ️ adb pull: target Toybox lacks byte-range dd; using standard SYNC")
+            return pullFileSingleSync(remotePath, localFile, expectedSize)
+        }
+
+        val remoteSha256 = remoteSha256(remotePath)
+        if (remoteSha256 == null) {
+            if (!isConnected) return false
+            onLog("ℹ️ adb pull: remote SHA-256 unavailable; using standard SYNC")
+            return pullFileSingleSync(remotePath, localFile, expectedSize)
+        }
+
+        return pullFileCheckpointed(remotePath, localFile, stableStat, remoteSha256)
+    }
+
+    private fun pullFileSingleSync(remotePath: String, localFile: File, expectedSize: Long?): Boolean {
         val cleanRemote = remotePath
         val parent = localFile.parentFile
         if (parent != null && !parent.exists() && !parent.mkdirs()) {
@@ -959,6 +996,244 @@ class AdbProtocol(
                 onLog("ℹ️ adb pull: temporary file cleanup skipped (${error.javaClass.simpleName})")
             }
             closeAdbStream(stream)
+        }
+    }
+
+    private fun checkpointedPullRangeToolAvailable(): Boolean {
+        val probe = runShellCommandForResult(
+            "toybox dd if=/dev/null of=/dev/null iflag=skip_bytes,count_bytes skip=0 count=0 status=none",
+            logOutput = false,
+            captureOutput = false
+        )
+        return probe.success
+    }
+
+    private fun remoteSha256(remotePath: String): String? {
+        val result = runShellCommandForResult(
+            "sha256sum " + shellQuote(remotePath),
+            logOutput = false,
+            captureOutput = true
+        )
+        if (!result.success) return null
+        return AdbCheckpointedPullPolicy.parseSha256Sum(result.stdout)
+    }
+
+    private fun localSha256(file: File): String {
+        val digest = java.security.MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(256 * 1024)
+        file.inputStream().buffered().use { input ->
+            while (true) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                digest.update(buffer, 0, read)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    private fun pullFileCheckpointed(
+        remotePath: String,
+        localFile: File,
+        stableStat: SyncStat,
+        remoteSha256: String
+    ): Boolean {
+        val parent = localFile.absoluteFile.parentFile
+        if (parent == null || (!parent.exists() && !parent.mkdirs())) {
+            onLog("❌ adb pull: could not create destination folder")
+            return false
+        }
+
+        val checkpoint = File(
+            parent,
+            AdbCheckpointedPullPolicy.checkpointFileName(
+                localFile.absolutePath,
+                remotePath,
+                stableStat.size,
+                stableStat.mtime,
+                remoteSha256
+            )
+        )
+        onLog("-> adb pull " + remotePath + " " + localFile.absolutePath)
+        onLog("Remote file size: " + stableStat.size + " bytes")
+        onLog("ℹ️ Large-file Pull: 4 MiB durable ranges, manual-reconnect resume enabled")
+        onLog("ℹ️ Remote SHA-256: " + remoteSha256)
+
+        return try {
+            RandomAccessFile(checkpoint, "rw").use { raf ->
+                var committed = raf.length()
+                if (!AdbCheckpointedPullPolicy.isValidCheckpointLength(stableStat.size, committed)) {
+                    onLog("⚠️ adb pull: invalid old checkpoint; restarting from byte 0")
+                    raf.setLength(0L)
+                    raf.fd.sync()
+                    committed = 0L
+                }
+                if (committed > 0L) {
+                    onLog("↻ adb pull: resuming from durable checkpoint " + committed + "/" + stableStat.size + " bytes")
+                }
+
+                while (!cancelled) {
+                    val range = AdbCheckpointedPullPolicy.nextRange(stableStat.size, committed) ?: break
+                    raf.seek(range.offset)
+                    if (!pullShellV2Range(remotePath, raf, range)) {
+                        runCatching {
+                            raf.setLength(range.offset)
+                            raf.fd.sync()
+                        }
+                        val preserved = range.offset
+                        if (!cancelled && preserved > 0L) {
+                            onLog(
+                                "⚠️ adb pull interrupted; durable checkpoint preserved at " +
+                                    preserved + "/" + stableStat.size +
+                                    " bytes. Reconnect ADB manually and run the same pull again to resume."
+                            )
+                        }
+                        return false
+                    }
+
+                    try {
+                        raf.fd.sync()
+                    } catch (error: Exception) {
+                        runCatching { raf.setLength(range.offset) }
+                        onLog("❌ adb pull: checkpoint fsync failed: " + (error.message ?: error.javaClass.simpleName))
+                        return false
+                    }
+
+                    val previous = committed
+                    committed = range.offset + range.length.toLong()
+                    val previousProgress = ((previous * 100L) / stableStat.size).toInt().coerceAtMost(100)
+                    val progress = ((committed * 100L) / stableStat.size).toInt().coerceAtMost(100)
+                    onProgress(progress, "Pull " + committed + "/" + stableStat.size + " bytes")
+                    if (progress >= 100 || progress / 10 != previousProgress / 10) {
+                        onLog("adb pull: " + progress + "% (" + committed + "/" + stableStat.size + " bytes)")
+                    }
+                }
+
+                if (cancelled) {
+                    onLog("⚠️ adb pull cancelled; completed checkpoint ranges were preserved")
+                    return false
+                }
+
+                val after = statRemotePath(remotePath, logMissing = false)
+                if (after == null) {
+                    onLog("⚠️ adb pull: final source STAT unavailable; completed checkpoint preserved")
+                    return false
+                }
+                if (!after.isRegularFile || after.size != stableStat.size || after.mtime != stableStat.mtime) {
+                    raf.setLength(0L)
+                    raf.fd.sync()
+                    onLog("❌ adb pull: remote source changed while reading; checkpoint discarded")
+                    return false
+                }
+
+                val localSha256 = localSha256(checkpoint)
+                if (!localSha256.equals(remoteSha256, ignoreCase = true)) {
+                    raf.setLength(0L)
+                    raf.fd.sync()
+                    onLog("❌ adb pull: SHA-256 mismatch; checkpoint discarded")
+                    onLog("Remote SHA-256: " + remoteSha256)
+                    onLog("Local SHA-256:  " + localSha256)
+                    return false
+                }
+                onLog("✅ adb pull SHA-256 verified: " + localSha256)
+            }
+
+            FilePublication.replace(checkpoint, localFile)
+            onLog("✅ adb pull completed: " + localFile.absolutePath + " (" + stableStat.size + " bytes)")
+            true
+        } catch (error: Exception) {
+            onLog("❌ adb pull checkpoint error: " + (error.message ?: error.javaClass.simpleName))
+            false
+        }
+    }
+
+    private fun pullShellV2Range(
+        remotePath: String,
+        output: RandomAccessFile,
+        range: AdbCheckpointedPullPolicy.Range
+    ): Boolean {
+        val command =
+            "toybox dd if=" + shellQuote(remotePath) +
+                " iflag=skip_bytes,count_bytes skip=" + range.offset +
+                " count=" + range.length +
+                " status=none"
+        val stream = openAdbStream("shell,v2,raw:" + command, logOpen = false) ?: return false
+        var exitCode: Int? = null
+        var received = 0L
+        val stderr = StringBuilder()
+
+        try {
+            val stdinCloseAcked = writeShellPacket(
+                stream,
+                SHELL_ID_CLOSE_STDIN,
+                EMPTY_PAYLOAD,
+                allowBufferedEarlyClose = true
+            )
+            if (!ShellV2EarlyClosePolicy.mayDrainAfterCloseStdin(
+                    stdinCloseAcked,
+                    stream.closed,
+                    pendingByteCount(stream),
+                    cancelled
+                )) {
+                return false
+            }
+
+            while (!cancelled && (!stream.closed || pendingByteCount(stream) > 0)) {
+                val header = readShellPacketHeader(stream) ?: break
+                when (header.id) {
+                    SHELL_ID_STDOUT -> {
+                        val data = readAdbStreamExact(stream, header.length) ?: return false
+                        val next = received + data.size.toLong()
+                        if (next > range.length.toLong()) {
+                            onLog("❌ adb pull range produced more bytes than requested")
+                            return false
+                        }
+                        output.write(data)
+                        received = next
+                    }
+                    SHELL_ID_STDERR -> {
+                        val data = readAdbStreamExact(stream, header.length) ?: return false
+                        if (stderr.length < 4096) {
+                            val text = String(data, Charsets.UTF_8)
+                            stderr.append(text.take(4096 - stderr.length))
+                        }
+                    }
+                    SHELL_ID_EXIT -> {
+                        val data = readAdbStreamExact(stream, header.length) ?: return false
+                        exitCode = ShellV2EarlyClosePolicy.completeExitCode(header.length, data)
+                            ?: return false
+                    }
+                    SHELL_ID_STDIN, SHELL_ID_CLOSE_STDIN -> {
+                        if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
+                            return false
+                        }
+                    }
+                    else -> {
+                        if (header.length > 0 && readAdbStreamExact(stream, header.length) == null) {
+                            return false
+                        }
+                    }
+                }
+            }
+
+            if (cancelled) return false
+            if (exitCode != 0) {
+                val detail = stderr.toString().trim()
+                onLog(
+                    "❌ adb pull range command failed: exit=" + (exitCode?.toString() ?: "missing") +
+                        if (detail.isNotEmpty()) ", stderr=" + detail else ""
+                )
+                return false
+            }
+            if (received != range.length.toLong()) {
+                onLog(
+                    "❌ adb pull range incomplete: " + received + "/" + range.length +
+                        " bytes at offset " + range.offset
+                )
+                return false
+            }
+            return true
+        } finally {
+            if (isConnected) closeAdbStream(stream) else stream.closed = true
         }
     }
 
