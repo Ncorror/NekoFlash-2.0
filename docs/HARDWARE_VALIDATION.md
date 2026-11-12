@@ -72,7 +72,7 @@ Additional **REV53** hardware checks on unlocked vayu Android14 completed 10/10 
 
 The reference APK is from [main CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886), commit `a31dedadd4ad`. Both emulator jobs passed. A verified physical HOST → TARGET report for REV45 is still pending.
 
-Use the [Insiders kit and RU/EN guides](insiders/README.md). Record both devices, Android versions, cable, build ID, test ID, result and reproduction steps. Priorities are OTG/RSA, terminal keyboard and rotation, 512-file ADB push, Stop and reconnect. Keep raw evidence within the trusted team. The older alpha10 results below apply only to their original builds.
+The old REV45 Insiders kit/guides are no longer part of the active release tree. Their historical results remain in Git history and the [physical evidence ledger](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). The older alpha10 results below apply only to their original builds.
 
 ---
 
