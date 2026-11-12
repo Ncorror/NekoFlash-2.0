@@ -23,6 +23,45 @@ data = adb_file.read_bytes()
 def raw_source_git_sha(payload):
     return hashlib.sha1(b'blob ' + str(len(payload)).encode() + b'\0' + payload).hexdigest()
 
+# REV58: issue #72 checkpointed large-file Pull. This is deliberately
+# isolated from the ADB packet transport: no failed USB packet is retried and
+# no automatic reconnect is introduced. Normalize only the reviewed Pull block
+# back to REV57, then run every older byte-for-byte ADB guard unchanged.
+rev58_checkpointed_pull_adb_hash = 'cbca9c738c00950aeb899c3e3fd0150998e32c63'
+if raw_source_git_sha(data) == rev58_checkpointed_pull_adb_hash:
+    pull_start = data.index(b'    private fun pullFileSingle(')
+    pull_end = data.index(b'    private fun pullDirectory(', pull_start)
+    reviewed_pull = data[pull_start:pull_end]
+    sync_start = reviewed_pull.index(b'    private fun pullFileSingleSync(')
+    helper_start = reviewed_pull.index(
+        b'    private fun checkpointedPullRangeToolAvailable(): Boolean {',
+        sync_start
+    )
+    previous_pull = reviewed_pull[sync_start:helper_start].replace(
+        b'    private fun pullFileSingleSync(',
+        b'    private fun pullFileSingle(',
+        1
+    )
+    data = data[:pull_start] + previous_pull + data[pull_end:]
+    assert raw_source_git_sha(data) == '2d1d0b416c4473f584323a88d22b71fc5b67343b', (
+        'REV58 modified unrelated ADB code'
+    )
+    checkpoint = (base/'AdbCheckpointedPullPolicy.kt').read_text()
+    assert 'const val RANGE_BYTES: Int = 256 * 1024' in checkpoint
+    assert 'const val MIN_FILE_BYTES: Long = 16L * 1024L * 1024L' in checkpoint
+    assert 'checkpointBytes % RANGE_BYTES.toLong() == 0L' in checkpoint
+    assert 'remoteSha256.lowercase()' in checkpoint
+    assert 'isDeviceMode && supportsShellV2 && fileSize >= MIN_FILE_BYTES' in checkpoint
+    assert (root/'app/src/test/java/ru/forum/adbfastboottool/AdbCheckpointedPullPolicyTest.kt').is_file()
+    assert 'if (!isConnected) return false' in adb
+    assert 'manual-reconnect resume enabled' in adb
+    assert 'toybox dd if=' in adb
+    assert 'iflag=skip_bytes,count_bytes' in adb
+    assert 'raf.setLength(range.offset)' in adb
+    assert 'raf.fd.sync()' in adb
+    assert 'SHA-256 mismatch; checkpoint discarded' in adb
+    assert 'FilePublication.replace(checkpoint, localFile)' in adb
+
 rev57_sideload_adb_hash = '2d1d0b416c4473f584323a88d22b71fc5b67343b'
 if raw_source_git_sha(data) == rev57_sideload_adb_hash:
     rev57_hunks = [
