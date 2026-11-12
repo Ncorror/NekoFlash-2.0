@@ -22,6 +22,7 @@ class FastbootPlanExecutorTest {
             events += command
             val ok = command != fail
             if (ok && command == "snapshot-update:cancel") variables["snapshot-update-status"] = "none"
+            if (ok && command.startsWith("set_active:")) variables["current-slot"] = command.substringAfter(':')
             return ok
         }
         override fun flash(partition: String, file: File) { events += "flash:$partition"; check("flash:$partition" != fail) }
@@ -258,6 +259,19 @@ class FastbootPlanExecutorTest {
         events.clear()
         executor().run(listOf(FastbootExecutionStep.SetActive("all")))
         assertEquals(listOf("set_active:a"), mutations())
+    }
+
+    @Test fun dynamicOtherSlotIsResolvedAfterAnEarlierSetActiveActuallyRuns() {
+        variables["current-slot"] = "a"
+        variables["slot-count"] = "2"
+        executor().run(
+            listOf(
+                FastbootExecutionStep.SetActive("b"),
+                FastbootExecutionStep.SetActive("other")
+            )
+        )
+        assertEquals(listOf("set_active:b", "set_active:a"), mutations())
+        assertTrue(events.lastIndexOf("get:current-slot") > events.indexOf("set_active:b"))
     }
 
     @Test fun forcedWipeCancelsAnActiveSnapshotBeforeTheFirstErase() {

@@ -169,6 +169,16 @@ class FastbootTerminalPlanTest {
         )
     }
 
+    @Test fun explicitSetActiveThenGlobalOtherKeepsBothHostOperationsInOrder() {
+        assertEquals(
+            listOf(
+                FastbootExecutionStep.SetActive("b"),
+                FastbootExecutionStep.SetActive("other")
+            ),
+            steps(parse("--set-active=other set_active b")!!)
+        )
+    }
+
     @Test fun unsupportedDesktopOnlyCommandsNeverFallThroughToRawWire() {
         for (command in listOf("flash:raw boot kernel.img", "stage payload.bin", "get_staged output.bin", "help")) {
             assertNull(command, parse(command))

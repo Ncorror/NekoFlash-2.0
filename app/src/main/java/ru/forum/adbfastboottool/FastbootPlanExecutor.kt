@@ -95,28 +95,38 @@ internal class FastbootPlanExecutor(
                 ?.takeIf { it in 1..26 } ?: error("Cannot determine slot count for --set-active")
             fun currentOrNull(): String? = port.getVar("current-slot")?.trim()?.removePrefix("_")
                 ?.takeIf { it.matches(Regex("[a-z]")) }
-            val slot = when (step.slot) {
-                null -> currentOrNull() ?: run {
-                    log("--set-active: current-slot is unavailable; desktop fastboot would skip set-active")
-                    return emptyList()
-                }
-                "all" -> {
-                    slotCount()
-                    "a"
-                }
-                "other" -> {
+
+            when (step.slot) {
+                null -> listOf(Prepared("set_active current") {
+                    val current = currentOrNull()
+                    if (current == null) {
+                        log("--set-active: current-slot is unavailable; desktop fastboot would skip set-active")
+                    } else {
+                        plannedActive = current
+                        check(port.command("set_active:$current")) { "Fastboot command failed: set_active:$current" }
+                    }
+                })
+                "other" -> listOf(Prepared("set_active other") {
                     val count = slotCount()
                     require(count > 1) { "No other slot for --set-active" }
                     val current = currentOrNull() ?: error("Cannot determine current slot for --set-active=other")
                     val index = current[0] - 'a'
                     require(index in 0 until count) { "Current slot is outside reported slot count" }
-                    ('a' + (index + 1) % count).toString()
+                    val resolved = ('a' + (index + 1) % count).toString()
+                    plannedActive = resolved
+                    check(port.command("set_active:$resolved")) { "Fastboot command failed: set_active:$resolved" }
+                })
+                "all" -> {
+                    slotCount()
+                    plannedActive = "a"
+                    listOf(command("set_active:a"))
                 }
-                else -> step.slot
+                else -> {
+                    require(step.slot.matches(Regex("[a-z]")))
+                    plannedActive = step.slot
+                    listOf(command("set_active:${step.slot}"))
+                }
             }
-            require(slot.matches(Regex("[a-z]")))
-            plannedActive = slot
-            listOf(command("set_active:$slot"))
         }
         is FastbootExecutionStep.Flash -> targets(step.partition, step.slot).map { flash(it, step.file) }
         is FastbootExecutionStep.PartitionCommand -> targets(step.partition, step.slot).map { command("${step.prefix}:$it") }
