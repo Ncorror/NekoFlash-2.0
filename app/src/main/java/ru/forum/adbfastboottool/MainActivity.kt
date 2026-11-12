@@ -1505,13 +1505,8 @@ class MainActivity : AppCompatActivity() {
 
             "set_active", "set-active" -> {
                 val slot = tokens.getOrNull(1)?.let { normalizeFastbootSlot(it) }
-                    ?: parsedOptions.setActive
-                    ?: return invalidTerminalFormat("fastboot set_active <a|b>")
-                if (slot == "all" || slot == "other") {
-                    viewModel.log("❌ set_active requires a concrete slot: a, b, ...")
-                    return null
-                }
-                TerminalAction.RawFastboot("set_active:$slot")
+                    ?: return invalidTerminalFormat("fastboot set_active <SLOT>")
+                TerminalAction.FastbootPlan(listOf(FastbootExecutionStep.SetActive(slot)))
             }
 
             "reboot" -> {
@@ -1521,9 +1516,17 @@ class MainActivity : AppCompatActivity() {
                     "bootloader" -> "reboot-bootloader"
                     "recovery" -> "reboot-recovery"
                     "fastboot" -> "reboot-fastboot"
-                    else -> clean
+                    else -> return invalidTerminalFormat("fastboot reboot [bootloader|recovery|fastboot]")
                 }
                 TerminalAction.RawFastboot(command)
+            }
+
+            "flash:raw", "stage", "get_staged", "help" -> {
+                viewModel.log(
+                    "⚠️ fastboot $op is a desktop host workflow and is not emulated by NekoFlash terminal. " +
+                        "Use supported flash/boot/fetch commands or explicit raw only for a real wire command."
+                )
+                null
             }
 
             "flashing" -> {

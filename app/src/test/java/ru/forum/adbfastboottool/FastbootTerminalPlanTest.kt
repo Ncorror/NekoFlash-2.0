@@ -157,6 +157,25 @@ class FastbootTerminalPlanTest {
             steps(parse("--slot=all --set-active reboot")!!)
         )
     }
+
+    @Test fun directSetActiveUsesTheSameDesktopSlotResolver() {
+        assertEquals(
+            listOf(FastbootExecutionStep.SetActive("other")),
+            steps(parse("set_active other")!!)
+        )
+        assertEquals(
+            listOf(FastbootExecutionStep.SetActive("all")),
+            steps(parse("set_active all")!!)
+        )
+    }
+
+    @Test fun unsupportedDesktopOnlyCommandsNeverFallThroughToRawWire() {
+        for (command in listOf("flash:raw boot kernel.img", "stage payload.bin", "get_staged output.bin", "help")) {
+            assertNull(command, parse(command))
+        }
+        assertNull(parse("reboot emergency"))
+        assertNull(parse("reboot nonsense"))
+    }
     @Test fun trailingCommandsCannotBeSilentlyDroppedFromAWipePlan() {
         val file = image()
         for (command in listOf("-w flash boot '${file.path}' reboot", "-w erase userdata reboot", "-w boot '${file.path}' reboot", "update-super '${file.path}' super ignored")) {
