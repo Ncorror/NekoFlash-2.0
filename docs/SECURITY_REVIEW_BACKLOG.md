@@ -34,9 +34,9 @@
 | P2 | Два токенайзера терминальных команд, вставка нескольких строк в raw PTY, push/pull к чувствительным файлам | модель командного ввода и предупреждений, без отключения легитимных абсолютных путей |
 | P2 | PKCS8 host-key в app-private файле, сериал в SharedPreferences, сырая копия terminal в буфер | архитектура защиты ключей (Android Keystore или совместимый способ), контроль доступа, UX очистки буфера |
 
-## Отдельный выпускной риск, подтверждён по workflow
+## Выпускной supply-chain риск — закрыт 13 ноября 2026
 
-**P1 до любого публичного release.** `.github/workflows/release.yml` запускается на любой тег `v*` с `contents: write` и проверяет совпадение тега с `versionName`, но не доказывает, что тег указывает на одобренный merge в `main`. Перед выпуском требуется явный проверяемый release-base policy и защита от подписи неутверждённого коммита. Также проверить пиннинг GitHub Actions по SHA и permissions.
+**RESOLVED.** Release provenance теперь проверяет, что tag совпадает с `versionName` и указывает на одобренную историю `main`; main-only `.github/RELEASE_REQUEST` может создать только ожидаемый version tag из текущего main. Build/release workflows используют сторонние GitHub Actions, закреплённые по полным commit SHA, с минимальными job permissions. Секреты подписи доступны только job в защищённом `nekoflash-release`.
 
 ## Исправлено только в документах, не в приложении
 

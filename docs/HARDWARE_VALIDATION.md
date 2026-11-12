@@ -1,3 +1,20 @@
+## Release qualification — 13 November 2026
+
+| Final field result | Release classification |
+| --- | --- |
+| Unlocked POCO X3 Pro `vayu`: `fastboot format userdata`, `fastboot -w`, metadata/cache handling, reboot, Android setup screen | **FIELD PASS — #64 closed** |
+| POCO X3 Pro host → POCO X3 Pro target: `framework.jar` Pull and repeated 128 MiB Pull/Push with matching SHA-256 | **FIELD PASS — generic ADB Pull path** |
+| POCO F7 / `onyx` host: intermittent inbound `USB_IN_FAILED/EPROTO`; same target/files pass on X3 Pro host; Legacy shows the same class of onyx-host receive failures | **Host-specific compatibility note — #72 closed with checkpoint/resume robustness** |
+| Recovery Sideload, Mass Flash, Fastboot reconnect/reboot, Xiaomi sign-in, ZIP select/clear, terminal input/rotation | **Accepted physical PASS evidence on tested builds/devices** |
+
+Large normal-Android Pulls now checkpoint every 256 KiB, never replay a failed USB/ADB packet, require manual reconnect after transport failure and publish the destination only after source recheck plus exact SHA-256 verification.
+
+POCO F7 power/VBUS sensitivity is plausible field context but was not instrumented; it is not recorded as a proven electrical root cause.
+
+**The dated sections below are historical evidence snapshots. Their old FAIL/PENDING wording describes those exact builds and is not the current release verdict.**
+
+---
+
 <div align="center">
 
 ## New physical field evidence — 9 November 2026, unlocked vayu

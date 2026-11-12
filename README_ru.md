@@ -2,46 +2,60 @@
 
 # NekoFlash 2.0
 
-**Последняя проверенная точка main:** `7273b014`, `6.0.0-alpha11`; [CI #698 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43068208355): JVM, Lint, Android API 26 и 34. Следующий комплект Insiders содержит **только debug APK** с проверенной контрольной суммой. Тесты и результаты теперь ведём **в чате команды**, без отдельного HTML-трекера. Полные диагностические ZIP экспортируем из NekoFlash.
+**Релизная линия:** `6.0.0-alpha11` · versionCode `234`.
 
-**Ранее опубликованный Insiders REV50** ([историческая страница релиза](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50)) собран из предыдущего коммита. Это не новая main и не production APK с постоянной подписью; старые материалы не перепаковываем.
-
-**Новые исправления:** «Очистить» выбранный ZIP в Sideload без удаления файла, индикатор авторизации Mi-аккаунта, версия Android после подключения ADB SYSTEM. Отдельно от релиза оставляем [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) ADB Pull EPROTO и [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) Fastboot `-w`/cache. Экспериментальный [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) не сливаем.
+NekoFlash позволяет с одного Android-телефона работать со вторым по USB OTG через ADB, Fastboot и Recovery. Для хоста нужны Android 8.0+, USB Host и кабель с передачей данных. Root на хосте необязателен.
 
 Русский · [English](README.md)
 
-NekoFlash работает с ADB и Fastboot с одного Android-телефона по OTG на другом. Хост: Android 8+, USB Host, кабель данных. Root необязателен.
+## Статус релиза
 
-**Сборки тестировщикам:** [зелёные CI main](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) · [история реальных тестов](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). Бери APK из точного CI, указывай build ID и отправляй скриншоты с полным диагностическим ZIP. Уже проверенные прошивки и поворот терминала не повторяем.
+Финальная аппаратная кампания alpha11 закрыта для выпуска:
 
-## Интерфейс приложения
+- **Fastboot format/wipe (#64): FIELD PASS.** На разблокированном POCO X3 Pro `vayu` подтверждены `fastboot format userdata`, обработка metadata/cache, `fastboot -w`, reboot и последующая загрузка Android до мастера первоначальной настройки.
+- **Большой ADB Pull (#72): закрыт.** POCO X3 Pro host → POCO X3 Pro target прошёл Pull `framework.jar`, повторные Pull/Push 128 МиБ и сравнение SHA-256. POCO F7 / `onyx` выделен как отдельный плавающий host-side USB receive case; большой Pull теперь пишет устойчивые checkpoint по 256 КиБ и публикует итоговый файл только после совпадения SHA-256.
+- Recovery/Sideload, Fastboot handshake/reboot, Mass Flash, вход Xiaomi, выбор/очистка ZIP и терминал/поворот имеют реальный аппаратный PASS на протестированных устройствах и сборках.
 
-В консоли доступны ADB shell, push/pull и установка APK. На вкладке прошивки собраны Quick Flash, очередь Mass Flash и инструменты Fastboot. Есть Recovery Sideload, Xiaomi Unlock, отчёты операций и исходные журналы USB.
+Актуальная сводка: [Hardware validation](docs/HARDWARE_VALIDATION.md). Датированные низкоуровневые эксперименты оставлены только в [журнале аппаратных доказательств](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md).
 
-Английский интерфейс опубликованной APK REV45 на эмуляторе Android 14 (API 34). На главной виден хост без подключённого устройства. В очередь Mass Flash добавлен тестовый образ.
+## POCO F7 / onyx как host
 
-| Главная | Терминал | Быстрая прошивка |
-| --- | --- | --- |
-| <img src="docs/screenshots/rev45/portrait-home.png" width="210" alt="Главная"> | <img src="docs/screenshots/rev45/terminal-command.png" width="210" alt="Терминал"> | <img src="docs/screenshots/rev45/portrait-quick.png" width="210" alt="Быстрая прошивка"> |
+POCO F7 (`onyx`, Android 16) неоднократно показывал плавающие ошибки входящего USB ещё в Legacy NekoFlash. На том же target и тех же файлах POCO X3 Pro в роли host работает нормально. Поэтому NekoFlash сохраняет fail-closed транспорт и после ручного переподключения продолжает большой Pull только с полностью записанного checkpoint.
 
-| Очередь Mass Flash | Инструменты Fastboot | ADB Sideload |
-| --- | --- | --- |
-| <img src="docs/screenshots/rev45/mass-queue.png" width="210" alt="Очередь Mass Flash"> | <img src="docs/screenshots/rev45/portrait-tools.png" width="210" alt="Инструменты Fastboot"> | <img src="docs/screenshots/rev45/portrait-sideload.png" width="210" alt="ADB Sideload"> |
+Чувствительность питания/VBUS правдоподобна по полевому поведению, но напряжение и ток мы не измеряли, поэтому это **не объявляется доказанной первопричиной**. Короткий кабель или USB-хаб с внешним питанием можно использовать как диагностический вариант для слабой/нестабильной OTG-шины.
 
-## Сборка и проверки
+## Скачать
 
-Сборка для сверки и скриншотов — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`a31dedadd4ad`](https://github.com/Ncorror/NekoFlash-2.0/commit/a31dedadd4adcf08691ece82c7574f05286078f3). [CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886/artifacts/13139380119).
+- [GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases) — официальные подписанные релизы.
+- [Зелёные CI main](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) — debug/test APK точного коммита.
+- [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) — координация тестировщиков.
 
-Прошли 308 JVM-тестов и по 20 инструментальных тестов на API 26 и 34. Lint завершился без замечаний. Точный SHA-256 APK и исходный коммит подтверждаются в соответствующем CI.
+Старые Insiders REV ZIP не считать текущим production-артефактом.
 
-[Audit / Аудит](docs/insiders/AUDIT-2026-11-02.md) · [Hardware](docs/HARDWARE_VALIDATION.md) · [USB OTG](docs/USB_CONNECTION_TROUBLESHOOTING.md) · [Privacy](PRIVACY.md)
+## Возможности
 
-Для локальной debug-сборки нужны JDK 17 и сборка утилит файловых систем. Точные шаги есть в [сборочном workflow](.github/workflows/build.yml).
+- ADB shell, push/pull, установка APK и диагностика.
+- Quick Flash, Mass Flash и Fastboot tools.
+- Recovery ADB Sideload: выбор файла отдельно, запуск отдельно.
+- Xiaomi Unlock account/session workflow.
+- Operation Center, полный diagnostic export и raw USB evidence.
+- Генерация ext4/F2FS на host для поддерживаемых Fastboot format.
+- Большой Pull с checkpoint/resume и финальной проверкой SHA-256.
+
+## Безопасность и диагностика
+
+NekoFlash не повторяет молча неудачные разрушительные Fastboot-команды и повреждённые ADB-пакеты. Разрушающие действия остаются явными. Полный diagnostic export сохраняется для технического разбора; сырые журналы лучше передавать только через доверенный канал.
+
+См. [USB troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md), [Privacy](PRIVACY.md) и [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+## Сборка и релиз
+
+CI использует JDK 17, проверенный Gradle Wrapper и GitHub Actions, закреплённые по commit SHA. Production-сборка fail-closed: защищённый release workflow требует постоянный ключ, сверяет SHA-256 сертификата `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2`, собирает APK, повторно проверяет сертификат APK и публикует checksum/build metadata.
+
+Релизный tag обязан совпадать с `versionName` и указывать на одобренный `main`. См. [release readiness](docs/RELEASE_READINESS-2026-11-10.md).
 
 ## Проект
 
 Автор и разработчик — [Ncorror](https://github.com/Ncorror). Участник проекта — [IQ-HARRY7](https://github.com/IQ-HARRY7).
 
-[Apache 2.0](LICENSE) · [Artwork](ASSETS_LICENSE.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Предыдущий README и история релизов](https://github.com/Ncorror/NekoFlash-2.0/blob/7b54ba1e70807bdc7cee65a64cff87fd002ce26b/README_ru.md)
-
-Теги — `android` `usb-otg` `usb-host` `adb` `fastboot` `adb-sideload` `android-recovery` `hardware-testing`
+[Apache 2.0](LICENSE) · [Artwork](ASSETS_LICENSE.md) · [Changelog](CHANGELOG.md)
