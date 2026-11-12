@@ -457,3 +457,22 @@ jobs:
             --title "NekoFlash $VERSION_NAME" \
             --generate-notes \
             "${EXTRA_FLAGS[@]}"
+
+      - name: Remove superseded branches after successful release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -u
+          for branch in \
+            "fix/adb-pull-checkpointed-ranges-72" \
+            "agent/nekoflash-astra" \
+            "release/6.0.0-alpha11"
+          do
+            ref="repos/$GITHUB_REPOSITORY/git/refs/heads/$branch"
+            if gh api -X DELETE "$ref" --silent; then
+              echo "Deleted superseded branch: $branch"
+            else
+              echo "Branch already absent or could not be deleted: $branch"
+            fi
+          done
