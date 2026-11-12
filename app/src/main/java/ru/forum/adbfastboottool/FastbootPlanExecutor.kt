@@ -119,16 +119,21 @@ internal class FastbootPlanExecutor(
         // while /cache is optional on modern Android. Prepare all images before mutation as
         // before, but execute the critical userdata + metadata reset before best-effort cache.
         is FastbootExecutionStep.Wipe -> {
-            val snapshotCancel = if (step.force) {
+            // AOSP checks snapshot state immediately before the global wipe, after any
+            // explicit commands already ran. Keep image generation preflight ahead of all
+            // mutations, but defer this state query/action to execution time so an explicit
+            // "snapshot-update cancel" is never followed by a stale duplicate cancel.
+            val snapshotCancel = if (step.force) listOf(Prepared("cancel snapshot if active") {
                 val status = port.getVar("snapshot-update-status")?.trim().orEmpty()
                 if (status.isNotEmpty() && status != "none") {
                     log("Wipe --force: snapshot-update-status=$status; cancelling snapshot before wipe")
-                    listOf(command("snapshot-update:cancel"))
+                    check(port.command("snapshot-update:cancel")) {
+                        "Fastboot snapshot-update:cancel failed. Wipe was not started."
+                    }
                 } else {
                     log("Wipe --force: no active snapshot update reported")
-                    emptyList()
                 }
-            } else emptyList()
+            }) else emptyList()
 
             snapshotCancel + listOf("userdata", "metadata", "cache").flatMap { partition ->
                 val type = port.getVar("partition-type:$partition")?.trim()?.takeIf { it.isNotEmpty() }
