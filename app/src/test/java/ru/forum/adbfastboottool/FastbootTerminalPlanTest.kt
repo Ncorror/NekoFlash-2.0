@@ -121,6 +121,16 @@ class FastbootTerminalPlanTest {
     @Test fun gsiWipeStaysTheFastbootdWireCommand() {
         assertEquals(listOf(FastbootExecutionStep.Raw("gsi:wipe")), steps(parse("gsi wipe")!!))
     }
+
+    @Test fun globalWipeRunsBeforeDesktopDeferredLogicalDelete() {
+        assertEquals(
+            listOf(
+                FastbootExecutionStep.Wipe(),
+                FastbootExecutionStep.Raw("delete-logical-partition:system_b")
+            ),
+            steps(parse("-w delete-logical-partition system_b")!!)
+        )
+    }
     @Test fun activeSlotOptionNoLongerDisappearsWhenPairedWithFlash() {
         val file = image()
         assertEquals(listOf(FastbootExecutionStep.Flash("boot", file, null), FastbootExecutionStep.SetActive("b")), steps(parse("--set-active=b flash boot '${file.path}'")!!))
