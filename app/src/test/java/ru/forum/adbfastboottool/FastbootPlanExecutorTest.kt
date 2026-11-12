@@ -218,15 +218,30 @@ class FastbootPlanExecutorTest {
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.WipeSuper(input, "other"))) }
         assertTrue(mutations().isEmpty())
     }
-    @Test fun activeSlotSelectionIsExecutedAndUsedByFollowingHostTargets() {
+    @Test fun globalSetActiveRunsAfterImmediateFlashAndDoesNotRetargetIt() {
         val input = File(temporary.root, "boot.img").also { it.writeBytes(ByteArray(100)) }
         executor().run(FastbootHostSyntax.compose(listOf(FastbootExecutionStep.Flash("boot", input, null)), false, emptySet(), "b"))
-        assertEquals(listOf("set_active:b", "flash:boot_b"), mutations())
-        assertTrue(events.contains("targets:boot:b"))
+        assertEquals(listOf("flash:boot", "set_active:b"), mutations())
+        assertTrue(events.contains("targets:boot:null"))
     }
-    @Test fun explicitSlotIsNotOverriddenByActiveSlotSelection() {
+
+    @Test fun explicitSlotStillTargetsThatSlotBeforeGlobalSetActive() {
         val input = File(temporary.root, "boot.img").also { it.writeBytes(ByteArray(100)) }
         executor().run(FastbootHostSyntax.compose(listOf(FastbootExecutionStep.Flash("boot", input, "a")), false, emptySet(), "b"))
-        assertEquals(listOf("set_active:b", "flash:boot_a"), mutations())
+        assertEquals(listOf("flash:boot_a", "set_active:b"), mutations())
+    }
+
+    @Test fun forcedWipeCancelsAnActiveSnapshotBeforeTheFirstErase() {
+        variables["snapshot-update-status"] = "merging"
+        executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))
+        assertTrue(events.contains("get:snapshot-update-status"))
+        assertTrue(events.indexOf("snapshot-update:cancel") < events.indexOf("erase:userdata"))
+    }
+
+    @Test fun forcedWipeDoesNotInventSnapshotCancelWhenStatusIsNone() {
+        variables["snapshot-update-status"] = "none"
+        executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))
+        assertFalse(events.contains("snapshot-update:cancel"))
+        assertTrue(events.contains("erase:userdata"))
     }
 }
