@@ -20,9 +20,15 @@ internal sealed class FastbootExecutionStep {
 internal object FastbootHostSyntax {
     private val postWipeCommands = setOf("reboot", "reboot-bootloader", "reboot-recovery", "reboot-fastboot")
 
+    private fun isDeferredByDesktopFastboot(step: FastbootExecutionStep): Boolean {
+        if (step !is FastbootExecutionStep.Raw) return false
+        return step.command in postWipeCommands || step.command.startsWith("delete-logical-partition:")
+    }
+
     /**
      * Desktop fastboot executes ordinary commands while parsing, then injects -w tasks,
-     * applies --set-active, and finally runs deferred reboot tasks. Preserve that order.
+     * applies --set-active, and finally runs deferred tasks (reboots and logical delete).
+     * Preserve that order.
      */
     fun compose(
         primary: List<FastbootExecutionStep>,
@@ -31,9 +37,7 @@ internal object FastbootHostSyntax {
         active: String?,
         force: Boolean = false
     ): List<FastbootExecutionStep> = buildList {
-        val (deferred, immediate) = primary.partition {
-            it is FastbootExecutionStep.Raw && it.command in postWipeCommands
-        }
+        val (deferred, immediate) = primary.partition(::isDeferredByDesktopFastboot)
         addAll(immediate)
         if (wipe) add(FastbootExecutionStep.Wipe(options, force))
         if (active != null) add(FastbootExecutionStep.SetActive(active))
