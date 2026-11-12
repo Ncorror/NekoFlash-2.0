@@ -34,6 +34,17 @@ class FastbootTerminalWaitPolicyTest {
         assertTrue(!FastbootTerminalWaitPolicy.isUnansweredTerminalCommand("short write 3/6"))
     }
 
+    @Test fun longWaitMessageExplainsThatTheCommandWasSentAndMustNotBeRepeated() {
+        val first = FastbootTerminalWaitPolicy.waitMessage("flash:cache", 10)
+        assertTrue(first.contains("Device is still processing flash:cache"))
+        assertTrue(first.contains("Command was sent"))
+        assertTrue(first.contains("Do not resend or disconnect"))
+
+        val later = FastbootTerminalWaitPolicy.waitMessage("erase:metadata", 50)
+        assertTrue(later.contains("Still processing erase:metadata"))
+        assertTrue(later.contains("waiting for final OKAY/FAIL"))
+    }
+
     @Test fun clockIsMonotonicAndTerminalBudgetUnchanged() {
         val start = 77_000_000_000L
         assertEquals(0L, FastbootTerminalWaitPolicy.elapsedMs(start, start))

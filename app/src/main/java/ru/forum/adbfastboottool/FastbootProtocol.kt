@@ -400,7 +400,7 @@ class FastbootProtocol(
                 val afterReadMs = FastbootTerminalWaitPolicy.elapsedMs(startedNs, readFinishedNs)
                 val elapsedSec = afterReadMs / 1000
                 if (elapsedSec / 10 != lastWaitLogSec / 10) {
-                    onLog("⏳ Fastboot is waiting for a response... ${elapsedSec} sec")
+                    onLog(FastbootTerminalWaitPolicy.waitMessage(clean, elapsedSec))
                     lastWaitLogSec = elapsedSec
                 }
                 val remainingMs =
@@ -2208,7 +2208,7 @@ class FastbootProtocol(
                 // Таймаут одного пакета — нормально при записи, логируем каждые 10 сек
                 val elapsedSec = elapsed / 1000
                 if (elapsedSec / 10 != lastLogSec / 10) {
-                    onLog("⏳ Waiting for device response... ${elapsedSec} sec")
+                    onLog(FastbootTerminalWaitPolicy.waitMessage(lastCommandName, elapsedSec))
                     lastLogSec = elapsedSec
                 }
                 continue

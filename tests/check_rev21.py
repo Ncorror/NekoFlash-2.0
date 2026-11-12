@@ -28,16 +28,17 @@ assert 'listOf("userdata", "metadata", "cache")' in executor
 assert 'snapshot-update-status' in executor and 'snapshot-update:cancel' in executor
 steps = (java / 'FastbootExecutionStep.kt').read_text()
 assert 'data class Wipe(val options: Set<String> = emptySet(), val force: Boolean = false)' in steps
-assert 'postWipeCommands' in steps
+assert 'postWipeCommands' in steps and 'delete-logical-partition:' in steps
 assert 'SuperEmptyImage.load(' in executor
 formatter = (java / 'FastbootFilesystemFormatter.kt').read_text()
-assert 'ProcessBuilder(args)' in formatter
+assert 'FastbootExt4.image(request)' in formatter
 assert 'FastbootF2fs.image(request)' in formatter
+assert 'AndroidSparseImage.fromRaw(' not in formatter
 assert 'output.fill(0, (aligned - offset) / blockSize)' in (java / 'AndroidSparseImage.kt').read_text()
 layout = ET.parse(root / 'app/src/main/res/layout/page_fastboot.xml').getroot()
 ids = [x.get('{http://schemas.android.com/apk/res/android}id') for x in layout.iter()]
 assert ids.count('@+id/btnToolFormat') == 1
-for name in ('AndroidSparseImageTest', 'FastbootF2fsTest', 'SuperEmptyImageTest', 'FastbootPlanExecutorTest',
+for name in ('AndroidSparseImageTest', 'FastbootExt4Test', 'FastbootF2fsTest', 'SuperEmptyImageTest', 'FastbootPlanExecutorTest',
              'FastbootFilesystemFormatterTest', 'FastbootHostSyntaxTest', 'FastbootTerminalPlanTest'):
     assert (root / f'app/src/test/java/ru/forum/adbfastboottool/{name}.kt').is_file()
 for workflow in ('build.yml', 'release.yml'):

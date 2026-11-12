@@ -9,8 +9,9 @@ java = root / 'app/src/main/java/ru/forum/adbfastboottool'
 formatter = (java / 'FastbootFilesystemFormatter.kt').read_text()
 vm = (java / 'DeviceViewModel.kt').read_text()
 assert 'discoverTools' not in formatter
-assert 'MKE2FS_CONFIG' in formatter and 'root_owner=0:0' in formatter
-assert 'profile?.delete()' in formatter
+assert 'FastbootExt4.image(request)' in formatter
+assert 'FastbootF2fs.image(request)' in formatter
+assert 'AndroidSparseImage.fromRaw(' not in formatter
 assert 'BundledFilesystemTools.fromDirectory(File(getApplication<Application>().applicationInfo.nativeLibraryDir))' in vm
 gradle = (root / 'app/build.gradle').read_text()
 assert 'useLegacyPackaging = true' in gradle
