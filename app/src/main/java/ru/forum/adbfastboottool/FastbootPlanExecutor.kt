@@ -118,18 +118,31 @@ internal class FastbootPlanExecutor(
         // /metadata carries metadata-encryption keys and is required for a complete FBE reset,
         // while /cache is optional on modern Android. Prepare all images before mutation as
         // before, but execute the critical userdata + metadata reset before best-effort cache.
-        is FastbootExecutionStep.Wipe -> listOf("userdata", "metadata", "cache").flatMap { partition ->
-            val type = port.getVar("partition-type:$partition")?.trim()?.takeIf { it.isNotEmpty() }
-            if (type == null) {
-                check(partition != "userdata") { "Cannot determine userdata filesystem; wipe was not started" }
-                log("Wipe: $partition is not reported by the device; skipped")
-                emptyList()
-            } else if (type == "ext4" || type == "f2fs") {
-                val image = filesystem(partition, null, null, step.options, type)
-                listOf(command("erase:$partition"), flash(partition, image))
-            } else {
-                log("Wipe: $partition type=$type; erase only, no filesystem generator for this type")
-                listOf(command("erase:$partition"))
+        is FastbootExecutionStep.Wipe -> {
+            val snapshotCancel = if (step.force) {
+                val status = port.getVar("snapshot-update-status")?.trim().orEmpty()
+                if (status.isNotEmpty() && status != "none") {
+                    log("Wipe --force: snapshot-update-status=$status; cancelling snapshot before wipe")
+                    listOf(command("snapshot-update:cancel"))
+                } else {
+                    log("Wipe --force: no active snapshot update reported")
+                    emptyList()
+                }
+            } else emptyList()
+
+            snapshotCancel + listOf("userdata", "metadata", "cache").flatMap { partition ->
+                val type = port.getVar("partition-type:$partition")?.trim()?.takeIf { it.isNotEmpty() }
+                if (type == null) {
+                    check(partition != "userdata") { "Cannot determine userdata filesystem; wipe was not started" }
+                    log("Wipe: $partition is not reported by the device; skipped")
+                    emptyList()
+                } else if (type == "ext4" || type == "f2fs") {
+                    val image = filesystem(partition, null, null, step.options, type)
+                    listOf(command("erase:$partition"), flash(partition, image))
+                } else {
+                    log("Wipe: $partition type=$type; erase only, no filesystem generator for this type")
+                    listOf(command("erase:$partition"))
+                }
             }
         }
         is FastbootExecutionStep.WipeSuper -> {
