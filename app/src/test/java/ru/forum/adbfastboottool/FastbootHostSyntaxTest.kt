@@ -30,8 +30,37 @@ class FastbootHostSyntaxTest {
             assertThrows(IllegalArgumentException::class.java) { FastbootHostSyntax.filesystemOptions(options) }
         }
     }
-    @Test fun combinedPlanContainsActiveWipeAndPrimaryExactlyOnce() {
+    @Test fun wipeRunsBeforeDeferredRebootAndSetActiveStillPrecedesReboot() {
         val plan = FastbootHostSyntax.compose(listOf(FastbootExecutionStep.Raw("reboot")), true, setOf("projid"), "b")
-        assertEquals(listOf(FastbootExecutionStep.SetActive("b"), FastbootExecutionStep.Wipe(setOf("projid")), FastbootExecutionStep.Raw("reboot")), plan)
+        assertEquals(
+            listOf(
+                FastbootExecutionStep.Wipe(setOf("projid")),
+                FastbootExecutionStep.SetActive("b"),
+                FastbootExecutionStep.Raw("reboot")
+            ),
+            plan
+        )
+    }
+
+    @Test fun immediateMutationRunsBeforeGlobalWipeLikeDesktopFastboot() {
+        val erase = FastbootExecutionStep.PartitionCommand("erase", "userdata", null)
+        assertEquals(
+            listOf(erase, FastbootExecutionStep.Wipe()),
+            FastbootHostSyntax.compose(listOf(erase), true, emptySet(), null)
+        )
+    }
+
+    @Test fun forceIsCarriedOnlyByTheGlobalWipeStep() {
+        assertEquals(
+            listOf(FastbootExecutionStep.Wipe(force = true)),
+            FastbootHostSyntax.compose(emptyList(), true, emptySet(), null, force = true)
+        )
+    }
+
+    @Test fun setActiveWithoutExplicitSlotIsStillRepresentedInThePlan() {
+        assertEquals(
+            listOf(FastbootExecutionStep.SetActive(null)),
+            FastbootHostSyntax.compose(emptyList(), false, emptySet(), null, activeRequested = true)
+        )
     }
 }

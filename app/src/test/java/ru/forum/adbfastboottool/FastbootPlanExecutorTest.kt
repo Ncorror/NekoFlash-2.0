@@ -18,7 +18,13 @@ class FastbootPlanExecutorTest {
             events += "targets:$partition:$slot"
             return when (slot) { "all" -> listOf("${partition}_a", "${partition}_b"); null -> listOf(partition); else -> listOf("${partition}_$slot") }
         }
-        override fun command(command: String): Boolean { events += command; return command != fail }
+        override fun command(command: String): Boolean {
+            events += command
+            val ok = command != fail
+            if (ok && command == "snapshot-update:cancel") variables["snapshot-update-status"] = "none"
+            if (ok && command.startsWith("set_active:")) variables["current-slot"] = command.substringAfter(':')
+            return ok
+        }
         override fun flash(partition: String, file: File) { events += "flash:$partition"; check("flash:$partition" != fail) }
         override fun download(file: File, command: String) { events += "download:$command" }
         override fun fetch(partition: String, file: File) { events += "fetch:$partition" }
@@ -218,15 +224,88 @@ class FastbootPlanExecutorTest {
         assertThrows(IllegalStateException::class.java) { executor().run(listOf(FastbootExecutionStep.WipeSuper(input, "other"))) }
         assertTrue(mutations().isEmpty())
     }
-    @Test fun activeSlotSelectionIsExecutedAndUsedByFollowingHostTargets() {
+    @Test fun globalSetActiveRunsAfterImmediateFlashAndDoesNotRetargetIt() {
         val input = File(temporary.root, "boot.img").also { it.writeBytes(ByteArray(100)) }
         executor().run(FastbootHostSyntax.compose(listOf(FastbootExecutionStep.Flash("boot", input, null)), false, emptySet(), "b"))
-        assertEquals(listOf("set_active:b", "flash:boot_b"), mutations())
-        assertTrue(events.contains("targets:boot:b"))
+        assertEquals(listOf("flash:boot", "set_active:b"), mutations())
+        assertTrue(events.contains("targets:boot:null"))
     }
-    @Test fun explicitSlotIsNotOverriddenByActiveSlotSelection() {
+
+    @Test fun explicitSlotStillTargetsThatSlotBeforeGlobalSetActive() {
         val input = File(temporary.root, "boot.img").also { it.writeBytes(ByteArray(100)) }
         executor().run(FastbootHostSyntax.compose(listOf(FastbootExecutionStep.Flash("boot", input, "a")), false, emptySet(), "b"))
-        assertEquals(listOf("set_active:b", "flash:boot_a"), mutations())
+        assertEquals(listOf("flash:boot_a", "set_active:b"), mutations())
+    }
+
+    @Test fun globalSetActiveWithoutSlotUsesCurrentSlotAtExecutionBoundary() {
+        variables["current-slot"] = "_b"
+        executor().run(FastbootHostSyntax.compose(emptyList(), false, emptySet(), null, activeRequested = true))
+        assertEquals(listOf("set_active:b"), mutations())
+        assertTrue(events.indexOf("get:current-slot") < events.indexOf("set_active:b"))
+    }
+
+    @Test fun globalSetActiveWithoutSlotIsSkippedWhenCurrentSlotIsUnavailable() {
+        variables.remove("current-slot")
+        executor().run(FastbootHostSyntax.compose(emptyList(), false, emptySet(), null, activeRequested = true))
+        assertTrue(mutations().isEmpty())
+    }
+
+    @Test fun globalSetActiveOtherAndAllMatchDesktopSlotResolution() {
+        variables["current-slot"] = "a"
+        variables["slot-count"] = "2"
+        executor().run(listOf(FastbootExecutionStep.SetActive("other")))
+        assertEquals(listOf("set_active:b"), mutations())
+
+        events.clear()
+        executor().run(listOf(FastbootExecutionStep.SetActive("all")))
+        assertEquals(listOf("set_active:a"), mutations())
+    }
+
+    @Test fun dynamicOtherSlotIsResolvedAfterAnEarlierSetActiveActuallyRuns() {
+        variables["current-slot"] = "a"
+        variables["slot-count"] = "2"
+        executor().run(
+            listOf(
+                FastbootExecutionStep.SetActive("b"),
+                FastbootExecutionStep.SetActive("other")
+            )
+        )
+        assertEquals(listOf("set_active:b", "set_active:a"), mutations())
+        assertTrue(events.lastIndexOf("get:current-slot") > events.indexOf("set_active:b"))
+    }
+
+    @Test fun concreteSetActiveRejectsSlotsOutsideReportedSlotCountBeforeMutation() {
+        variables["slot-count"] = "1"
+        assertThrows(IllegalArgumentException::class.java) {
+            executor().run(listOf(FastbootExecutionStep.SetActive("b")))
+        }
+        assertTrue(mutations().isEmpty())
+    }
+
+    @Test fun forcedWipeCancelsAnActiveSnapshotBeforeTheFirstErase() {
+        variables["snapshot-update-status"] = "merging"
+        executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))
+        assertTrue(events.contains("get:snapshot-update-status"))
+        assertTrue(events.indexOf("snapshot-update:cancel") < events.indexOf("erase:userdata"))
+    }
+
+    @Test fun forcedWipeDoesNotInventSnapshotCancelWhenStatusIsNone() {
+        variables["snapshot-update-status"] = "none"
+        executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))
+        assertFalse(events.contains("snapshot-update:cancel"))
+        assertTrue(events.contains("erase:userdata"))
+    }
+
+    @Test fun explicitSnapshotCancelBeforeForcedWipeIsNotRepeatedFromStalePreflightState() {
+        variables["snapshot-update-status"] = "merging"
+        executor().run(
+            listOf(
+                FastbootExecutionStep.Raw("snapshot-update:cancel"),
+                FastbootExecutionStep.Wipe(force = true)
+            )
+        )
+        assertEquals(1, events.count { it == "snapshot-update:cancel" })
+        assertTrue(events.indexOf("snapshot-update:cancel") < events.indexOf("get:snapshot-update-status"))
+        assertTrue(events.indexOf("get:snapshot-update-status") < events.indexOf("erase:userdata"))
     }
 }

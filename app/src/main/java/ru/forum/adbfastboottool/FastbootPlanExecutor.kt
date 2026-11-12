@@ -91,9 +91,47 @@ internal class FastbootPlanExecutor(
     private fun prepare(step: FastbootExecutionStep): List<Prepared> = when (step) {
         is FastbootExecutionStep.Raw -> listOf(command(step.command))
         is FastbootExecutionStep.SetActive -> {
-            require(step.slot.matches(Regex("[a-z]")))
-            plannedActive = step.slot
-            listOf(command("set_active:${step.slot}"))
+            fun slotCount(): Int = port.getVar("slot-count")?.trim()?.toIntOrNull()
+                ?.takeIf { it in 1..26 } ?: error("Cannot determine slot count for --set-active")
+            fun currentOrNull(): String? = port.getVar("current-slot")?.trim()?.removePrefix("_")
+                ?.takeIf { it.matches(Regex("[a-z]")) }
+
+            when (step.slot) {
+                null -> listOf(Prepared("set_active current") {
+                    val current = currentOrNull()
+                    if (current == null) {
+                        log("--set-active: current-slot is unavailable; desktop fastboot would skip set-active")
+                    } else {
+                        plannedActive = current
+                        check(port.command("set_active:$current")) { "Fastboot command failed: set_active:$current" }
+                    }
+                })
+                "other" -> listOf(Prepared("set_active other") {
+                    val count = slotCount()
+                    require(count > 1) { "No other slot for --set-active" }
+                    val current = currentOrNull() ?: error("Cannot determine current slot for --set-active=other")
+                    val index = current[0] - 'a'
+                    require(index in 0 until count) { "Current slot is outside reported slot count" }
+                    val resolved = ('a' + (index + 1) % count).toString()
+                    plannedActive = resolved
+                    check(port.command("set_active:$resolved")) { "Fastboot command failed: set_active:$resolved" }
+                })
+                "all" -> {
+                    slotCount()
+                    plannedActive = "a"
+                    listOf(command("set_active:a"))
+                }
+                else -> {
+                    require(step.slot.matches(Regex("[a-z]")))
+                    val count = slotCount()
+                    val index = step.slot[0] - 'a'
+                    require(index in 0 until count) {
+                        "Slot ${step.slot} does not exist; device reports $count slot(s)"
+                    }
+                    plannedActive = step.slot
+                    listOf(command("set_active:${step.slot}"))
+                }
+            }
         }
         is FastbootExecutionStep.Flash -> targets(step.partition, step.slot).map { flash(it, step.file) }
         is FastbootExecutionStep.PartitionCommand -> targets(step.partition, step.slot).map { command("${step.prefix}:$it") }
@@ -118,18 +156,36 @@ internal class FastbootPlanExecutor(
         // /metadata carries metadata-encryption keys and is required for a complete FBE reset,
         // while /cache is optional on modern Android. Prepare all images before mutation as
         // before, but execute the critical userdata + metadata reset before best-effort cache.
-        is FastbootExecutionStep.Wipe -> listOf("userdata", "metadata", "cache").flatMap { partition ->
-            val type = port.getVar("partition-type:$partition")?.trim()?.takeIf { it.isNotEmpty() }
-            if (type == null) {
-                check(partition != "userdata") { "Cannot determine userdata filesystem; wipe was not started" }
-                log("Wipe: $partition is not reported by the device; skipped")
-                emptyList()
-            } else if (type == "ext4" || type == "f2fs") {
-                val image = filesystem(partition, null, null, step.options, type)
-                listOf(command("erase:$partition"), flash(partition, image))
-            } else {
-                log("Wipe: $partition type=$type; erase only, no filesystem generator for this type")
-                listOf(command("erase:$partition"))
+        is FastbootExecutionStep.Wipe -> {
+            // AOSP checks snapshot state immediately before the global wipe, after any
+            // explicit commands already ran. Keep image generation preflight ahead of all
+            // mutations, but defer this state query/action to execution time so an explicit
+            // "snapshot-update cancel" is never followed by a stale duplicate cancel.
+            val snapshotCancel = if (step.force) listOf(Prepared("cancel snapshot if active") {
+                val status = port.getVar("snapshot-update-status")?.trim().orEmpty()
+                if (status.isNotEmpty() && status != "none") {
+                    log("Wipe --force: snapshot-update-status=$status; cancelling snapshot before wipe")
+                    check(port.command("snapshot-update:cancel")) {
+                        "Fastboot snapshot-update:cancel failed. Wipe was not started."
+                    }
+                } else {
+                    log("Wipe --force: no active snapshot update reported")
+                }
+            }) else emptyList()
+
+            snapshotCancel + listOf("userdata", "metadata", "cache").flatMap { partition ->
+                val type = port.getVar("partition-type:$partition")?.trim()?.takeIf { it.isNotEmpty() }
+                if (type == null) {
+                    check(partition != "userdata") { "Cannot determine userdata filesystem; wipe was not started" }
+                    log("Wipe: $partition is not reported by the device; skipped")
+                    emptyList()
+                } else if (type == "ext4" || type == "f2fs") {
+                    val image = filesystem(partition, null, null, step.options, type)
+                    listOf(command("erase:$partition"), flash(partition, image))
+                } else {
+                    log("Wipe: $partition type=$type; erase only, no filesystem generator for this type")
+                    listOf(command("erase:$partition"))
+                }
             }
         }
         is FastbootExecutionStep.WipeSuper -> {

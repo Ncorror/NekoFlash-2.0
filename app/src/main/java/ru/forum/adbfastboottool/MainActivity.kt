@@ -1168,8 +1168,10 @@ class MainActivity : AppCompatActivity() {
         val wireCommand: String,
         val slot: String? = null,
         val setActive: String? = null,
+        val setActiveRequested: Boolean = false,
         val serial: String? = null,
         val wipe: Boolean = false,
+        val force: Boolean = false,
         val filesystemOptions: Set<String> = emptySet(),
         val sparseLimit: Long? = null
     )
@@ -1195,8 +1197,10 @@ class MainActivity : AppCompatActivity() {
         val wireTokens = mutableListOf<String>()
         var slot: String? = null
         var setActive: String? = null
+        var setActiveRequested = false
         var serial: String? = null
         var wipe = false
+        var force = false
         var filesystemOptions = emptySet<String>()
         var sparseLimit: Long? = null
         var i = 0
@@ -1238,16 +1242,17 @@ class MainActivity : AppCompatActivity() {
                 lower.startsWith("--slot=") -> {
                     slot = normalizeFastbootSlot(token.substringAfter('=')) ?: return null
                 }
-                lower == "--set-active" -> {
-                    val value = nextOptionValue("--set-active") ?: return null
-                    setActive = normalizeFastbootSlot(value)?.takeUnless { it == "all" || it == "other" } ?: return null
+                lower == "--set-active" || lower == "-a" -> {
+                    setActiveRequested = true
                 }
                 lower.startsWith("--set-active=") -> {
-                    setActive = normalizeFastbootSlot(token.substringAfter('='))?.takeUnless { it == "all" || it == "other" } ?: return null
+                    setActiveRequested = true
+                    setActive = normalizeFastbootSlot(token.substringAfter('=')) ?: return null
                 }
-                lower == "-a" -> {
-                    val value = nextOptionValue("-a") ?: return null
-                    setActive = normalizeFastbootSlot(value)?.takeUnless { it == "all" || it == "other" } ?: return null
+                lower.startsWith("-a") && token.length > 2 -> {
+                    setActiveRequested = true
+                    val attached = token.substring(2).removePrefix("=")
+                    setActive = normalizeFastbootSlot(attached) ?: return null
                 }
                 lower == "--disable-verity" || lower == "--disable-verification" -> {
                     viewModel.log(
@@ -1256,7 +1261,8 @@ class MainActivity : AppCompatActivity() {
                     )
                     return null
                 }
-                lower == "--skip-reboot" || lower == "--skip-secondary" || lower == "--force" || lower == "--verbose" || lower == "-v" -> {
+                lower == "--force" -> force = true
+                lower == "--skip-reboot" || lower == "--skip-secondary" || lower == "--verbose" || lower == "-v" -> {
                     viewModel.log("ℹ️ Option $token is not used by the terminal handler for a single USB command.")
                 }
                 token == "-S" || lower == "--sparse-limit" ||
@@ -1286,7 +1292,18 @@ class MainActivity : AppCompatActivity() {
             i += 1
         }
 
-        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial, wipe, filesystemOptions, sparseLimit)
+        return FastbootTerminalOptions(
+            commandTokens,
+            wireTokens.joinToString(" "),
+            slot,
+            setActive,
+            setActiveRequested,
+            serial,
+            wipe,
+            force,
+            filesystemOptions,
+            sparseLimit
+        )
     }
 
     private fun parseFastbootCommand(cmd: String): FastbootTerminalRequest? {
@@ -1309,8 +1326,8 @@ class MainActivity : AppCompatActivity() {
             return null
         }
         if (action is TerminalAction.LocalStatus || action is TerminalAction.OpenReportsFolder) {
-            if (parsedOptions.wipe || parsedOptions.setActive != null || parsedOptions.sparseLimit != null) {
-                viewModel.log("❌ Local status/reports cannot be combined with -w, --set-active or -S")
+            if (parsedOptions.wipe || parsedOptions.force || parsedOptions.setActiveRequested || parsedOptions.sparseLimit != null) {
+                viewModel.log("❌ Local status/reports cannot be combined with -w, --force, --set-active or -S")
                 return null
             }
             return FastbootTerminalRequest(action, parsedOptions.serial)
@@ -1331,7 +1348,17 @@ class MainActivity : AppCompatActivity() {
             is TerminalAction.FastbootFetch -> listOf(FastbootExecutionStep.Fetch(action.partition, action.outputFile, action.slot))
             else -> error("Unexpected ADB action in Fastboot parser")
         }
-        val plan = FastbootHostSyntax.compose(steps, parsedOptions.wipe, parsedOptions.filesystemOptions, parsedOptions.setActive)
+        val active = if (parsedOptions.setActiveRequested) {
+            parsedOptions.setActive ?: parsedOptions.slot
+        } else null
+        val plan = FastbootHostSyntax.compose(
+            steps,
+            parsedOptions.wipe,
+            parsedOptions.filesystemOptions,
+            active,
+            parsedOptions.force,
+            parsedOptions.setActiveRequested
+        )
         if (parsedOptions.sparseLimit != null && plan.none {
                 it is FastbootExecutionStep.Flash || it is FastbootExecutionStep.Format ||
                     it is FastbootExecutionStep.Wipe || it is FastbootExecutionStep.WipeSuper
@@ -1478,13 +1505,8 @@ class MainActivity : AppCompatActivity() {
 
             "set_active", "set-active" -> {
                 val slot = tokens.getOrNull(1)?.let { normalizeFastbootSlot(it) }
-                    ?: parsedOptions.setActive
-                    ?: return invalidTerminalFormat("fastboot set_active <a|b>")
-                if (slot == "all" || slot == "other") {
-                    viewModel.log("❌ set_active requires a concrete slot: a, b, ...")
-                    return null
-                }
-                TerminalAction.RawFastboot("set_active:$slot")
+                    ?: return invalidTerminalFormat("fastboot set_active <SLOT>")
+                TerminalAction.FastbootPlan(listOf(FastbootExecutionStep.SetActive(slot)))
             }
 
             "reboot" -> {
@@ -1494,9 +1516,17 @@ class MainActivity : AppCompatActivity() {
                     "bootloader" -> "reboot-bootloader"
                     "recovery" -> "reboot-recovery"
                     "fastboot" -> "reboot-fastboot"
-                    else -> clean
+                    else -> return invalidTerminalFormat("fastboot reboot [bootloader|recovery|fastboot]")
                 }
                 TerminalAction.RawFastboot(command)
+            }
+
+            "flash:raw", "stage", "get_staged", "help" -> {
+                viewModel.log(
+                    "⚠️ fastboot $op is a desktop host workflow and is not emulated by NekoFlash terminal. " +
+                        "Use supported flash/boot/fetch commands or explicit raw only for a real wire command."
+                )
+                null
             }
 
             "flashing" -> {
