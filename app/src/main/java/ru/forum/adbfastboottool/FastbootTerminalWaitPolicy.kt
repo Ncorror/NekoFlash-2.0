@@ -26,6 +26,20 @@ internal object FastbootTerminalWaitPolicy {
         ((nowNs - startNs).coerceAtLeast(0L) / 1_000_000L)
 
     /**
+     * Long bootloader erase/flash operations can stay silent for tens of seconds.
+     * Make that state explicit without changing deadlines, retries or wire behavior.
+     */
+    fun waitMessage(command: String?, elapsedSec: Long): String {
+        val label = command?.trim()?.takeIf { it.isNotEmpty() } ?: "Fastboot command"
+        return if (elapsedSec <= 10L) {
+            "⏳ Device is still processing $label. Command was sent; waiting for final OKAY/FAIL... " +
+                "$elapsedSec sec. Do not resend or disconnect."
+        } else {
+            "⏳ Still processing $label... $elapsedSec sec; waiting for final OKAY/FAIL."
+        }
+    }
+
+    /**
      * Add only enough delay to avoid a tight loop. A slow timeout already
      * provides the delay; a fast failure gets a small cancellable pause.
      */
