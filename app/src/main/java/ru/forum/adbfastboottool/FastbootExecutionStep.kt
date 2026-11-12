@@ -13,15 +13,31 @@ internal sealed class FastbootExecutionStep {
     data class Inspect(val partition: String) : FastbootExecutionStep()
     data class Format(val partition: String, val type: String? = null, val size: String? = null,
         val slot: String? = null, val options: Set<String> = emptySet()) : FastbootExecutionStep()
-    data class Wipe(val options: Set<String> = emptySet()) : FastbootExecutionStep()
+    data class Wipe(val options: Set<String> = emptySet(), val force: Boolean = false) : FastbootExecutionStep()
     data class WipeSuper(val image: File, val slot: String?) : FastbootExecutionStep()
 }
 
 internal object FastbootHostSyntax {
-    fun compose(primary: List<FastbootExecutionStep>, wipe: Boolean, options: Set<String>, active: String?): List<FastbootExecutionStep> = buildList {
+    private val postWipeCommands = setOf("reboot", "reboot-bootloader", "reboot-recovery", "reboot-fastboot")
+
+    /**
+     * Desktop fastboot executes ordinary commands while parsing, then injects -w tasks,
+     * applies --set-active, and finally runs deferred reboot tasks. Preserve that order.
+     */
+    fun compose(
+        primary: List<FastbootExecutionStep>,
+        wipe: Boolean,
+        options: Set<String>,
+        active: String?,
+        force: Boolean = false
+    ): List<FastbootExecutionStep> = buildList {
+        val (deferred, immediate) = primary.partition {
+            it is FastbootExecutionStep.Raw && it.command in postWipeCommands
+        }
+        addAll(immediate)
+        if (wipe) add(FastbootExecutionStep.Wipe(options, force))
         if (active != null) add(FastbootExecutionStep.SetActive(active))
-        if (wipe) add(FastbootExecutionStep.Wipe(options))
-        addAll(primary)
+        addAll(deferred)
     }
 
     fun format(command: String, partition: String, slot: String?, options: Set<String>): FastbootExecutionStep.Format {
