@@ -56,7 +56,7 @@ If onyx or another host is unstable, try a short known-good cable. An externally
 
 ## REV43 Android HOST → TARGET field tests
 
-**Historical REV43 round (not today's assignment):** the old [RU](testing/INSIDERS-FIELD-TEST-REV43-RU.md) / [EN](testing/INSIDERS-FIELD-TEST-REV43-EN.md) test plans below remain for reference. For current triage see the [real-device evidence ledger](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md) and [current Insiders entry](insiders/README.md). The 1023/1024/1025, 512-file Push/Pull and 16 MiB acceptance already passed on the tested locked Android12 vayu; don't assign identical retries without a new device, code change or missing result. The historical round said: Test USB idle reconnect, legacy ADB maxdata, 512-file recursive `adb push -r`, cancellation and USB detach **only during disposable ADB file transfer**. Record exact APK build ID, HOST/TARGET models, permission prompts, timing, status transitions and original logs.
+**Historical REV43 round (not today's assignment):** the standalone RU/EN field-plan files were removed from the active release tree. Their results remain in Git history and the [real-device evidence ledger](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). The 1023/1024/1025, 512-file Push/Pull and 16 MiB acceptance already passed on the tested locked Android12 vayu; do not assign identical retries without a new device, code change or missing result.
 
 If USB is detached during `adb push`, the TARGET file can be incomplete: verify length/hash before using it. Do not claim success from a progress percentage. Do not unplug while Fastboot DATA, flash, unlock, erase or format is active. Full diagnostic logs and `trace-*.bin` go to a trusted private channel, not a public GitHub issue.
 
