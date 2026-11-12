@@ -1,7 +1,0 @@
-NekoFlash Insiders — APK-only field testing
-Тестбук больше не используется. В новом комплекте только APK.
-All test instructions and results are in the team chat.
-Download the APK from a successful main GitHub Actions run; note its exact build ID.
-Export full diagnostics using NekoFlash and send screenshots privately.
-Do not repeat already accepted flash, rotation or wipe tests.
-Telegram: https://t.me/+NR_FiUmvXlViOTUy

@@ -2,46 +2,60 @@
 
 # NekoFlash 2.0
 
-**Latest accepted main baseline:** `7273b014`, `6.0.0-alpha11`; [GitHub Actions #698 SUCCESS](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43068208355) (JVM, Lint, Android API 26 and 34). The next Insiders build distributes **only the debug APK**, with source provenance checked in CI. Hardware test instructions and results are now handled **in the team chat**, not a browser checklist. Raw diagnostic ZIPs are exported from NekoFlash itself.
+**Release line:** `6.0.0-alpha11` · versionCode `234`.
 
-**Previous published Insiders REV50** ([release history](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/insiders-rev50)) is an archived debug prerelease from an older source commit, not the latest main or signed production APK. Existing published assets remain historical.
-
-**New improvements:** Clear chosen Sideload ZIP without deleting it, show Xiaomi account authorization progress, and display Android version from the connected ADB SYSTEM device. Outstanding [#72](https://github.com/Ncorror/NekoFlash-2.0/issues/72) inbound Pull EPROTO and [#64](https://github.com/Ncorror/NekoFlash-2.0/issues/64) Fastboot wipe/cache reply remain separate hardware investigations; experimental [PR #83](https://github.com/Ncorror/NekoFlash-2.0/pull/83) is not included.
+NekoFlash operates ADB, Fastboot and Recovery workflows directly from one Android phone to another over USB OTG. Host requirements: Android 8.0+, USB Host support and a data-capable cable. Root on the host is optional.
 
 English · [Русский](README_ru.md)
 
-NekoFlash operates ADB and Fastboot between Android phones via USB OTG. Host Android 8+, USB Host and a data cable required. Root on the host is optional.
+## Release status
 
-**Testing downloads:** [successful main CI artifacts](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) · [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) · [historical hardware evidence](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). Download the APK for the exact tested commit, record build ID and send screenshots + full diagnostic export privately. Previously completed flashing and terminal rotation are not assigned again.
+The final alpha11 hardware campaign is closed for release:
 
-## Inside the app
+- **Fastboot format/wipe (#64): FIELD PASS.** `fastboot format userdata`, metadata/cache handling, `fastboot -w`, reboot and subsequent Android setup boot were verified on the unlocked POCO X3 Pro `vayu`.
+- **Large ADB Pull (#72): resolved.** POCO X3 Pro host → POCO X3 Pro target passed `framework.jar` Pull plus repeated 128 MiB Pull/Push with matching SHA-256. POCO F7 / `onyx` is classified as an intermittent host-side USB receive compatibility case; large Pull now uses durable 256 KiB checkpoints and verifies the final SHA-256 before publication.
+- Recovery/Sideload, Fastboot handshake/reboot, Mass Flash, Xiaomi account sign-in, ZIP select/clear and terminal rotation/input have physical PASS evidence on the tested devices/builds.
 
-The console supports ADB shell, push/pull and APK installation. The Flash tab contains Quick Flash, a Mass Flash queue and Fastboot tools. The app also has recovery Sideload, Xiaomi Unlock, operation reports and raw USB diagnostics.
+The authoritative current summary is [Hardware validation](docs/HARDWARE_VALIDATION.md). Dated low-level experiments remain only in the [physical evidence ledger](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md).
 
-English interface of the published REV45 APK on an Android 14 emulator (API 34). Home shows a disconnected host. The Mass Flash queue contains a test image.
+## POCO F7 / onyx host note
 
-| Home | Terminal | Quick Flash |
-| --- | --- | --- |
-| <img src="docs/screenshots/rev45/portrait-home.png" width="210" alt="Home"> | <img src="docs/screenshots/rev45/terminal-command.png" width="210" alt="Terminal"> | <img src="docs/screenshots/rev45/portrait-quick.png" width="210" alt="Quick Flash"> |
+POCO F7 (`onyx`, Android 16) has repeatedly shown intermittent inbound USB failures as a host, including in Legacy NekoFlash. The same target/files pass on a POCO X3 Pro host. NekoFlash therefore keeps fail-closed transport behavior and resumes large Pulls only from fully fsynced checkpoints after a manual reconnect.
 
-| Mass Flash queue | Fastboot tools | ADB Sideload |
-| --- | --- | --- |
-| <img src="docs/screenshots/rev45/mass-queue.png" width="210" alt="Mass Flash queue"> | <img src="docs/screenshots/rev45/portrait-tools.png" width="210" alt="Fastboot tools"> | <img src="docs/screenshots/rev45/portrait-sideload.png" width="210" alt="ADB Sideload"> |
+Power/VBUS sensitivity is plausible field context but was not instrumented, so it is **not** claimed as the proven root cause. A short cable or externally powered USB hub is a useful diagnostic when a host has weak/unstable OTG power.
 
-## Build and evidence
+## Downloads
 
-Reference APK and gallery — `6.0.0-alpha11-dev` (234), `ru.forum.adbfastboottool.dev`, [`a31dedadd4ad`](https://github.com/Ncorror/NekoFlash-2.0/commit/a31dedadd4adcf08691ece82c7574f05286078f3). [CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886) · [APK ZIP](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886/artifacts/13139380119).
+- [GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases) — official signed releases.
+- [Successful main CI](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) — debug/test artifacts for the exact commit.
+- [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) — tester coordination.
 
-308 JVM tests passed. Android API 26 and 34 passed 20 instrumentation tests each. Lint reported zero findings. The APK SHA-256 and source commit are tracked by the exact CI run.
+Do not treat an old Insiders REV ZIP as the current production artifact.
 
-[Audit / Аудит](docs/insiders/AUDIT-2026-11-02.md) · [Hardware](docs/HARDWARE_VALIDATION.md) · [USB OTG](docs/USB_CONNECTION_TROUBLESHOOTING.md) · [Privacy](PRIVACY.md)
+## What is included
 
-For a local debug build, use JDK 17 and the repository’s filesystem tool build steps. See the [build workflow](.github/workflows/build.yml).
+- ADB shell, push/pull, APK install and diagnostics.
+- Quick Flash, Mass Flash and Fastboot tools.
+- Recovery ADB Sideload with separate file selection and explicit Start.
+- Xiaomi Unlock account/session workflow.
+- Operation Center, full diagnostic export and raw USB evidence.
+- Host-side ext4/F2FS filesystem generation for supported Fastboot format commands.
+- Checkpointed large-file Pull with source/destination SHA-256 verification.
+
+## Safety and diagnostics
+
+NekoFlash does not silently retry failed destructive Fastboot commands or failed ADB packets. Destructive operations remain explicit. Full diagnostic exports are kept for technical analysis; share raw logs only through a trusted channel because they can contain device/command context.
+
+See [USB troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md), [Privacy](PRIVACY.md) and [Third-party notices](THIRD_PARTY_NOTICES.md).
+
+## Build and release
+
+CI uses JDK 17, the checked-in Gradle Wrapper and pinned GitHub Actions. Production packaging is fail-closed: the protected release workflow requires the permanent signing key, verifies certificate SHA-256 `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2`, builds the release APK, verifies the APK certificate again and publishes checksums/build metadata.
+
+The release tag must match `versionName` and be rooted at the approved `main` commit. See [release readiness](docs/RELEASE_READINESS-2026-11-10.md).
 
 ## Project
 
 Author and maintainer — [Ncorror](https://github.com/Ncorror). Project collaborator — [IQ-HARRY7](https://github.com/IQ-HARRY7).
 
-[Apache 2.0](LICENSE) · [Artwork](ASSETS_LICENSE.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Previous README and release history](https://github.com/Ncorror/NekoFlash-2.0/blob/7b54ba1e70807bdc7cee65a64cff87fd002ce26b/README.md)
-
-Topics — `android` `usb-otg` `usb-host` `adb` `fastboot` `adb-sideload` `android-recovery` `hardware-testing`
+[Apache 2.0](LICENSE) · [Artwork](ASSETS_LICENSE.md) · [Changelog](CHANGELOG.md)

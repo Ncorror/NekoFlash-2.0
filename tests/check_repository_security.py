@@ -16,14 +16,42 @@ for workflow_name, workflow in (("build.yml", build), ("release.yml", release)):
     assert "Expected certificate:" in workflow
 
 
+# Third-party actions in build/release must be immutable full-SHA pins.
+expected_actions = {
+    "actions/checkout": "fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09",
+    "actions/setup-java": "b6effb05e454b25005698d916606bdc6ffcbf961",
+    "gradle/actions/setup-gradle": "8da46b539cd8fe6ab27ca75128919a18d757604c",
+    "actions/upload-artifact": "b7c566a772e6b6bfb58ed0dc250532a479d7789f",
+    "actions/download-artifact": "37930b1c2abaa49bbe596cd826c3c89aef350131",
+    "reactivecircus/android-emulator-runner": "a421e43855164a8197daf9d8d40fe71c6996bb0d",
+}
+seen = {}
+for workflow_name, workflow in (("build.yml", build), ("release.yml", release)):
+    for action, ref in re.findall(r"uses:\s+([^@\s]+)@([0-9A-Za-z._/-]+)", workflow):
+        assert re.fullmatch(r"[0-9a-f]{40}", ref), (
+            f"{workflow_name}: action must use a full commit SHA: {action}@{ref}"
+        )
+        if action in expected_actions:
+            assert ref == expected_actions[action], (
+                f"{workflow_name}: unexpected pin for {action}: {ref}"
+            )
+        seen[action] = ref
+for action, ref in expected_actions.items():
+    if action in build or action in release:
+        assert seen.get(action) == ref, f"Missing audited action pin: {action}"
+
 assert "  tag-provenance:" in release
 preflight = release.split("  tag-provenance:", 1)[1].split("\n  release:", 1)[0]
 release_job = release.split("\n  release:", 1)[1]
 assert "git merge-base --is-ancestor" in preflight
 assert "refs/heads/main" in preflight
-assert "Release tag must match versionName" in preflight
+assert 'EXPECTED_TAG="v$VERSION"' in preflight
+assert ".github/RELEASE_REQUEST" in preflight
+assert '[ "$TAG_COMMIT" = "$MAIN_TIP" ]' in preflight
+assert 'git tag -a "$TAG" "$TAG_COMMIT"' in preflight
+assert 'git push origin "refs/tags/$TAG"' in preflight
 assert "secrets." not in preflight
-assert "contents: read" in preflight
+assert "contents: write" in preflight
 assert "needs: tag-provenance" in release_job
 assert "environment: nekoflash-release" in release_job
 assert "contents: write" in release_job
@@ -45,5 +73,5 @@ assert "secrets.NEKOFLASH_KEYSTORE_BASE64" in release_job
 for path in ("/.github/workflows/", "/app/build.gradle", "/gradle/wrapper/"):
     assert path in owners and "@Ncorror" in owners
 
-print("PASS: signing requires main, explicit opt-in, protected environment and tag provenance")
+print("PASS: release provenance, signing isolation and immutable action pins verified")
 print("NOTE: repository rulesets, environment reviewers and secret migration MUST be configured in GitHub Settings")

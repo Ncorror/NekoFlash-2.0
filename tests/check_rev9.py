@@ -25,7 +25,8 @@ assert 'val lockStateVerified = fastbootReady' in main
 assert 'val canRunUnlock = fastbootReady && lockStateVerified && !operationActive' in main
 assert 'Kotlin JVM queue and diagnostic regression tests' in ci
 assert ':app:testDebugUnitTest' in ci
-assert (root/'docs/testing/REV9-BIG-DEVICE-TEST-RU.md').is_file()
+assert (root/'docs/HARDWARE_VALIDATION.md').is_file()
+assert (root/'docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md').is_file()
 # Optional permission/risk gate: UI can open without mandatory storage access.
 welcome = (root/'app/src/main/java/ru/forum/adbfastboottool/WelcomeActivity.kt').read_text()
 gate = (root/'app/src/main/java/ru/forum/adbfastboottool/OnboardingGate.kt').read_text()

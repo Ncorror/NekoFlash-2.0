@@ -4,6 +4,10 @@ run-name: Release ${{ github.ref_name }}
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - '.github/RELEASE_REQUEST'
     tags:
       - 'v*'
 
@@ -15,40 +19,69 @@ env:
 
 jobs:
   tag-provenance:
-    name: Verify release tag origin
+    name: Verify/create approved release tag
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+    outputs:
+      tag: ${{ steps.provenance.outputs.tag }}
+      version_name: ${{ steps.provenance.outputs.version_name }}
+      version_code: ${{ steps.provenance.outputs.version_code }}
     steps:
-      - name: Checkout tagged source without release secrets
-        uses: actions/checkout@v5
+      - name: Checkout release source without release secrets
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-      - name: Require approved main ancestry and matching version
+      - name: Verify main provenance and prepare version tag
+        id: provenance
         shell: bash
         run: |
           set -Eeuo pipefail
-          git fetch --no-tags origin '+refs/heads/main:refs/remotes/origin/main'
-          TAG_COMMIT="$(git rev-parse HEAD^{commit})"
-          MAIN_TIP="$(git rev-parse refs/remotes/origin/main^{commit})"
-          if ! git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_TIP"; then
-            echo "::error::Release tag is not based on main history"
-            exit 1
-          fi
+          git fetch --tags --force origin '+refs/heads/main:refs/remotes/origin/main'
           VERSION="$(sed -nE 's/^[[:space:]]*versionName[[:space:]]*=[[:space:]]*"([^"]+)".*/\1/p' app/build.gradle | head -1)"
+          VERSION_CODE="$(sed -nE 's/^[[:space:]]*versionCode[[:space:]]*=[[:space:]]*([0-9]+).*/\1/p' app/build.gradle | head -1)"
           test -n "$VERSION"
-          if [ "$GITHUB_REF_NAME" != "v$VERSION" ]; then
-            echo "::error::Release tag must match versionName"
-            exit 1
-          fi
+          test -n "$VERSION_CODE"
+          EXPECTED_TAG="v$VERSION"
           case "$VERSION" in
             *dev*|*snapshot*|*SNAPSHOT*)
-              echo "::error::Development versions cannot be published"
+              echo "::error::Development versions cannot be published: $VERSION"
               exit 1
               ;;
           esac
-          echo "Provenance OK: $TAG_COMMIT is on main history"
-
+          MAIN_TIP="$(git rev-parse refs/remotes/origin/main^{commit})"
+          case "$GITHUB_REF" in
+            refs/tags/*)
+              TAG="${GITHUB_REF#refs/tags/}"
+              TAG_COMMIT="$(git rev-parse HEAD^{commit})"
+              [ "$TAG" = "$EXPECTED_TAG" ] || { echo "::error::Tag $TAG does not match $EXPECTED_TAG"; exit 1; }
+              git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_TIP" || { echo "::error::Release tag is not based on main history"; exit 1; }
+              ;;
+            refs/heads/main)
+              test -s .github/RELEASE_REQUEST || { echo "::error::Missing .github/RELEASE_REQUEST"; exit 1; }
+              TAG="$(tr -d '[:space:]' < .github/RELEASE_REQUEST)"
+              [ "$TAG" = "$EXPECTED_TAG" ] || { echo "::error::Release request $TAG does not match $EXPECTED_TAG"; exit 1; }
+              TAG_COMMIT="$(git rev-parse HEAD^{commit})"
+              [ "$TAG_COMMIT" = "$MAIN_TIP" ] || { echo "::error::Release request is not current main"; exit 1; }
+              if git show-ref --verify --quiet "refs/tags/$TAG"; then
+                EXISTING="$(git rev-parse "$TAG^{commit}")"
+                [ "$EXISTING" = "$TAG_COMMIT" ] || { echo "::error::Existing tag points to another commit"; exit 1; }
+              else
+                git config user.name "github-actions[bot]"
+                git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                git tag -a "$TAG" "$TAG_COMMIT" -m "NekoFlash $VERSION"
+                git push origin "refs/tags/$TAG"
+              fi
+              ;;
+            *)
+              echo "::error::Release workflow must run from a version tag or current main release request"
+              exit 1
+              ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version_name=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "version_code=$VERSION_CODE" >> "$GITHUB_OUTPUT"
+          echo "Release provenance OK: $TAG -> $TAG_COMMIT"
   release:
     name: Build, verify and publish signed APK
     runs-on: ubuntu-latest
@@ -59,8 +92,8 @@ jobs:
     environment: nekoflash-release
 
     steps:
-      - name: Checkout tagged source
-        uses: actions/checkout@v5
+      - name: Checkout release source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
 
@@ -70,7 +103,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          TAG="${GITHUB_REF_NAME}"
+          TAG="${{ needs.tag-provenance.outputs.tag }}"
 
           VERSION_NAME="$(
             sed -nE \
@@ -112,7 +145,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -133,7 +166,7 @@ jobs:
           sha256sum gradle/wrapper/gradle-wrapper.jar
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v6
+        uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6
 
       - name: Prepare and verify permanent release key
         env:
@@ -361,7 +394,7 @@ jobs:
           NekoFlash release
           versionName=$VERSION_NAME
           versionCode=$VERSION_CODE
-          gitTag=$GITHUB_REF_NAME
+          gitTag=${{ needs.tag-provenance.outputs.tag }}
           gitCommit=$GITHUB_SHA
           gitRunId=$GITHUB_RUN_ID
           releaseSigned=true
@@ -389,7 +422,7 @@ jobs:
           cat "${FINAL_APK}.sha256"
 
       - name: Upload verified release bundle
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: NekoFlash-${{ steps.version.outputs.version_name }}-release
           path: release-dist/*
@@ -424,3 +457,22 @@ jobs:
             --title "NekoFlash $VERSION_NAME" \
             --generate-notes \
             "${EXTRA_FLAGS[@]}"
+
+      - name: Remove superseded branches after successful release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -u
+          for branch in \
+            "fix/adb-pull-checkpointed-ranges-72" \
+            "agent/nekoflash-astra" \
+            "release/6.0.0-alpha11"
+          do
+            ref="repos/$GITHUB_REPOSITORY/git/refs/heads/$branch"
+            if gh api -X DELETE "$ref" --silent; then
+              echo "Deleted superseded branch: $branch"
+            else
+              echo "Branch already absent or could not be deleted: $branch"
+            fi
+          done

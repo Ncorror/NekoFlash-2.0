@@ -1,3 +1,20 @@
+## Release qualification — 13 November 2026
+
+| Final field result | Release classification |
+| --- | --- |
+| Unlocked POCO X3 Pro `vayu`: `fastboot format userdata`, `fastboot -w`, metadata/cache handling, reboot, Android setup screen | **FIELD PASS — #64 closed** |
+| POCO X3 Pro host → POCO X3 Pro target: `framework.jar` Pull and repeated 128 MiB Pull/Push with matching SHA-256 | **FIELD PASS — generic ADB Pull path** |
+| POCO F7 / `onyx` host: intermittent inbound `USB_IN_FAILED/EPROTO`; same target/files pass on X3 Pro host; Legacy shows the same class of onyx-host receive failures | **Host-specific compatibility note — #72 closed with checkpoint/resume robustness** |
+| Recovery Sideload, Mass Flash, Fastboot reconnect/reboot, Xiaomi sign-in, ZIP select/clear, terminal input/rotation | **Accepted physical PASS evidence on tested builds/devices** |
+
+Large normal-Android Pulls now checkpoint every 256 KiB, never replay a failed USB/ADB packet, require manual reconnect after transport failure and publish the destination only after source recheck plus exact SHA-256 verification.
+
+POCO F7 power/VBUS sensitivity is plausible field context but was not instrumented; it is not recorded as a proven electrical root cause.
+
+**The dated sections below are historical evidence snapshots. Their old FAIL/PENDING wording describes those exact builds and is not the current release verdict.**
+
+---
+
 <div align="center">
 
 ## New physical field evidence — 9 November 2026, unlocked vayu
@@ -55,7 +72,7 @@ Additional **REV53** hardware checks on unlocked vayu Android14 completed 10/10 
 
 The reference APK is from [main CI #413](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41438797886), commit `a31dedadd4ad`. Both emulator jobs passed. A verified physical HOST → TARGET report for REV45 is still pending.
 
-Use the [Insiders kit and RU/EN guides](insiders/README.md). Record both devices, Android versions, cable, build ID, test ID, result and reproduction steps. Priorities are OTG/RSA, terminal keyboard and rotation, 512-file ADB push, Stop and reconnect. Keep raw evidence within the trusted team. The older alpha10 results below apply only to their original builds.
+The old REV45 Insiders kit/guides are no longer part of the active release tree. Their historical results remain in Git history and the [physical evidence ledger](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). The older alpha10 results below apply only to their original builds.
 
 ---
 
