@@ -25,6 +25,10 @@ assert 'internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock 
 assert executor.index('val prepared =') < executor.index('prepared.forEachIndexed')
 assert 'FastbootDownloadSizePolicy.validate(' in executor
 assert 'listOf("userdata", "metadata", "cache")' in executor
+assert 'snapshot-update-status' in executor and 'snapshot-update:cancel' in executor
+steps = (java / 'FastbootExecutionStep.kt').read_text()
+assert 'data class Wipe(val options: Set<String> = emptySet(), val force: Boolean = false)' in steps
+assert 'postWipeCommands' in steps
 assert 'SuperEmptyImage.load(' in executor
 formatter = (java / 'FastbootFilesystemFormatter.kt').read_text()
 assert 'ProcessBuilder(args)' in formatter
