@@ -56,4 +56,11 @@ class FastbootHostSyntaxTest {
             FastbootHostSyntax.compose(emptyList(), true, emptySet(), null, force = true)
         )
     }
+
+    @Test fun setActiveWithoutExplicitSlotIsStillRepresentedInThePlan() {
+        assertEquals(
+            listOf(FastbootExecutionStep.SetActive(null)),
+            FastbootHostSyntax.compose(emptyList(), false, emptySet(), null, activeRequested = true)
+        )
+    }
 }

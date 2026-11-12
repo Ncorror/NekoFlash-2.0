@@ -5,7 +5,7 @@ import java.io.File
 /** Host work stays in one admitted operation; it is never sent as invented USB commands. */
 internal sealed class FastbootExecutionStep {
     data class Raw(val command: String) : FastbootExecutionStep()
-    data class SetActive(val slot: String) : FastbootExecutionStep()
+    data class SetActive(val slot: String? = null) : FastbootExecutionStep()
     data class Flash(val partition: String, val file: File, val slot: String?) : FastbootExecutionStep()
     data class PartitionCommand(val prefix: String, val partition: String, val slot: String?) : FastbootExecutionStep()
     data class Download(val file: File, val command: String) : FastbootExecutionStep()
@@ -35,12 +35,13 @@ internal object FastbootHostSyntax {
         wipe: Boolean,
         options: Set<String>,
         active: String?,
-        force: Boolean = false
+        force: Boolean = false,
+        activeRequested: Boolean = active != null
     ): List<FastbootExecutionStep> = buildList {
         val (deferred, immediate) = primary.partition(::isDeferredByDesktopFastboot)
         addAll(immediate)
         if (wipe) add(FastbootExecutionStep.Wipe(options, force))
-        if (active != null) add(FastbootExecutionStep.SetActive(active))
+        if (activeRequested) add(FastbootExecutionStep.SetActive(active))
         addAll(deferred)
     }
 

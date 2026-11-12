@@ -236,6 +236,13 @@ class FastbootPlanExecutorTest {
         assertEquals(listOf("flash:boot_a", "set_active:b"), mutations())
     }
 
+    @Test fun globalSetActiveWithoutSlotUsesCurrentSlotAtExecutionBoundary() {
+        variables["current-slot"] = "_b"
+        executor().run(FastbootHostSyntax.compose(emptyList(), false, emptySet(), null, activeRequested = true))
+        assertEquals(listOf("set_active:b"), mutations())
+        assertTrue(events.indexOf("get:current-slot") < events.indexOf("set_active:b"))
+    }
+
     @Test fun forcedWipeCancelsAnActiveSnapshotBeforeTheFirstErase() {
         variables["snapshot-update-status"] = "merging"
         executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))

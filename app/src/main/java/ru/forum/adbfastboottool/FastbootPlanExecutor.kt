@@ -91,9 +91,12 @@ internal class FastbootPlanExecutor(
     private fun prepare(step: FastbootExecutionStep): List<Prepared> = when (step) {
         is FastbootExecutionStep.Raw -> listOf(command(step.command))
         is FastbootExecutionStep.SetActive -> {
-            require(step.slot.matches(Regex("[a-z]")))
-            plannedActive = step.slot
-            listOf(command("set_active:${step.slot}"))
+            val slot = step.slot ?: port.getVar("current-slot")?.trim()?.removePrefix("_")
+                ?.takeIf { it.matches(Regex("[a-z]")) }
+                ?: error("Cannot determine current slot for --set-active")
+            require(slot.matches(Regex("[a-z]")))
+            plannedActive = slot
+            listOf(command("set_active:$slot"))
         }
         is FastbootExecutionStep.Flash -> targets(step.partition, step.slot).map { flash(it, step.file) }
         is FastbootExecutionStep.PartitionCommand -> targets(step.partition, step.slot).map { command("${step.prefix}:$it") }

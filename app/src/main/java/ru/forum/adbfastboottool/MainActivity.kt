@@ -1168,6 +1168,7 @@ class MainActivity : AppCompatActivity() {
         val wireCommand: String,
         val slot: String? = null,
         val setActive: String? = null,
+        val setActiveRequested: Boolean = false,
         val serial: String? = null,
         val wipe: Boolean = false,
         val force: Boolean = false,
@@ -1196,6 +1197,7 @@ class MainActivity : AppCompatActivity() {
         val wireTokens = mutableListOf<String>()
         var slot: String? = null
         var setActive: String? = null
+        var setActiveRequested = false
         var serial: String? = null
         var wipe = false
         var force = false
@@ -1240,16 +1242,17 @@ class MainActivity : AppCompatActivity() {
                 lower.startsWith("--slot=") -> {
                     slot = normalizeFastbootSlot(token.substringAfter('=')) ?: return null
                 }
-                lower == "--set-active" -> {
-                    val value = nextOptionValue("--set-active") ?: return null
-                    setActive = normalizeFastbootSlot(value)?.takeUnless { it == "all" || it == "other" } ?: return null
+                lower == "--set-active" || lower == "-a" -> {
+                    setActiveRequested = true
                 }
                 lower.startsWith("--set-active=") -> {
+                    setActiveRequested = true
                     setActive = normalizeFastbootSlot(token.substringAfter('='))?.takeUnless { it == "all" || it == "other" } ?: return null
                 }
-                lower == "-a" -> {
-                    val value = nextOptionValue("-a") ?: return null
-                    setActive = normalizeFastbootSlot(value)?.takeUnless { it == "all" || it == "other" } ?: return null
+                lower.startsWith("-a") && token.length > 2 -> {
+                    setActiveRequested = true
+                    val attached = token.substring(2).removePrefix("=")
+                    setActive = normalizeFastbootSlot(attached)?.takeUnless { it == "all" || it == "other" } ?: return null
                 }
                 lower == "--disable-verity" || lower == "--disable-verification" -> {
                     viewModel.log(
@@ -1289,7 +1292,18 @@ class MainActivity : AppCompatActivity() {
             i += 1
         }
 
-        return FastbootTerminalOptions(commandTokens, wireTokens.joinToString(" "), slot, setActive, serial, wipe, force, filesystemOptions, sparseLimit)
+        return FastbootTerminalOptions(
+            commandTokens,
+            wireTokens.joinToString(" "),
+            slot,
+            setActive,
+            setActiveRequested,
+            serial,
+            wipe,
+            force,
+            filesystemOptions,
+            sparseLimit
+        )
     }
 
     private fun parseFastbootCommand(cmd: String): FastbootTerminalRequest? {
@@ -1312,7 +1326,7 @@ class MainActivity : AppCompatActivity() {
             return null
         }
         if (action is TerminalAction.LocalStatus || action is TerminalAction.OpenReportsFolder) {
-            if (parsedOptions.wipe || parsedOptions.force || parsedOptions.setActive != null || parsedOptions.sparseLimit != null) {
+            if (parsedOptions.wipe || parsedOptions.force || parsedOptions.setActiveRequested || parsedOptions.sparseLimit != null) {
                 viewModel.log("❌ Local status/reports cannot be combined with -w, --force, --set-active or -S")
                 return null
             }
@@ -1334,12 +1348,16 @@ class MainActivity : AppCompatActivity() {
             is TerminalAction.FastbootFetch -> listOf(FastbootExecutionStep.Fetch(action.partition, action.outputFile, action.slot))
             else -> error("Unexpected ADB action in Fastboot parser")
         }
+        val active = if (parsedOptions.setActiveRequested) {
+            parsedOptions.setActive ?: parsedOptions.slot?.takeUnless { it == "all" || it == "other" }
+        } else null
         val plan = FastbootHostSyntax.compose(
             steps,
             parsedOptions.wipe,
             parsedOptions.filesystemOptions,
-            parsedOptions.setActive,
-            parsedOptions.force
+            active,
+            parsedOptions.force,
+            parsedOptions.setActiveRequested
         )
         if (parsedOptions.sparseLimit != null && plan.none {
                 it is FastbootExecutionStep.Flash || it is FastbootExecutionStep.Format ||
