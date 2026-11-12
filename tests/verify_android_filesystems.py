@@ -46,11 +46,14 @@ def expand(source, target, overlay=False):
                         n = min(len(buffer), size)
                         out.write(buffer[:n])
                         size -= n
-            elif kind == 0xcac3 and overlay:
+            elif kind == 0xcac3:
+                # AOSP make_f2fs -S legitimately emits DONT_CARE for untouched blocks.
+                # On a fresh output, seeking creates zero-filled holes for fsck inspection;
+                # on an overlay, it preserves the target bytes exactly like fastboot/libsparse.
                 assert total == chunk_header
                 out.seek(size, 1)
             else:
-                raise AssertionError(f'Unexpected chunk {kind:x}; formatting must not leave DONT_CARE blocks')
+                raise AssertionError(f'Unexpected sparse chunk {kind:x}')
             assert inp.tell() == start + total
         assert out.tell() == blocks * block
         assert inp.read(1) == b''
@@ -80,15 +83,23 @@ for fs in ('ext4', 'f2fs'):
         manifest = pull(name + '.parts.txt').read_text().splitlines()
         limit = int(manifest[0])
         assert limit == 16384 and len(manifest) > 2
+
+        # Compare resparse behavior against the original sparse image on the same
+        # non-zero target. This preserves AOSP DONT_CARE semantics instead of
+        # pretending skipped blocks are zeroed by the sparse stream itself.
+        expected = args.output / (name + '.expected-overlay.raw')
         recombined = args.output / (name + '.resparse.raw')
-        # Poison catches both lost data between downloads and zero-FILL incorrectly treated as SKIP.
-        with recombined.open('wb') as out:
-            poison = b'\x5a' * (1024 * 1024)
-            left = raw.stat().st_size
-            while left:
-                size = min(left, len(poison))
-                out.write(poison[:size])
-                left -= size
+        poison = b'\x5a' * (1024 * 1024)
+        for target in (expected, recombined):
+            with target.open('wb') as out:
+                left = raw.stat().st_size
+                while left:
+                    n = min(left, len(poison))
+                    out.write(poison[:n])
+                    left -= n
+        expand(sparse, expected, overlay=True)
+        expected_overlay_hash = digest(expected)
+
         sizes = []
         for index, part_name in enumerate(manifest[1:], 1):
             assert part_name == f'{name}-part-{index}.sparse'
@@ -96,7 +107,7 @@ for fs in ('ext4', 'f2fs'):
             sizes.append(part.stat().st_size)
             assert 0 < sizes[-1] <= limit
             expand(part, recombined, overlay=True)
-        assert digest(recombined) == original_hash, 'Resparse changed the expanded filesystem'
+        assert digest(recombined) == expected_overlay_hash, 'Resparse changed sparse overlay semantics'
         tool = shutil.which('e2fsck' if fs == 'ext4' else 'fsck.f2fs')
         command = [tool, '-f', '-n', str(recombined)] if fs == 'ext4' else [tool, '-f', str(recombined)]
         result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
@@ -106,9 +117,11 @@ for fs in ('ext4', 'f2fs'):
             stat = subprocess.check_output(['debugfs', '-R', 'stat <2>', str(recombined)], text=True)
             assert re.search(r'User:\s+0\s+Group:\s+0', stat), stat
         evidence = dict(image=name, expanded=raw.stat().st_size, original_sparse=sparse.stat().st_size,
-                        sha256=original_hash, resparse_equal=True, part_count=len(sizes), part_sizes=sizes,
+                        sha256=original_hash, sparse_overlay_sha256=expected_overlay_hash,
+                        resparse_equal=True, part_count=len(sizes), part_sizes=sizes,
                         download_limit=limit, fsck=result.returncode)
         (args.output / (name + '.resparse.json')).write_text(json.dumps(evidence, indent=2) + '\n')
         print(f'PASS Android {name}: expanded={raw.stat().st_size}, sparse={sparse.stat().st_size}, parts={len(sizes)}, resparse SHA256 identical, fsck=0')
         raw.unlink()
+        expected.unlink()
         recombined.unlink()

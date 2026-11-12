@@ -4,6 +4,7 @@ import java.io.File
 import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.security.SecureRandom
 import java.util.concurrent.TimeUnit
 
 internal data class FilesystemSpec(val type: String, val sizeBytes: Long, val eraseBlockBytes: Long = 0,
@@ -22,11 +23,13 @@ internal class FastbootFilesystemFormatter(
 ) : FilesystemFormatter {
     override fun generate(spec: FilesystemSpec, directory: File, checkCancelled: () -> Unit): File {
         require(spec.type in setOf("ext4", "f2fs")) { "Unsupported filesystem: ${spec.type}" }
-        val tool = tools[spec.type]?.takeIf { it.isFile && it.canExecute() }
-            ?: error("Filesystem generator unavailable on this Android host: ${spec.type} (mke2fs / mkfs.f2fs). No erase was sent.")
         val size = spec.sizeBytes / 4096 * 4096
         require(size >= 4096 && size / 4096 <= 0xffff_ffffL) { "Filesystem size cannot be encoded in Android sparse: $size" }
         require(directory.isDirectory)
+        if (spec.type == "f2fs") return generateF2fs(spec, size, directory, checkCancelled)
+
+        val tool = tools["ext4"]?.takeIf { it.isFile && it.canExecute() }
+            ?: error("Filesystem generator unavailable on this Android host: ext4 (mke2fs). No erase was sent.")
         val raw = File.createTempFile("filesystem-", ".raw", directory)
         val sparse = File.createTempFile("filesystem-", ".sparse", directory)
         val processLog = File.createTempFile("mkfs-", ".log", directory)
@@ -68,14 +71,39 @@ internal class FastbootFilesystemFormatter(
         }
     }
 
-    internal fun arguments(tool: File, spec: FilesystemSpec, image: File, size: Long): List<String> {
-        if (spec.type == "f2fs") return buildList {
-            addAll(listOf(tool.absolutePath, "-f", "-t", "0", "-g", "android"))
-            if ("projid" in spec.options) addAll(listOf("-O", "project_quota,extra_attr"))
-            if ("casefold" in spec.options) addAll(listOf("-O", "casefold", "-C", "utf8"))
-            if ("compress" in spec.options) addAll(listOf("-O", "compression,extra_attr"))
-            addAll(listOf(image.absolutePath, (size / 512).toString()))
+    private fun generateF2fs(spec: FilesystemSpec, size: Long, directory: File, checkCancelled: () -> Unit): File {
+        val sparse = File.createTempFile("filesystem-", ".sparse", directory)
+        var keep = false
+        try {
+            checkCancelled()
+            val random = SecureRandom()
+            val uuid = ByteArray(16).also(random::nextBytes)
+            val request = FastbootF2fs.Request(
+                sizeBytes = size,
+                projectIds = "projid" in spec.options,
+                casefold = "casefold" in spec.options,
+                compression = "compress" in spec.options,
+                uuid = uuid,
+                now = System.currentTimeMillis() / 1000L,
+                checkpointVersion = ((random.nextInt() and Int.MAX_VALUE) or 1).toLong(),
+                kernelRelease = System.getProperty("os.version").orEmpty()
+            )
+            log("Host filesystem: f2fs, $size bytes, generator=AOSP make_f2fs -S compatible")
+            val image = FastbootF2fs.image(request).getOrElse {
+                throw IllegalStateException("AOSP-compatible F2FS sparse generation failed: ${it.message}", it)
+            }
+            checkCancelled()
+            sparse.writeBytes(image)
+            require(AndroidSparseImage.inspect(sparse, checkCancelled).expandedBytes == size)
+            keep = true
+            return sparse
+        } finally {
+            if (!keep) sparse.delete()
         }
+    }
+
+    internal fun arguments(tool: File, spec: FilesystemSpec, image: File, size: Long): List<String> {
+        require(spec.type == "ext4")
         val features = "none,has_journal,extent,huge_file,flex_bg,uninit_bg,dir_nlink,extra_isize," +
             "sparse_super,large_file,filetype,resize_inode,dir_index,ext_attr" +
             if ("casefold" in spec.options) ",casefold" else ""

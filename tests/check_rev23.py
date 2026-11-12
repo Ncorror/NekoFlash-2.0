@@ -34,6 +34,7 @@ for name in ('build.yml', 'release.yml'):
 instrumentation = (root / 'app/src/androidTest/java/ru/forum/adbfastboottool/BundledFilesystemToolsTest.kt').read_text()
 assert 'plan.forEachPart(' in instrumentation and '.parts.txt' in instrumentation
 independent = (root / 'tests/verify_android_filesystems.py').read_text()
-assert 'digest(recombined) == original_hash' in independent
+assert 'digest(recombined) == expected_overlay_hash' in independent
+assert 'expand(sparse, expected, overlay=True)' in independent
 assert 'overlay=True' in independent and 'fsck.f2fs' in independent
 print('PASS REV23: shared bounded resparse, preflight, original packet transport, independent reconstruction/fsck')

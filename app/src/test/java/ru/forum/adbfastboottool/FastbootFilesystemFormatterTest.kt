@@ -26,6 +26,11 @@ class FastbootFilesystemFormatterTest {
     }
     @Test fun realExt4RoundTripsThroughSparseAndPassesE2fsck() = validate("ext4", 32L * 1024 * 1024)
     @Test fun realF2fsRoundTripsThroughSparseAndPassesFsck() = validate("f2fs", 128L * 1024 * 1024)
+    @Test fun f2fsGenerationDoesNotDependOnExternalMkfsExecutable() {
+        val sparse = FastbootFilesystemFormatter(emptyMap())
+            .generate(FilesystemSpec("f2fs", 128L * 1024 * 1024), temporary.root) {}
+        assertEquals(128L * 1024 * 1024, AndroidSparseImage.inspect(sparse).expandedBytes)
+    }
     @Test fun ext4CasefoldAndProjectInodesAreAcceptedByRealTools() = validate("ext4", 32L * 1024 * 1024, setOf("casefold", "projid"))
     @Test fun f2fsAllHostOptionsProduceValidFilesystem() = validate("f2fs", 128L * 1024 * 1024, setOf("casefold", "projid", "compress"))
     @Test fun missingToolFailsBeforeCreatingAnyImages() {
