@@ -1055,7 +1055,7 @@ class AdbProtocol(
         )
         onLog("-> adb pull " + remotePath + " " + localFile.absolutePath)
         onLog("Remote file size: " + stableStat.size + " bytes")
-        onLog("ℹ️ Large-file Pull: 4 MiB durable ranges, manual-reconnect resume enabled")
+        onLog("ℹ️ Large-file Pull: 256 KiB durable ranges, manual-reconnect resume enabled")
         onLog("ℹ️ Remote SHA-256: " + remoteSha256)
 
         return try {

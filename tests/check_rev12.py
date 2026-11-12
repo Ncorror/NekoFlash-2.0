@@ -27,7 +27,7 @@ def raw_source_git_sha(payload):
 # isolated from the ADB packet transport: no failed USB packet is retried and
 # no automatic reconnect is introduced. Normalize only the reviewed Pull block
 # back to REV57, then run every older byte-for-byte ADB guard unchanged.
-rev58_checkpointed_pull_adb_hash = '3cfb141b6077ef52c9d9d00bf02ea2a34b445359'
+rev58_checkpointed_pull_adb_hash = 'cbca9c738c00950aeb899c3e3fd0150998e32c63'
 if raw_source_git_sha(data) == rev58_checkpointed_pull_adb_hash:
     pull_start = data.index(b'    private fun pullFileSingle(')
     pull_end = data.index(b'    private fun pullDirectory(', pull_start)
@@ -47,7 +47,7 @@ if raw_source_git_sha(data) == rev58_checkpointed_pull_adb_hash:
         'REV58 modified unrelated ADB code'
     )
     checkpoint = (base/'AdbCheckpointedPullPolicy.kt').read_text()
-    assert 'const val RANGE_BYTES: Int = 4 * 1024 * 1024' in checkpoint
+    assert 'const val RANGE_BYTES: Int = 256 * 1024' in checkpoint
     assert 'const val MIN_FILE_BYTES: Long = 16L * 1024L * 1024L' in checkpoint
     assert 'checkpointBytes % RANGE_BYTES.toLong() == 0L' in checkpoint
     assert 'remoteSha256.lowercase()' in checkpoint

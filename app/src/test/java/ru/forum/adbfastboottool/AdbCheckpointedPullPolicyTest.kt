@@ -29,27 +29,27 @@ class AdbCheckpointedPullPolicyTest {
 
     @Test
     fun rangesAreFixedAndFinalRangeIsExact() {
-        val four = AdbCheckpointedPullPolicy.RANGE_BYTES.toLong()
+        val range = AdbCheckpointedPullPolicy.RANGE_BYTES.toLong()
         assertEquals(
-            AdbCheckpointedPullPolicy.Range(0L, four.toInt()),
-            AdbCheckpointedPullPolicy.nextRange(four * 2 + 123L, 0L)
+            AdbCheckpointedPullPolicy.Range(0L, range.toInt()),
+            AdbCheckpointedPullPolicy.nextRange(range * 2 + 123L, 0L)
         )
         assertEquals(
-            AdbCheckpointedPullPolicy.Range(four * 2, 123),
-            AdbCheckpointedPullPolicy.nextRange(four * 2 + 123L, four * 2)
+            AdbCheckpointedPullPolicy.Range(range * 2, 123),
+            AdbCheckpointedPullPolicy.nextRange(range * 2 + 123L, range * 2)
         )
-        assertNull(AdbCheckpointedPullPolicy.nextRange(four * 2, four * 2))
+        assertNull(AdbCheckpointedPullPolicy.nextRange(range * 2, range * 2))
     }
 
     @Test
     fun onlyDurableWholeRangesAreValidResumePoints() {
-        val four = AdbCheckpointedPullPolicy.RANGE_BYTES.toLong()
-        val total = four * 3 + 17L
+        val range = AdbCheckpointedPullPolicy.RANGE_BYTES.toLong()
+        val total = range * 3 + 17L
         assertTrue(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, 0L))
-        assertTrue(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, four))
-        assertTrue(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, four * 2))
+        assertTrue(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, range))
+        assertTrue(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, range * 2))
         assertTrue(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, total))
-        assertFalse(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, four + 1L))
+        assertFalse(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, range + 1L))
         assertFalse(AdbCheckpointedPullPolicy.isValidCheckpointLength(total, total + 1L))
     }
 

@@ -10,7 +10,7 @@ import java.security.MessageDigest
  * from the last durable range without publishing a partial destination file.
  */
 internal object AdbCheckpointedPullPolicy {
-    const val RANGE_BYTES: Int = 4 * 1024 * 1024
+    const val RANGE_BYTES: Int = 256 * 1024
     const val MIN_FILE_BYTES: Long = 16L * 1024L * 1024L
 
     data class Range(val offset: Long, val length: Int)
