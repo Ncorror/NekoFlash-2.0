@@ -274,6 +274,14 @@ class FastbootPlanExecutorTest {
         assertTrue(events.lastIndexOf("get:current-slot") > events.indexOf("set_active:b"))
     }
 
+    @Test fun concreteSetActiveRejectsSlotsOutsideReportedSlotCountBeforeMutation() {
+        variables["slot-count"] = "1"
+        assertThrows(IllegalArgumentException::class.java) {
+            executor().run(listOf(FastbootExecutionStep.SetActive("b")))
+        }
+        assertTrue(mutations().isEmpty())
+    }
+
     @Test fun forcedWipeCancelsAnActiveSnapshotBeforeTheFirstErase() {
         variables["snapshot-update-status"] = "merging"
         executor().run(listOf(FastbootExecutionStep.Wipe(force = true)))

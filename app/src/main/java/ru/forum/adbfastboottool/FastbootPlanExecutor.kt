@@ -123,6 +123,11 @@ internal class FastbootPlanExecutor(
                 }
                 else -> {
                     require(step.slot.matches(Regex("[a-z]")))
+                    val count = slotCount()
+                    val index = step.slot[0] - 'a'
+                    require(index in 0 until count) {
+                        "Slot ${step.slot} does not exist; device reports $count slot(s)"
+                    }
                     plannedActive = step.slot
                     listOf(command("set_active:${step.slot}"))
                 }
