@@ -6,6 +6,15 @@
 
 </div>
 
+## Unreleased — post-release audit
+
+- Hardened sanitized share copies for explicit `adb/fastboot -s SERIAL` selectors; raw forensic logs remain unchanged.
+- Tightened manual release tags to exact current `main` and aligned future release publication with normal/latest Release policy.
+- Renamed the generic APK-only tester kit and removed obsolete REV9/old-repository Termux routes.
+- Consolidated current documentation and removed competing REV/refactor/source-audit snapshots from the active tree.
+- Corrected Pages URLs and replaced the obsolete Sideload picker warning with the shipped explicit Choose → Start behavior.
+- Recorded the remaining administrative gap: repository rulesets were empty when audited; protected release-environment approval is verified separately.
+
 ## 6.0.0-alpha11 — 13 November 2026
 
 Release candidate promoted to the protected signed-release path after the final hardware audit.

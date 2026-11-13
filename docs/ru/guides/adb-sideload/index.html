@@ -7,25 +7,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#ff7a1a">
 <meta name="robots" content="index,follow,max-image-preview:large">
-<link rel="canonical" href="https://ncorror.github.io/NekoFlash/ru/guides/adb-sideload/">
-<link rel="alternate" hreflang="ru" href="https://ncorror.github.io/NekoFlash/ru/guides/adb-sideload/">
-<link rel="alternate" hreflang="en" href="https://ncorror.github.io/NekoFlash/guides/adb-sideload/">
-<link rel="alternate" hreflang="x-default" href="https://ncorror.github.io/NekoFlash/guides/adb-sideload/">
+<link rel="canonical" href="https://ncorror.github.io/NekoFlash-2.0/ru/guides/adb-sideload/">
+<link rel="alternate" hreflang="ru" href="https://ncorror.github.io/NekoFlash-2.0/ru/guides/adb-sideload/">
+<link rel="alternate" hreflang="en" href="https://ncorror.github.io/NekoFlash-2.0/guides/adb-sideload/">
+<link rel="alternate" hreflang="x-default" href="https://ncorror.github.io/NekoFlash-2.0/guides/adb-sideload/">
 <link rel="icon" href="../../../assets/favicon.svg">
 <meta property="og:type" content="article">
 <meta property="og:site_name" content="NekoFlash">
 <meta property="og:locale" content="ru_RU">
-<meta property="og:url" content="https://ncorror.github.io/NekoFlash/ru/guides/adb-sideload/">
+<meta property="og:url" content="https://ncorror.github.io/NekoFlash-2.0/ru/guides/adb-sideload/">
 <meta property="og:title" content="ADB Sideload с Android без компьютера">
 <meta property="og:description" content="Передача ZIP-обновления из Android в Recovery / ADB Sideload через USB OTG.">
-<meta property="og:image" content="https://ncorror.github.io/NekoFlash/assets/og-image.png">
+<meta property="og:image" content="https://ncorror.github.io/NekoFlash-2.0/assets/og-image.png">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="stylesheet" href="../../../assets/site.css">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NekoFlash","item":"https://ncorror.github.io/NekoFlash/ru/"},{"@type":"ListItem","position":2,"name":"Руководства","item":"https://ncorror.github.io/NekoFlash/ru/guides/"},{"@type":"ListItem","position":3,"name":"ADB Sideload с Android","item":"https://ncorror.github.io/NekoFlash/ru/guides/adb-sideload/"}]}
+{"@context":"https://schema.org","@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"NekoFlash","item":"https://ncorror.github.io/NekoFlash-2.0/ru/"},{"@type":"ListItem","position":2,"name":"Руководства","item":"https://ncorror.github.io/NekoFlash-2.0/ru/guides/"},{"@type":"ListItem","position":3,"name":"ADB Sideload с Android","item":"https://ncorror.github.io/NekoFlash-2.0/ru/guides/adb-sideload/"}]}
 </script>
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"TechArticle","headline":"ADB Sideload с Android без компьютера","description":"Передача update ZIP из Android-хоста в Recovery через ADB Sideload и USB OTG.","inLanguage":"ru","mainEntityOfPage":"https://ncorror.github.io/NekoFlash/ru/guides/adb-sideload/"}
+{"@context":"https://schema.org","@type":"TechArticle","headline":"ADB Sideload с Android без компьютера","description":"Передача update ZIP из Android-хоста в Recovery через ADB Sideload и USB OTG.","inLanguage":"ru","mainEntityOfPage":"https://ncorror.github.io/NekoFlash-2.0/ru/guides/adb-sideload/"}
 </script>
 </head>
 <body>
@@ -41,7 +41,7 @@
 <h2>2. Подключите Android-хост</h2>
 <p>Соедините телефон или планшет с NekoFlash и целевое устройство кабелем USB OTG / USB-C с поддержкой передачи данных.</p>
 
-<div class="notice" style="margin:20px 0"><strong>Важное предупреждение для конкретной сборки (9 ноября 2026).</strong> В установленной DEV APK из <code>main</code> (<code>6a8accd8e33e</code>) выбор ZIP в диалоге файлов <strong>сразу запускает его отправку</strong>. Не открывай выбор файла, пока целевой телефон не подготовлен, а SHA-256 основного ROM ZIP не проверен по официальному источнику. В <a href="https://github.com/Ncorror/NekoFlash-2.0/pull/71">PR #71</a> уже реализованы отдельные «Выбрать ZIP» и «Начать Sideload» с подтверждением; CI прошёл, но <strong>PR ещё не в main и не принят аппаратно</strong>. 100% передачи и <code>DONEDONE</code> не доказывают успешную установку. При ошибке подписи основного ROM не обходить проверку — остановиться. <a href="https://github.com/Ncorror/NekoFlash-2.0/pull/63">Аудит реальных результатов</a>.</div>
+<div class="notice" style="margin:20px 0"><strong>Текущее поведение Sideload.</strong> Выбор ZIP ничего не отправляет на target: он только сохраняет выбранный источник. Выбор можно очистить, не удаляя исходный файл. Передача начинается только после отдельного явного Start и подтверждения. До Start проверь источник и SHA-256 ZIP. Даже 100% передачи не доказывают установку пакета — итоговый verdict определяется по данным Recovery.</div>
 <h2>3. Выберите ZIP</h2>
 <p>Откройте вкладку Sideload в NekoFlash и выберите совместимый ZIP-файл обновления. Если файл сначала импортируется в рабочее хранилище NekoFlash, убедитесь, что свободного места достаточно.</p>
 
