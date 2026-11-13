@@ -1,55 +1,44 @@
-<div align="center">
+# NekoFlash 2.0 — legal/distribution review
 
-<img src="artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+This is a maintainer checklist, not legal advice.
 
-# Legal Review
+## Project code
 
-### Maintainer checklist, project licensing, trademarks, and compliance
+NekoFlash project source is distributed under the root Apache License 2.0 unless a file or component states otherwise.
 
-English
+Project artwork listed in [ASSETS_LICENSE.md](../ASSETS_LICENSE.md) is excluded from the Apache-2.0 branding/artwork grant.
 
-</div>
+## Third-party material
 
+The APK includes separate filesystem executables:
+- e2fsprogs / `mke2fs`;
+- f2fs-tools / `mkfs.f2fs`.
 
-This document is a maintainer checklist, not legal advice.
+They retain their upstream GPL-2.0/component-specific licensing and are not relicensed as Apache-2.0 NekoFlash code.
 
-## Project license
+The current release model therefore keeps `filesystem-tools-source.tar.gz` alongside the APK as corresponding source. See [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md) and [vendor/filesystems/README.md](../vendor/filesystems/README.md).
 
-NekoFlash source code is distributed under the Apache License 2.0.
+## Current public release
 
-The root `LICENSE` file should contain the canonical Apache-2.0 license text. Project-specific attribution, trademark disclaimers, release notes and third-party notices should not be mixed into the canonical license text.
+`v6.0.0-alpha11` publishes custom assets:
+- `NekoFlash-6.0.0-alpha11.apk`;
+- `NekoFlash-6.0.0-alpha11.apk.sha256`;
+- `filesystem-tools-source.tar.gz`.
 
-## Independence statement
+GitHub additionally exposes automatic source-code archives for the tag.
 
-NekoFlash is an independent project and is not affiliated with or endorsed by Google, Xiaomi, MiForge, Termux or any referenced open-source project.
+## Independence
 
-NekoFlash does not require Termux, desktop adb/fastboot, MiFlash, MiForge, Google Play Services or vendor cloud services for the documented USB workflows.
+NekoFlash is independent and is not affiliated with or endorsed by Google, Xiaomi, Termux, MiForge or the upstream open-source projects referenced by the implementation.
 
-Android platform APIs, build tools and declared open-source dependencies remain under their own licenses.
+Android, Xiaomi and other names/trademarks remain the property of their respective owners.
 
-## Maintainer policy
+## Distribution checklist
 
-- Do not claim ownership of third-party names, trademarks or projects.
-- Do not claim that the project has no dependencies.
-- Do not bundle third-party binaries, vendor firmware, proprietary blobs or copied source code unless their license allows redistribution and the notice is recorded.
-- Keep raw private hardware logs, serials, tokens and personal identifiers outside Git.
-- Keep public evidence sanitized.
-- Keep release APKs in GitHub Releases assets, not in the repository tree.
-
-## Third-party dependency review
-
-Before a stable release, review Gradle files and any bundled components.
-
-If a dependency is bundled into the APK, record it in `THIRD_PARTY_NOTICES.md` when required by its license.
-
-## Historical release evidence vs. NekoFlash 2.0 DEV
-
-The following is **historical evidence recorded for the original release line**, not a live claim that these assets are the newest release:
-
-- tag: `v6.0.0-alpha10.1`
-- recorded base commit: `de1225b9cd5be110c72c6f130320b2d62d927cc0`
-- recorded release asset: `NekoFlash-v6.0.0-alpha10.1-release.apk`
-
-The separate `Ncorror/NekoFlash-2.0` development repository had **no GitHub Releases when reviewed on 2026-10-30**. The current DEV source uses `versionName=6.0.0-alpha11`, `versionCode=234`; a version string in source is **not** proof of a signed/published release. See [development status](DEVELOPMENT_STATUS.md) and [open release-security checks](SECURITY_REVIEW_BACKLOG.md).
-
-Bundled ext4/F2FS filesystem executables carry upstream GPL-2.0/component licenses and require matching notices and corresponding source as described in [THIRD_PARTY_NOTICES](../THIRD_PARTY_NOTICES.md) and [vendor/filesystems](../vendor/filesystems/README.md). The tag-driven release workflow currently needs an explicit approved-commit policy before public distribution.
+Before every signed release:
+1. verify the exact source/tag and permanent APK certificate;
+2. verify third-party notices and pinned filesystem source manifest;
+3. publish the corresponding-source archive with the APK;
+4. do not include proprietary firmware/ROMs or account material;
+5. keep private hardware logs/serials/tokens outside public GitHub;
+6. ensure public release notes do not overstate hardware qualification.

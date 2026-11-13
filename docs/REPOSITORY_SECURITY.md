@@ -1,150 +1,46 @@
-# Защита NekoFlash 2.0: GitHub Rulesets, подписанный APK, секреты
+# NekoFlash 2.0 — repository and release security
 
-## Обновление ключа подписи — 11 ноября 2026
+## Verified on 13 November 2026
 
-Владелец создал новый PKCS12-keystore в закрытом каталоге Termux: `~/.nekoflash-signing/release.jks`, alias `nekoflash_release`. Публичный SHA-256 сертификата: `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2`. Исходного приватного ключа прежней production-подписи у владельца нет; текущий файл JKS **не** может обновлять APK, подписанные старым ключом, при одинаковом applicationId. Сохраняем старые установки и идентификаторы приложения без изменений до принятия отдельного решения о миграции.
+- Release environment `nekoflash-release` is real and approval-gated: the alpha11 signed release remained in GitHub's waiting deployment state until the owner approved it.
+- The signed release workflow completed successfully and verified the permanent certificate before and after APK build.
+- Build/release third-party Actions are pinned to full commit SHAs.
+- Release source provenance and exact-SHA CI gates are enforced in workflow code.
+- Repository rulesets API returned **no rulesets** (`[]`) during this audit.
+- Branch-protection details could not be read by the connected GitHub App (403: integration permission), so this repository must **not** claim branch protection was independently verified by the audit.
 
-**Статус:** локальный ключ создан, но резервные копии, secret provisioning и успешный подписанный релиз **не подтверждены**. Ошибка CI #687 — отсутствуют четыре release secret, а не ошибка приложения. Никакие пароли, Base64 от приватного JKS или сам JKS в GitHub-коммиты и чаты не передавать.
+## Source-enforced release gates
 
-Порядок завершения: (1) две независимые защищённые резервные копии с проверенным расшифрованием, (2) подтверждение ограничений `nekoflash-release`, (3) установка четырёх **environment secrets** только в защищённое окружение, (4) CI и ручная проверка подписанного APK и его SHA-256 сертификата, (5) отдельная безопасная аппаратная приёмка и решение о совместимости установки. Новый версионный тег пока не создавать.
+The workflow requires:
+- exact `versionName` ↔ `v$versionName`;
+- release tag commit == current `main`;
+- exact-SHA successful main CI before tag/signing;
+- protected `nekoflash-release` environment before signing secrets;
+- permanent certificate SHA-256 `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2`;
+- APK certificate re-verification after build;
+- APK/filesystem verification before GitHub Release publication.
 
-**Архивная оценка состояния GitHub на 2 ноября 2026.** Текущие branch-protection/rulesets, права участников и секреты нельзя считать проверенными этим документом без нового чтения настроек с соответствующими полномочиями. Текущее состояние сборки и фактические аппаратные результаты отдельно: [DEV статус](DEVELOPMENT_STATUS.md) / [реестр](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-RU.md). Не менять доступ участников на основании одной старой заметки.
+## Remaining manual GitHub Settings hardening
 
-Ревизия 02.11.2026 (перенесена из PR #21/#22). Репозиторий: `Ncorror/NekoFlash-2.0`.
-На момент подготовки: **main не защищена**, rulesets пусты,
-у `IQ-HARRY7` уровень `write`. Это оценка **прав доступа**, а не
-обвинение участника в недобросовестности.
+The source repository cannot create administrative rulesets through the connected GitHub App. The owner should configure this in **Settings → Rules → Rulesets**.
 
-## Что делает этот PR — и чего не делает
+For `main`:
+- require a Pull Request before merge;
+- require the real CI checks selected from a successful main run;
+- block force pushes;
+- restrict branch deletion;
+- require conversation resolution if desired.
 
-- Релиз по `v*` **до чтения секрета подписи** отвергает тег, не
-  указывающий на коммит из истории `main`.
-- `release.yml` использует GitHub Actions environment `nekoflash-release`.
-- `build.yml` запускает подписанный APK только при **явном** выборе
-  `sign_release=true`, на ветке `main`, через то же защищённое
-  окружение; обычные PR, push, DEV и ручные debug-проверки используют
-  `nekoflash-ci` без подписывающих секретов.
-- `.github/CODEOWNERS` запрашивает внимание владельца к изменению
-  workflow, Gradle, Gradle wrapper, C/C++, scripts и filesystem-tools.
+For a solo maintainer, do not require an approval that the author is technically unable to provide unless a second trusted reviewer is available.
 
-**Важно:** само наличие `environment:` в YAML не включает модерацию.
-Если `nekoflash-release` не создано и не защищено в Settings, GitHub может
-автоматически создать пустое окружение без защиты. Пока ключи лежат в
-**repository secrets**, workflow с правами записи может их использовать.
-Ни одна правка YAML не заменит перенос секретов и GitHub Rulesets.
+For `v*` tags:
+- restrict updates and deletion;
+- if tag creation is restricted too, explicitly allow the trusted release workflow/admin path so the automated exact-main release flow is not broken.
 
-## Ручные действия владельца в GitHub — выполнять в указанном порядке
+After enabling rulesets, perform a non-destructive verification with an ordinary PR. Do **not** create a fake production `v*` tag just to test the rule; the tag path is a real publish path.
 
-### 1. Временно исключить недоверенный прямой push
+## Secrets
 
-Перейти в [Settings → Collaborators](https://github.com/Ncorror/NekoFlash-2.0/settings/access).
-Перепроверить список `write`/администраторов и токенов с доступом.
-При одиночном сопровождении безопасный вариант: отозвать прямое `write`
-у внешних участников; они по-прежнему могут присылать Pull Request
-**из fork**. Это не обвинение и не удаление авторства или старых PR.
-Если `write` оставлен, обязательно требовать PR с одобрением от
-**другого доверенного человека**, иначе человек с `write` может
-объединить собственный PR без независимой проверки при 0 approvals.
+Signing secrets belong only in `nekoflash-release`, not in ordinary CI. Never commit a JKS, Base64 keystore or passwords.
 
-### 2. Создать ruleset для main
-
-[Settings → Rules → Rulesets](https://github.com/Ncorror/NekoFlash-2.0/settings/rules).
-`New ruleset → New branch ruleset`, имя `protect-main`,
-`Enforcement: Active`, целевая ветка **`main`** (точное совпадение).
-
-- Require a pull request before merging.
-- Require status checks to pass: **`build`** (точное имя из нового CI).
-- Block force pushes.
-- Restrict deletions.
-- Require conversation resolution — при наличии этой опции.
-- Не добавлять широкие `write`/`maintain` bypass-исключения.
-- **Одному сопровождающему:** пока нет второго доверенного ревьюера,
-  не включать `Require approvals` и `Require review from Code Owners`
-  вместе с `Do not allow bypass`: автор не может одобрить свой PR,
-  можно заблокировать собственный рабочий процесс. Вместо этого сначала
-  убрать чужое `write` (шаг 1). С двумя доверенными ревьюерами —
-  включить 1 approval и, при необходимости, CODEOWNERS.
-
-### 3. Защита долгоживущей DEV-ветки — только если она снова появится
-
-`work/rev26-terminal-imports-20261030` — старая базовая ветка и не актуальная DEV.
-После закрытия старых PR её можно удалить. **Не создавать ruleset для этой устаревшей ветки.**
-Когда появится новая долгоживущая DEV-ветка, защищать именно её точное имя,
-а не все `work/rev*`, чтобы не ломать временные рабочие ветки.
-
-Те же PR, запрет force-push и удаления. Required checks выбрать из
-успешного CI целевой DEV-ветки:
-
-- `build`
-- `Installed mkfs on Android API 26`
-- `Installed mkfs on Android API 34`
-
-Проверять реальные **check names** в UI перед сохранением правил.
-Если required status GitHub пока не предлагает, сначала запустить PR-CI,
-затем добавить его; не придумывать/не прописывать несуществующий статус.
-
-### 4. Защитить теги выпуска
-
-Создать `New tag ruleset`, `Enforcement: Active`, targeting `v*`.
-Включить `Restrict creations`, `Restrict updates`,
-`Restrict deletions`. Исключение/bypass для создания тегов
-предоставить только **доверенному владельцу/Repository admins**,
-**НЕ** всем `write`. Защита тега должна позволять владельцу
-сознательно создать версионный тег, но запрещать его переписывание
-остальным. Проверить доступные исключения в UI.
-
-### 5. Создать подписывающее окружение и перенести секреты
-
-[Settings → Environments](https://github.com/Ncorror/NekoFlash-2.0/settings/environments)
-→ New environment: **`nekoflash-release`**.
-
-- Required reviewers: **только владелец `Ncorror`** (при одном
-  владельце опцию Prevent self-review выключить, иначе владелец
-  не сможет одобрить собственный запуск). С доверенным вторым
-  рецензентом рекомендуем Prevent self-review включить.
-- Deployment branches and tags: **Selected branches and tags**,
-  разрешить `main` и `v*`, исключить DEV и feature branches.
-- По возможности запретить администраторский обход правил.
-- Добавить именно **environment secrets** с текущими названиями:
-  `NEKOFLASH_KEYSTORE_BASE64`,
-  `NEKOFLASH_STORE_PASSWORD`, `NEKOFLASH_KEY_ALIAS`,
-  `NEKOFLASH_KEY_PASSWORD`.
-- После проверки исходных резервных копий и переноса
-  **удалить одноимённые repository secrets** в
-  [Settings → Secrets and variables → Actions](https://github.com/Ncorror/NekoFlash-2.0/settings/secrets/actions).
-  Секреты GitHub нельзя посмотреть повторно после создания.
-  **Не удалять последний экземпляр ключа без отдельной резервной
-  копии.** Если исходные значения недоступны, приоритет —
-  изоляция write-доступа; подписанный релиз до безопасной миграции
-  лучше временно не выполнять.
-- `nekoflash-ci` — только для публичных тестов. **НЕ добавлять в него
-  ключи подписи** или другие приватные данные.
-
-### 6. Включить code changes и проверить
-
-Объединить новый hardening PR в `main` только после полного CI.
-Отдельной активной DEV-ветки сейчас нет; не создавать её исключительно для правил доступа.
-Административные Rulesets, reviewers и перенос ключей выполняет владелец через GitHub Settings.
-Проверить, что:
-1. прямой push в защищённые main/DEV без PR отклоняется;
-2. Pull Request проходит нужный набор checks;
-3. `workflow_dispatch` с `sign_release=false` не получает key secrets;
-4. `workflow_dispatch` с `sign_release=true` вне `main`
-   не подписывает APK;
-5. подписанный выпуск из `main` / `v*` требует approved environment;
-6. тег на коммите вне `main` отвергается до чтения signing secrets;
-7. GitHub audit trail и старые PR остаются доступными.
-
-**Не создавать тестовый `v*` тег** в рабочем репозитории ради проверки:
-он запускает настоящий publish workflow. Для негативных проверок использовать
-отдельный тестовый репозиторий без реального ключа.
-
-## Аварийный порядок
-
-Если есть признаки компрометации: остановить выдачу новых APK,
-заблокировать лишний `write`, отозвать ненужные PAT и GitHub Apps,
-проверить workflow/run logs и releases/tags, отделить релизный ключ,
-проверить целостность исходников по доверенным SHA и подписи APK.
-Не менять сертификат подписи без плана обновления Android-пакета.
-До расследования не удалять диагностические данные, историю Git
-или существующие тестовые логи.
+The successful alpha11 release proves the configured environment had the required release values at that time; GitHub does not expose secret contents for audit.

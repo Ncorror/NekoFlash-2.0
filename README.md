@@ -2,60 +2,70 @@
 
 # NekoFlash 2.0
 
-**Release line:** `6.0.0-alpha11` · versionCode `234`.
+NekoFlash lets one Android device act as a USB host for another Android device and provides ADB, Fastboot, Recovery/Sideload, diagnostics and Xiaomi account/unlock workflows without a PC.
 
-NekoFlash operates ADB, Fastboot and Recovery workflows directly from one Android phone to another over USB OTG. Host requirements: Android 8.0+, USB Host support and a data-capable cable. Root on the host is optional.
+**Latest signed release:** [v6.0.0-alpha11](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha11) · versionCode 234  
+**Release APK SHA-256:** `dfd7648d1b786b1072c0eec850d190fa472059c79b5373b26a67f1392a5c0135`
 
 English · [Русский](README_ru.md)
 
-## Release status
+## Current state
 
-The final alpha11 hardware campaign is closed for release:
+The alpha11 hardware/release campaign is complete. The signed release passed the protected release workflow, permanent-certificate verification and the exact-SHA CI gate. Current `main` contains post-release maintenance and is not the same thing as the already-published signed tag.
 
-- **Fastboot format/wipe (#64): FIELD PASS.** `fastboot format userdata`, metadata/cache handling, `fastboot -w`, reboot and subsequent Android setup boot were verified on the unlocked POCO X3 Pro `vayu`.
-- **Large ADB Pull (#72): resolved.** POCO X3 Pro host → POCO X3 Pro target passed `framework.jar` Pull plus repeated 128 MiB Pull/Push with matching SHA-256. POCO F7 / `onyx` is classified as an intermittent host-side USB receive compatibility case; large Pull now uses durable 256 KiB checkpoints and verifies the final SHA-256 before publication.
-- Recovery/Sideload, Fastboot handshake/reboot, Mass Flash, Xiaomi account sign-in, ZIP select/clear and terminal rotation/input have physical PASS evidence on the tested devices/builds.
+Hardware-qualified highlights:
 
-The authoritative current summary is [Hardware validation](docs/HARDWARE_VALIDATION.md). Dated low-level experiments remain only in the [physical evidence ledger](docs/testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md).
+- Fastboot format/wipe on unlocked POCO X3 Pro `vayu`: `format userdata`, `fastboot -w`, metadata/cache handling, reboot and Android setup boot — **FIELD PASS**.
+- ADB Pull/Push control on POCO X3 Pro host → POCO X3 Pro target: `framework.jar` Pull and repeated 128 MiB Pull/Push with matching SHA-256 — **FIELD PASS**.
+- POCO F7 / `onyx` remains a documented intermittent USB-host receive compatibility case. Large Pull uses durable checkpoints and final SHA-256 verification; failed USB packets are never silently replayed.
+- Recovery/Sideload, Mass Flash, Fastboot transitions, Xiaomi sign-in, ZIP select/clear and terminal rotation/input have accepted physical evidence on the tested rigs.
 
-## POCO F7 / onyx host note
-
-POCO F7 (`onyx`, Android 16) has repeatedly shown intermittent inbound USB failures as a host, including in Legacy NekoFlash. The same target/files pass on a POCO X3 Pro host. NekoFlash therefore keeps fail-closed transport behavior and resumes large Pulls only from fully fsynced checkpoints after a manual reconnect.
-
-Power/VBUS sensitivity is plausible field context but was not instrumented, so it is **not** claimed as the proven root cause. A short cable or externally powered USB hub is a useful diagnostic when a host has weak/unstable OTG power.
+See [current status](docs/STATUS.md) and [hardware validation](docs/HARDWARE_VALIDATION.md).
 
 ## Downloads
 
-- [GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases) — official signed releases.
-- [Successful main CI](https://github.com/Ncorror/NekoFlash-2.0/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess) — debug/test artifacts for the exact commit.
-- [Telegram Insiders](https://t.me/+NR_FiUmvXlViOTUy) — tester coordination.
+Use [GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases/latest) for the signed public APK.
 
-Do not treat an old Insiders REV ZIP as the current production artifact.
+A release intentionally publishes only:
+- the APK;
+- its SHA-256 file;
+- `filesystem-tools-source.tar.gz`, required corresponding source for bundled filesystem tools.
 
-## What is included
+Debug/test artifacts from Actions are not production releases.
 
-- ADB shell, push/pull, APK install and diagnostics.
-- Quick Flash, Mass Flash and Fastboot tools.
-- Recovery ADB Sideload with separate file selection and explicit Start.
-- Xiaomi Unlock account/session workflow.
-- Operation Center, full diagnostic export and raw USB evidence.
-- Host-side ext4/F2FS filesystem generation for supported Fastboot format commands.
-- Checkpointed large-file Pull with source/destination SHA-256 verification.
+## Main features
 
-## Safety and diagnostics
+- ADB shell, install, push/pull and diagnostics.
+- Quick Flash, Mass Flash and direct Fastboot commands.
+- Recovery ADB Sideload with non-mutating ZIP selection and an explicit Start action.
+- Xiaomi account/session and unlock workflow.
+- Operation Center with full diagnostic evidence export.
+- Host-side ext4/F2FS generation for supported Fastboot formatting.
+- Large-file Pull checkpoint/resume with final source/destination SHA-256 verification.
 
-NekoFlash does not silently retry failed destructive Fastboot commands or failed ADB packets. Destructive operations remain explicit. Full diagnostic exports are kept for technical analysis; share raw logs only through a trusted channel because they can contain device/command context.
+## Safety model
 
-See [USB troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md), [Privacy](PRIVACY.md) and [Third-party notices](THIRD_PARTY_NOTICES.md).
+NekoFlash is a professional tool. It keeps full raw diagnostic evidence and does not hide direct ADB/Fastboot functionality. It also does not silently retry an ambiguous destructive Fastboot write or a failed ADB packet.
 
-## Build and release
+Raw diagnostics may contain device identifiers, commands and paths. Sanitized/shareable exports are a separate copy and do not modify the raw evidence. See [Privacy](PRIVACY.md), [Security](docs/SECURITY.md) and [Professional recovery policy](docs/PROFESSIONAL_RECOVERY_POLICY.md).
 
-CI uses JDK 17, the checked-in Gradle Wrapper and pinned GitHub Actions. Production packaging is fail-closed: the protected release workflow requires the permanent signing key, verifies certificate SHA-256 `3d9d8ec98ff5a0aa5e72a257f02babe19c0ff91f0af431955aa9afe8901cf5b2`, builds the release APK, verifies the APK certificate again and publishes checksums/build metadata.
+## Documentation
 
-The release tag must match `versionName` and be rooted at the approved `main` commit. See [release readiness](docs/RELEASE_READINESS-2026-11-10.md).
+Start at [docs/README.md](docs/README.md).
+
+Key documents:
+- [Status](docs/STATUS.md)
+- [Post-release audit](docs/AUDIT_2026-11-13.md)
+- [Hardware validation](docs/HARDWARE_VALIDATION.md)
+- [USB troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md)
+- [Repository/release security](docs/REPOSITORY_SECURITY.md)
+- [Legal review](docs/LEGAL_REVIEW.md)
+- [Third-party notices](THIRD_PARTY_NOTICES.md)
+
+Historical REV/audit snapshots are preserved by Git history rather than kept as competing current instructions.
 
 ## Project
 
 Author and maintainer — [Ncorror](https://github.com/Ncorror). Project collaborator — [IQ-HARRY7](https://github.com/IQ-HARRY7).
 
-[Apache 2.0](LICENSE) · [Artwork](ASSETS_LICENSE.md) · [Changelog](CHANGELOG.md)
+[Apache 2.0](LICENSE) · [Artwork terms](ASSETS_LICENSE.md) · [Changelog](CHANGELOG.md)
