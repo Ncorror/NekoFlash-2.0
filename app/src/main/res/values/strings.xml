@@ -190,9 +190,9 @@ Not requested:
     <string name="settings_section_system">SYSTEM</string>
     <string name="settings_section_service">SERVICE</string>
     <string name="settings_section_links">LINKS</string>
-    <string name="settings_github">🐙 GitHub</string>
+    <string name="settings_github">GitHub</string>
     <string name="settings_github_sub">Source code, releases and project issues</string>
-    <string name="settings_telegram">✈️ Telegram</string>
+    <string name="settings_telegram">Telegram</string>
     <string name="settings_telegram_sub">NekoFlash tester group</string>
     <string name="settings_link_open_error">Could not open link: %1$s</string>
     <string name="settings_clear_workspace">🗑 Clear workspace folder</string>

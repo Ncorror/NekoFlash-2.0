@@ -3203,6 +3203,48 @@ class MainActivity : AppCompatActivity() {
             setOnClickListener { onClick() }
         }
 
+        fun linkRow(iconRes: Int, text: String, sub: String, onClick: () -> Unit) =
+            android.widget.LinearLayout(this).apply {
+                orientation = android.widget.LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+                isClickable = true
+                isFocusable = true
+                minimumHeight = dp(72)
+                contentDescription = "$text. $sub"
+                val ripple = android.util.TypedValue()
+                theme.resolveAttribute(android.R.attr.selectableItemBackground, ripple, true)
+                if (ripple.resourceId != 0) setBackgroundResource(ripple.resourceId)
+                setPadding(dp(20), dp(14), dp(20), dp(14))
+
+                addView(android.widget.ImageView(this@MainActivity).apply {
+                    setImageResource(iconRes)
+                    scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
+                    importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+                    layoutParams = android.widget.LinearLayout.LayoutParams(dp(32), dp(32)).apply {
+                        marginEnd = dp(16)
+                    }
+                })
+
+                addView(android.widget.LinearLayout(this@MainActivity).apply {
+                    orientation = android.widget.LinearLayout.VERTICAL
+                    layoutParams = android.widget.LinearLayout.LayoutParams(0, android.view.ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+                    addView(android.widget.TextView(this@MainActivity).apply {
+                        this.text = text
+                        setTextColor("#F3F6FA".toColorInt())
+                        textSize = 16f
+                        typeface = android.graphics.Typeface.MONOSPACE
+                    })
+                    addView(android.widget.TextView(this@MainActivity).apply {
+                        this.text = sub
+                        setTextColor("#AEB8C5".toColorInt())
+                        textSize = 13f
+                        typeface = android.graphics.Typeface.MONOSPACE
+                    })
+                })
+
+                setOnClickListener { onClick() }
+            }
+
         // ── Система ──
         container.addView(sectionTitle(getString(R.string.settings_section_system)))
         val sysCard = card()
@@ -3224,11 +3266,13 @@ class MainActivity : AppCompatActivity() {
         // ── Ссылки ──
         container.addView(sectionTitle(getString(R.string.settings_section_links)))
         val linksCard = card()
-        linksCard.addView(row(
+        linksCard.addView(linkRow(
+            R.drawable.ic_brand_github,
             getString(R.string.settings_github),
             getString(R.string.settings_github_sub)
         ) { openExternalLink(GITHUB_URL) })
-        linksCard.addView(row(
+        linksCard.addView(linkRow(
+            R.drawable.ic_brand_telegram,
             getString(R.string.settings_telegram),
             getString(R.string.settings_telegram_sub)
         ) { openExternalLink(TELEGRAM_URL) })
