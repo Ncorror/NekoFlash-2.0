@@ -3220,6 +3220,31 @@ class MainActivity : AppCompatActivity() {
         svcCard.addView(row(getString(R.string.settings_about),
             getString(R.string.settings_about_sub, appVersionName())) { showAboutDialog() })
         container.addView(svcCard)
+
+        // ── Ссылки ──
+        container.addView(sectionTitle(getString(R.string.settings_section_links)))
+        val linksCard = card()
+        linksCard.addView(row(
+            getString(R.string.settings_github),
+            getString(R.string.settings_github_sub)
+        ) { openExternalLink(GITHUB_URL) })
+        linksCard.addView(row(
+            getString(R.string.settings_telegram),
+            getString(R.string.settings_telegram_sub)
+        ) { openExternalLink(TELEGRAM_URL) })
+        container.addView(linksCard)
+    }
+
+    private fun openExternalLink(url: String) {
+        val intent = Intent(Intent.ACTION_VIEW, url.toUri()).apply {
+            addCategory(Intent.CATEGORY_BROWSABLE)
+        }
+        runCatching { startActivity(intent) }
+            .onFailure {
+                val message = getString(R.string.settings_link_open_error, url)
+                viewModel.log(DiagnosticLogPolicy.Level.ERROR, message)
+                Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+            }
     }
 
     private fun appVersionName(): String = try {
@@ -5086,6 +5111,8 @@ class MainActivity : AppCompatActivity() {
     private val PARTITION_NAME_PATTERN = Regex("^[A-Za-z0-9._:-]+$")
 
     companion object {
+        private const val GITHUB_URL = "https://github.com/Ncorror/NekoFlash-2.0"
+        private const val TELEGRAM_URL = "https://t.me/+NR_FiUmvXlViOTUy"
         private const val USB_PERMISSION_TIMEOUT_MS = 30_000L
         private const val EXTRA_USB_INTENT_CONSUMED = "nekoflash_usb_intent_consumed"
         private const val STARTUP_USB_SCAN_DELAY_MS = 350L

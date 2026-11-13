@@ -191,6 +191,12 @@
     <string name="layout_sideload_import">Импорт файла</string>
     <string name="settings_section_system">СИСТЕМА</string>
     <string name="settings_section_service">СЕРВИС</string>
+    <string name="settings_section_links">ССЫЛКИ</string>
+    <string name="settings_github">🐙 GitHub</string>
+    <string name="settings_github_sub">Исходный код, релизы и задачи проекта</string>
+    <string name="settings_telegram">✈️ Telegram</string>
+    <string name="settings_telegram_sub">Группа тестировщиков NekoFlash</string>
+    <string name="settings_link_open_error">Не удалось открыть ссылку: %1$s</string>
     <string name="settings_clear_workspace">🗑 Очистить рабочую папку</string>
     <string name="settings_clear_workspace_sub">Удалить импортированные файлы из рабочей папки</string>
     <string name="settings_clear_workspace_confirm">Удалить все файлы в:
@@ -240,7 +246,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="logs_export_zip">Экспорт всех логов в ZIP</string>
     <string name="logs_export_raw_warning">В архив войдут исходные журналы без очистки. Они могут содержать идентификаторы устройств и вывод команд. Сохраняй ZIP и передавай только проверенной команде тестирования. Исходные файлы не изменятся и не удалятся.</string>
     <string name="logs_export_continue">Выбрать место для ZIP</string>
-    <string name="logs_export_done">ZIP журналов сохранён. Файлов в архиве: %1$d. Приложи его к отчёту TestBook.</string>
+    <string name="logs_export_done">ZIP журналов сохранён. Файлов в архиве: %1$d. Приложи его к отчёту тестирования.</string>
     <string name="logs_export_failed">Не удалось экспортировать журналы: %1$s</string>
     <string name="logs_export_incomplete">ZIP создан, но история диагностики неполная или менялась при экспорте. Файлов: %1$d. Предупреждений: %2$d. Проверь EXPORT-MANIFEST.txt; не считай архив полным отчётом.</string>
     <string name="logs_sheet_title">ЛОГИ И СЕССИИ</string>
