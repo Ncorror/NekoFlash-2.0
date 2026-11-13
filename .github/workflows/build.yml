@@ -66,7 +66,7 @@ jobs:
           python3 tests/check_rev26.py
           python3 tests/check_i18n.py
           python3 tests/check_docs.py
-          python3 tests/check_insiders_apk_kit.py
+          python3 tests/check_tester_kit.py
           python3 tests/check_diagnostic_zip_verifier.py
 
       - name: Native transfer deadline regression tests
@@ -563,8 +563,8 @@ jobs:
           retention-days: 30
 
 
-  insiders-kit:
-    name: Package verified Insiders tester kit
+  tester-kit:
+    name: Package verified tester APK
     outputs:
       artifact_id: ${{ steps.upload.outputs.artifact-id }}
       artifact_digest: ${{ steps.upload.outputs.artifact-digest }}
@@ -578,12 +578,12 @@ jobs:
           path: kit-input
       - name: Stage and verify APK-only kit
         run: |
-          python3 scripts/package_insiders.py kit-input tester-kit --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
-          python3 scripts/verify_insiders_kit.py tester-kit --source-artifact kit-input --commit "$GITHUB_SHA"
+          python3 scripts/package_tester_kit.py kit-input tester-kit --commit "$GITHUB_SHA" --run "$GITHUB_RUN_ID"
+          python3 scripts/verify_tester_kit.py tester-kit --source-artifact kit-input --commit "$GITHUB_SHA"
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         id: upload
         with:
-          name: NekoFlash-Insiders-Tester-Kit
+          name: NekoFlash-Tester-Kit
           path: tester-kit/
           if-no-files-found: error
           retention-days: 90

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage an APK-only Insiders kit from the exact verified CI artifact."""
+"""Stage an APK-only tester kit from the exact verified CI artifact."""
 import argparse, hashlib, re, shutil
 from pathlib import Path
 
@@ -20,4 +20,4 @@ if (a.debug / "checksums-sha256.txt").read_text().split() != [digest, apk.name]:
     raise SystemExit("APK source SHA-256 mismatch")
 a.output.mkdir(parents=True, exist_ok=False)
 shutil.copyfile(apk, a.output / apk.name)
-print(f"Insiders APK-only kit: commit={a.commit} run={a.run} apk={apk.name} sha256={digest}")
+print(f"Tester APK-only kit: commit={a.commit} run={a.run} apk={apk.name} sha256={digest}")

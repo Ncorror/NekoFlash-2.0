@@ -36,6 +36,9 @@ object ReportSanitizer {
     private val adbKeyDirFieldRegex = Regex("(?i)(adbKeyDir\"?\\s*[:=]\\s*\"?)[^\"\\s,}]+")
     private val serialTextRegex = Regex("(?i)(serialno|serial|ro\\.serialno|ro\\.boot\\.serialno)(\\s*[:=]\\s*)[^\\s,;|\"]+")
     private val serialJsonRegex = Regex("(?i)(\"(?:serialno|serial|ro\\.serialno|ro\\.boot\\.serialno)\"\\s*:\\s*\")[^\"]*\"")
+    private val commandSerialSelectorRegex = Regex(
+        "(?i)(\\b(?:adb|fastboot)(?:\\.exe)?\\b[^\\r\\n]*?\\s-s\\s+)(?:\\\"[^\\\"]*\\\"|[^\\s]+)"
+    )
     private val accountIdTextRegex = Regex("(?i)(userId|cUserId|uid)(\\s*[:=]\\s*)[^\\s,;|\"]+")
     private val accountIdJsonRegex = Regex("(?i)(\"(?:userId|cUserId|uid)\"\\s*:\\s*\")[^\"]*\"")
     private val miLoginIdRegex = Regex("(?i)(Signed in \\(ID:\\s*)[^)]+")
@@ -94,6 +97,7 @@ object ReportSanitizer {
                 m.groupValues[1] + m.groupValues[2] + REDACTED_SERIAL
             }
             .replace(serialJsonRegex, "$1$REDACTED_SERIAL\"")
+            .replace(commandSerialSelectorRegex, "$1$REDACTED_SERIAL")
             .replace(accountIdTextRegex) { m ->
                 m.groupValues[1] + m.groupValues[2] + REDACTED_ACCOUNT_ID
             }

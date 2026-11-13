@@ -43,7 +43,7 @@ for action, ref in expected_actions.items():
 assert "  tag-provenance:" in release
 preflight = release.split("  tag-provenance:", 1)[1].split("\n  release:", 1)[0]
 release_job = release.split("\n  release:", 1)[1]
-assert "git merge-base --is-ancestor" in preflight
+assert '[ "$TAG_COMMIT" = "$MAIN_TIP" ]' in preflight
 assert "refs/heads/main" in preflight
 assert 'EXPECTED_TAG="v$VERSION"' in preflight
 assert ".github/RELEASE_REQUEST" in preflight
@@ -57,6 +57,8 @@ assert "Exact-SHA main CI PASS before tag creation" in preflight
 assert "refusing to create $TAG" in preflight
 assert preflight.index("Exact-SHA main CI PASS before tag creation") < preflight.index('git tag -a "$TAG" "$TAG_COMMIT"')
 assert "needs: tag-provenance" in release_job
+assert "--prerelease" not in release_job
+assert "--latest" in release_job
 assert "environment: nekoflash-release" in release_job
 assert "contents: write" in release_job
 

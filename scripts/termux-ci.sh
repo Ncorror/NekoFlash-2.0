@@ -14,16 +14,16 @@
 #   bash scripts/termux-ci.sh --run-id 29832274659 --with-apk
 #
 # Optional environment variables:
-#   NEKOFLASH_REPO=Ncorror/NekoFlash
+#   NEKOFLASH_REPO=Ncorror/NekoFlash-2.0
 #   NEKOFLASH_WORKFLOW=build.yml
 #   NEKOFLASH_BRANCH=main
 #   NEKOFLASH_DOWNLOAD_DIR=$HOME/storage/downloads
 set -uo pipefail
 
-REPO="${NEKOFLASH_REPO:-Ncorror/NekoFlash}"
+REPO="${NEKOFLASH_REPO:-Ncorror/NekoFlash-2.0}"
 WORKFLOW="${NEKOFLASH_WORKFLOW:-build.yml}"
 BRANCH="${NEKOFLASH_BRANCH:-main}"
-PROJECT_DIR="${NEKOFLASH_PROJECT_DIR:-$HOME/NekoFlash}"
+PROJECT_DIR="${NEKOFLASH_PROJECT_DIR:-$HOME/NekoFlash-2.0}"
 DOWNLOAD_DIR="${NEKOFLASH_DOWNLOAD_DIR:-$HOME/storage/downloads}"
 RUN_ID=""
 LAUNCH_NEW=1
