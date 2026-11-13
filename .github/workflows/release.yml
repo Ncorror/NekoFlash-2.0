@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: read
     outputs:
       tag: ${{ steps.provenance.outputs.tag }}
       version_name: ${{ steps.provenance.outputs.version_name }}
@@ -34,6 +35,8 @@ jobs:
           fetch-depth: 0
       - name: Verify main provenance and prepare version tag
         id: provenance
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -63,6 +66,25 @@ jobs:
               [ "$TAG" = "$EXPECTED_TAG" ] || { echo "::error::Release request $TAG does not match $EXPECTED_TAG"; exit 1; }
               TAG_COMMIT="$(git rev-parse HEAD^{commit})"
               [ "$TAG_COMMIT" = "$MAIN_TIP" ] || { echo "::error::Release request is not current main"; exit 1; }
+              for attempt in $(seq 1 60); do
+                JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml/runs?head_sha=$TAG_COMMIT&event=push&per_page=10")"
+                SUCCESS_COUNT="$(printf '%s' "$JSON" | jq '[.workflow_runs[] | select(.head_sha == "'"$TAG_COMMIT"'" and .event == "push" and .conclusion == "success")] | length')"
+                FAILURE_COUNT="$(printf '%s' "$JSON" | jq '[.workflow_runs[] | select(.head_sha == "'"$TAG_COMMIT"'" and .event == "push" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | length')"
+                if [ "$SUCCESS_COUNT" -gt 0 ]; then
+                  echo "Exact-SHA main CI PASS before tag creation: $TAG_COMMIT"
+                  break
+                fi
+                if [ "$FAILURE_COUNT" -gt 0 ]; then
+                  echo "::error::Exact-SHA main CI failed; refusing to create $TAG"
+                  exit 1
+                fi
+                if [ "$attempt" -eq 60 ]; then
+                  echo "::error::Timed out waiting for exact-SHA main CI before tag creation"
+                  exit 1
+                fi
+                echo "Waiting for exact-SHA main CI before tag creation: attempt $attempt/60"
+                sleep 30
+              done
               if git show-ref --verify --quiet "refs/tags/$TAG"; then
                 EXISTING="$(git rev-parse "$TAG^{commit}")"
                 [ "$EXISTING" = "$TAG_COMMIT" ] || { echo "::error::Existing tag points to another commit"; exit 1; }

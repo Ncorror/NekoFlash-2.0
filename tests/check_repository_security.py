@@ -52,6 +52,10 @@ assert 'git tag -a "$TAG" "$TAG_COMMIT"' in preflight
 assert 'git push origin "refs/tags/$TAG"' in preflight
 assert "secrets." not in preflight
 assert "contents: write" in preflight
+assert "actions: read" in preflight
+assert "Exact-SHA main CI PASS before tag creation" in preflight
+assert "refusing to create $TAG" in preflight
+assert preflight.index("Exact-SHA main CI PASS before tag creation") < preflight.index('git tag -a "$TAG" "$TAG_COMMIT"')
 assert "needs: tag-provenance" in release_job
 assert "environment: nekoflash-release" in release_job
 assert "contents: write" in release_job
