@@ -28,7 +28,7 @@ IGNORE_SCHEMES = {"http", "https", "mailto", "tel", "data", "javascript", "file"
 
 FORBIDDEN_PUBLIC_TEXT = (
     "https://ncorror.github.io/NekoFlash/",
-    "https://github.com/Ncorror/NekoFlash"",
+    'href="https://github.com/Ncorror/NekoFlash"',
 )
 FORBIDDEN_SIDELOAD_TEXT = (
     "immediately starts sending it",
