@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Check repository-local documentation links without network access.
-
-Scan all Markdown/HTML documents, report historical dead links, and fail on
-broken links in current public entry points. Release of old snapshots is not
-silently blocked by intentionally missing ZIP paths in archival documents.
-"""
+"""Validate current NekoFlash documentation without network access."""
 from __future__ import annotations
 
 import re
@@ -12,18 +7,38 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-CURRENT = {
-    "README_ru.md", "docs/index.html", "docs/ru/index.html",
-    "README.md", "PRIVACY.md", "THIRD_PARTY_NOTICES.md",
+
+CURRENT_FILES = {
+    "README.md", "README_ru.md", "PRIVACY.md", "THIRD_PARTY_NOTICES.md",
     "ASSETS_LICENSE.md", "CHANGELOG.md",
-    "docs/DEVELOPMENT_STATUS.md", "docs/SECURITY_REVIEW_BACKLOG.md",
-    "docs/HARDWARE_VALIDATION.md", "docs/RELEASE_READINESS-2026-11-10.md", "docs/LEGAL_REVIEW.md",
-    "docs/UI_UX_AUDIT.md", "docs/USB_CONNECTION_TROUBLESHOOTING.md",
+    "docs/README.md", "docs/STATUS.md", "docs/AUDIT_2026-11-13.md",
+    "docs/HARDWARE_VALIDATION.md", "docs/USB_CONNECTION_TROUBLESHOOTING.md",
+    "docs/SECURITY.md", "docs/REPOSITORY_SECURITY.md", "docs/LEGAL_REVIEW.md",
+    "docs/PROFESSIONAL_RECOVERY_POLICY.md",
+    "docs/index.html", "docs/ru/index.html", "docs/404.html",
     "vendor/filesystems/README.md",
 }
+CURRENT_PREFIXES = (
+    "docs/guides/",
+    "docs/ru/guides/",
+)
 MD_LINK = re.compile(r"!?(?:\[[^\]\n]*\])\(([^)\n]+)\)")
 HTML_LINK = re.compile(r"""\b(?:href|src)\s*=\s*["']([^"']+)["']""", re.IGNORECASE)
 IGNORE_SCHEMES = {"http", "https", "mailto", "tel", "data", "javascript", "file"}
+
+FORBIDDEN_PUBLIC_TEXT = (
+    "https://ncorror.github.io/NekoFlash/",
+    'href="https://github.com/Ncorror/NekoFlash"',
+)
+FORBIDDEN_SIDELOAD_TEXT = (
+    "immediately starts sending it",
+    "сразу запускает его отправку",
+    "PR #71",
+)
+
+def is_current(relative: Path) -> bool:
+    posix = relative.as_posix()
+    return posix in CURRENT_FILES or any(posix.startswith(prefix) for prefix in CURRENT_PREFIXES)
 
 def target_of(raw: str) -> str | None:
     raw = raw.strip()
@@ -32,16 +47,12 @@ def target_of(raw: str) -> str | None:
     else:
         raw = raw.split(" ", 1)[0]
     if not raw or raw.startswith(("#", "//", "/")):
-        return None  # document anchors and site-root links
-    parsed = urlsplit(raw)
-    if parsed.scheme.lower() in IGNORE_SCHEMES or parsed.netloc:
         return None
-    if parsed.scheme:
+    parsed = urlsplit(raw)
+    if parsed.scheme.lower() in IGNORE_SCHEMES or parsed.netloc or parsed.scheme:
         return None
     path = unquote(parsed.path)
-    if not path:
-        return None
-    return path.replace("\\", "/")
+    return path.replace("\\", "/") if path else None
 
 def scan_file(path: Path) -> list[tuple[int, str]]:
     data = path.read_text(encoding="utf-8")
@@ -59,26 +70,42 @@ def scan_file(path: Path) -> list[tuple[int, str]]:
 
 def main() -> None:
     checked = 0
-    warnings = []
-    errors = []
+    warnings: list[str] = []
+    errors: list[str] = []
+    current_text: dict[str, str] = {}
+
     for suffix in ("*.md", "*.html"):
         for path in sorted(ROOT.rglob(suffix)):
             relative = path.relative_to(ROOT)
             if any(part.startswith(".") or part in {"build", "node_modules"} for part in relative.parts):
                 continue
             checked += 1
+            if is_current(relative):
+                current_text[relative.as_posix()] = path.read_text(encoding="utf-8")
             for line, target in scan_file(path):
                 item = f"{relative}:{line} -> {target}"
-                if relative.as_posix() in CURRENT:
-                    errors.append(item)
-                else:
-                    warnings.append(item)
+                (errors if is_current(relative) else warnings).append(item)
+
+    for path, data in current_text.items():
+        for forbidden in FORBIDDEN_PUBLIC_TEXT:
+            if forbidden in data:
+                errors.append(f"{path}: stale public URL/text: {forbidden}")
+
+    for path in (
+        "docs/guides/adb-sideload/index.html",
+        "docs/ru/guides/adb-sideload/index.html",
+    ):
+        data = current_text.get(path, "")
+        for forbidden in FORBIDDEN_SIDELOAD_TEXT:
+            if forbidden in data:
+                errors.append(f"{path}: obsolete Sideload instruction: {forbidden}")
+
     print(f"Documentation link check: {checked} Markdown/HTML files")
     for item in warnings:
-        print("ARCHIVE/OTHER LINK REVIEW:", item)
+        print("HISTORICAL/OTHER LINK REVIEW:", item)
     for item in errors:
-        print("BROKEN CURRENT DOC LINK:", item)
-    print(f"Current broken links: {len(errors)}; historical/other links to review: {len(warnings)}")
+        print("BROKEN/STALE CURRENT DOC:", item)
+    print(f"Current errors: {len(errors)}; historical/other warnings: {len(warnings)}")
     if errors:
         raise SystemExit(1)
 

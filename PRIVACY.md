@@ -1,40 +1,45 @@
-<div align="center">
-
-<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
-
 # NekoFlash Privacy Note
 
-### Data privacy, telemetry, local operations, and offline integrity
+This document describes the current NekoFlash source tree. It is not a substitute for a jurisdiction-specific store privacy policy.
 
-English
+## Local operations
 
-</div>
+ADB, Fastboot, USB discovery, file transfer, flashing, Sideload, diagnostics and command execution are performed locally between the Android host running NekoFlash and the USB-connected target.
 
+The current source tree contains no analytics, advertising or third-party crash-reporting SDK.
 
-This document describes the behavior of the current NekoFlash source tree. It is not a substitute for a jurisdiction-specific privacy policy if the application is later distributed through a store or service that requires one.
+## Xiaomi / Mi Unlock
 
-## Local device operations
+The optional Xiaomi workflow requires network access to official Xiaomi account/unlock endpoints used by the implementation.
 
-ADB, Fastboot, USB discovery, file transfer, flashing, sideload, diagnostics and command execution are performed locally between the Android host running NekoFlash and the USB-connected target device.
+WebView authentication cookies and session values can persist across Back/cancel and future launches. Valid existing cookies may be reused. **Back/cancel is not Logout.** The explicit Logout action clears WebView cookies.
 
-The current source tree contains no analytics, advertising, third-party crash-reporting or telemetry SDK integration.
+Use Logout on a shared host phone or whenever the Xiaomi session must be removed.
 
-## Xiaomi / Mi Unlock network traffic
+NekoFlash does not operate its own account/telemetry backend.
 
-The optional Mi Unlock workflow requires Internet/network access and communicates over HTTPS with official Xiaomi account and unlock endpoints used by that flow, including `account.xiaomi.com`, `api.account.xiaomi.com` and the bounded regional unlock hosts defined in source.
+## Files and raw diagnostics
 
-Mi account identifiers, WebView cookies, `passToken`, `deviceId`, `ssecurity`, service cookies and unlock request data are handled only for the Mi Unlock workflow. **Authentication cookies may remain in Android WebView storage across Back/cancel and future launches until explicit Logout.** The current `MiLoginActivity` reuses valid existing cookies and calls `CookieManager.removeAllCookies` from its Logout action. Closing the screen clears in-memory fields and WebView state, but should **not** be treated as equivalent to logging out of the Xiaomi account. Use the explicit Logout control when the device is shared or when the session must be cleared. This persistence behavior is under review before release.
+NekoFlash uses shared storage/workspace paths for firmware, imported files, logs and diagnostic exports. Raw evidence under paths such as `/sdcard/Download/NekoFlash/` can contain commands, device properties, filenames, USB identifiers and operation results.
 
-NekoFlash does not operate its own account, analytics or telemetry backend.
+Shared storage is not app-private. Other applications with sufficient storage access may read those files. Do not publish raw logs/screenshots without review.
 
-## Files and logs
+The project intentionally preserves full raw technical evidence for professional recovery. Raw logs are not silently shortened or sanitized.
 
-NekoFlash uses a workspace in shared storage for selected payloads, imported files, logs, protocol traces and exported diagnostic reports. In the current source, full diagnostic logs and reports may be stored under `/sdcard/Download/NekoFlash/` and include commands, device properties, filenames, USB identifiers and operation results. **Shared-storage files are not app-private**: other apps with sufficient storage privileges can read them. Do not treat raw logs or screenshots as safe to publish.
+## Sanitized/shareable copies
 
-Sanitized sharing/export paths apply the project's report sanitization logic, but **redaction is not a complete guarantee**: for example, a serial supplied as `fastboot -s SERIAL getvar all` is not covered by the current `serial:` / `serial=` pattern. The "Copy terminal" action copies a raw transcript to Android's clipboard, which may contain identifiers and sensitive paths. **Review and manually redact exported material before sending it to anyone**; prefer short, purpose-specific test logs rather than full sessions.
+Sanitized export is a separate copy. Current `main` masks structured device/account identifiers, sensitive device properties, known private/shared paths and explicit `adb -s SERIAL` / `fastboot -s SERIAL` selectors.
 
-The ADB host private key is currently persisted as an app-private PKCS#8 file (`adbkey.pk8`), not a non-exportable Android Keystore key. The application declares broad storage access because the current distribution model expects direct access to firmware and diagnostic files. Android application backup is disabled. Changes to raw-log storage and export sanitization are tracked in [the security backlog](docs/SECURITY_REVIEW_BACKLOG.md).
+Sanitization is defense-in-depth, not a promise that arbitrary command output can never contain a sensitive value. Review material before public sharing.
 
-## Permissions relevant to data handling
+The signed alpha11 APK predates the post-release selector-specific sanitizer hardening; alpha11 users should manually review even sanitized output.
 
-The manifest declares Internet/network state permissions for the optional Xiaomi / Mi Unlock feature, storage access for user-selected firmware/diagnostic files, foreground-service and wake-lock permissions for long USB operations, notification permission where required by Android, and overlay-hiding protection for sensitive screens. It does not request contacts, SMS, microphone, camera, phone or location permissions.
+## ADB identity
+
+The ADB host private key is stored in app-private storage as a PKCS#8 identity. New private-key publication uses same-directory staging, owner-only permissions, fsync and atomic rename. Existing corrupt identity is preserved instead of silently rotated.
+
+## Permissions
+
+The application requests the Android permissions needed for USB/long-running operations, notifications, network access for optional Xiaomi login and broad storage access for the professional firmware/diagnostic workflow. It does not request contacts, SMS, microphone, camera, phone or location permissions.
+
+See [docs/SECURITY.md](docs/SECURITY.md) and [docs/PROFESSIONAL_RECOVERY_POLICY.md](docs/PROFESSIONAL_RECOVERY_POLICY.md).

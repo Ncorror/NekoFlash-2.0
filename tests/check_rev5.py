@@ -6,7 +6,7 @@ from pathlib import Path
 from xml.etree import ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[1]
-BASELINE = ROOT / 'docs/source-audit/LEGACY-SOURCE-SHA256.json'
+BASELINE = ROOT / 'tests/fixtures/LEGACY-SOURCE-SHA256.json'
 AND = '{http://schemas.android.com/apk/res/android}'
 
 

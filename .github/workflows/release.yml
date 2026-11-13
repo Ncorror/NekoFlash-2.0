@@ -58,7 +58,7 @@ jobs:
               TAG="${GITHUB_REF#refs/tags/}"
               TAG_COMMIT="$(git rev-parse HEAD^{commit})"
               [ "$TAG" = "$EXPECTED_TAG" ] || { echo "::error::Tag $TAG does not match $EXPECTED_TAG"; exit 1; }
-              git merge-base --is-ancestor "$TAG_COMMIT" "$MAIN_TIP" || { echo "::error::Release tag is not based on main history"; exit 1; }
+              [ "$TAG_COMMIT" = "$MAIN_TIP" ] || { echo "::error::Release tag must point to current main"; exit 1; }
               ;;
             refs/heads/main)
               test -s .github/RELEASE_REQUEST || { echo "::error::Missing .github/RELEASE_REQUEST"; exit 1; }
@@ -493,14 +493,6 @@ jobs:
         run: |
           set -euo pipefail
 
-          EXTRA_FLAGS=()
-
-          case "$VERSION_NAME" in
-            *-alpha*|*-beta*|*-rc*)
-              EXTRA_FLAGS+=(--prerelease)
-              ;;
-          esac
-
           gh release create "$TAG" \
             release-dist/NekoFlash-"$VERSION_NAME".apk \
             release-dist/NekoFlash-"$VERSION_NAME".apk.sha256 \
@@ -508,23 +500,4 @@ jobs:
             --verify-tag \
             --title "NekoFlash $VERSION_NAME" \
             --generate-notes \
-            "${EXTRA_FLAGS[@]}"
-
-      - name: Remove superseded branches after successful release
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -u
-          for branch in \
-            "fix/adb-pull-checkpointed-ranges-72" \
-            "agent/nekoflash-astra" \
-            "release/6.0.0-alpha11"
-          do
-            ref="repos/$GITHUB_REPOSITORY/git/refs/heads/$branch"
-            if gh api -X DELETE "$ref" --silent; then
-              echo "Deleted superseded branch: $branch"
-            else
-              echo "Branch already absent or could not be deleted: $branch"
-            fi
-          done
+            --latest

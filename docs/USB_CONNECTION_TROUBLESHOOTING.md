@@ -1,69 +1,46 @@
-<div align="center">
+# NekoFlash 2.0 — USB/OTG troubleshooting
 
-<img src="artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="160" height="160" style="display: block; margin: 0 auto;" alt="NekoFlash Logo" />
+## Expected roles
 
-# USB Connection Troubleshooting
+For phone-to-phone service:
+- NekoFlash device: USB host / data host;
+- target device: USB peripheral;
+- power normally flows from host to target.
 
-### USB-C role negotiation, OTG power flow, and device detection diagnostics
+With USB-C to USB-C, Android can negotiate the wrong role. Do not start an operation until NekoFlash shows the intended target.
 
-English
+## If the target is not detected
 
-</div>
+1. Disconnect and reconnect the cable.
+2. Wait for role negotiation and USB permission.
+3. Swap cable ends or rotate the USB-C connector.
+4. Try a short, known-good data cable.
+5. Verify the target is actually in Android ADB, Recovery/Sideload, Fastboot or Fastbootd as expected.
+6. Confirm RSA authorization for normal Android ADB.
 
+Do not repeatedly resend a destructive command merely because the device disappeared.
 
-## USB-C role negotiation
+## POCO F7 / onyx
 
-When using a direct USB-C to USB-C cable, Android may sometimes negotiate the wrong USB data role or USB power role.
+POCO F7/onyx has historical and current evidence of intermittent long inbound USB failures when used as host. The same vayu target and files passed on a POCO X3 Pro host.
 
-## Expected connection
+For a large Pull:
+- if transport fails, NekoFlash stops fail-closed;
+- reconnect manually;
+- run the same Pull again;
+- the current implementation resumes from the last complete durable checkpoint;
+- accept the result only after final SHA-256 verification.
 
-- NekoFlash phone: USB host
-- NekoFlash phone: power source
-- target/patient phone: USB device
-- target/patient phone: power sink
-- power direction: from the NekoFlash host phone to the target/patient phone
+A powered hub can be useful as a diagnostic if OTG power is suspected, but the recorded tests did not measure VBUS voltage/current. Do not document “weak power” as a proven root cause.
 
-In this state, the target/patient phone may show that it is charging from the NekoFlash host phone. That is expected.
+## Fastboot
 
-## Incorrect USB role
+Fastboot sessions become unusable after protocol desync, short transfer, transport failure or disconnect. Reconnect before the next operation. Slow bootloader processing is not automatically a timeout; NekoFlash waits for legitimate final responses according to the current transport policy.
 
-The connection is wrong if:
+## Recovery/Sideload
 
-- the NekoFlash host phone shows that it is charging from the target/patient device;
-- the target/patient device behaves as the USB host;
-- an unexpected device appears first;
-- normal Android ADB `DEVICE` mode does not attach to the intended target.
+Recovery ADB/Sideload is a different mode from normal Android ADB. A disconnect near 100% can be expected when Recovery reboots or replaces itself. Transfer percentage alone does not prove installation success.
 
-Do not start flash, sideload or shell operations while the detected device is not the intended target.
+## Evidence
 
-## Recovery steps
-
-1. Unplug and reconnect the cable.
-2. Swap cable ends.
-3. Rotate one or both USB-C connectors.
-4. Try another data-capable USB-C cable.
-5. Wait until NekoFlash shows the intended target device.
-6. Confirm that the NekoFlash phone is the host and the target/patient phone is the connected USB device.
-7. Only then start ADB shell, sideload or flash operations.
-
-## POCO F7 / onyx host compatibility
-
-POCO F7 (`onyx`, Android 16) is a special host case in the current evidence set. Long inbound ADB transfers can fail intermittently with a real host USB receive error even when the target, file and NekoFlash build work on a POCO X3 Pro host. Legacy NekoFlash recorded similar intermittent inbound payload failures on the same onyx host.
-
-For large Pulls NekoFlash stays fail-closed: it does not retry a failed USB packet. Fully completed 256 KiB ranges are fsynced, and after a manual reconnect the same Pull can resume from the durable checkpoint. The completed file is published only after the remote source is rechecked and SHA-256 matches.
-
-If onyx or another host is unstable, try a short known-good cable. An externally powered USB hub is a useful diagnostic when OTG power is suspected. This is not a claim that power is the root cause: VBUS voltage/current were not measured in the recorded tests.
-
-## REV43 Android HOST → TARGET field tests
-
-**Historical REV43 round (not today's assignment):** the standalone RU/EN field-plan files were removed from the active release tree. Their results remain in Git history and the [real-device evidence ledger](testing/PHYSICAL-TEST-EVIDENCE-LEDGER-2026-11-08-EN.md). The 1023/1024/1025, 512-file Push/Pull and 16 MiB acceptance already passed on the tested locked Android12 vayu; do not assign identical retries without a new device, code change or missing result.
-
-If USB is detached during `adb push`, the TARGET file can be incomplete: verify length/hash before using it. Do not claim success from a progress percentage. Do not unplug while Fastboot DATA, flash, unlock, erase or format is active. Full diagnostic logs and `trace-*.bin` go to a trusted private channel, not a public GitHub issue.
-
-Merged DEV REV43 has [API26 UI test failures](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/41248168147); this is not evidence of a USB hardware failure. Keep the UI/CI and physical USB results separate.
-
-## Scope
-
-This issue is documented for normal Android ADB `DEVICE` mode.
-
-Fastboot and Recovery/SIDELOAD are separate modes and remain covered by their own validation tests.
+When a new failure is reproducible, export a fresh NekoFlash diagnostics ZIP and keep the original raw evidence private. Do not replace a current failure report with an old REV checklist.

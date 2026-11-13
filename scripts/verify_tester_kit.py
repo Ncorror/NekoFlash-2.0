@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify exactly one Insiders APK and optional exact-run source provenance."""
+"""Verify exactly one tester APK and optional exact-run source provenance."""
 import argparse, hashlib, re
 from pathlib import Path
 
@@ -10,7 +10,7 @@ p.add_argument("--commit")
 a = p.parse_args()
 apks = list(a.kit.glob("NekoFlash-*-debug.apk"))
 if len(apks) != 1 or {f.name for f in a.kit.iterdir()} != {apks[0].name}:
-    raise SystemExit("Insiders kit must contain only one APK (no HTML or extras)")
+    raise SystemExit("Tester kit must contain only one APK (no HTML or extras)")
 apk, = apks
 if not re.fullmatch(r"NekoFlash-[\w.-]+-debug\.apk", apk.name):
     raise SystemExit("Unexpected APK name")
