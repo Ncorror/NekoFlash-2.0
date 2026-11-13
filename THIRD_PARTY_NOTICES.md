@@ -21,6 +21,15 @@ NekoFlash contains `app/src/main/res/drawable/ic_nf_recovery_green.xml`, a modif
 
 License: Creative Commons Attribution 3.0. Android is a trademark of Google LLC.
 
+## Settings brand icons
+
+The Settings links use third-party brand marks only to identify their destinations:
+
+- `app/src/main/res/drawable/ic_brand_github.xml` uses GitHub's current `mark-github` vector from Primer Octicons. GitHub and the GitHub/Invertocat marks are trademarks of GitHub, Inc.; use remains subject to GitHub's logo guidelines.
+- `app/src/main/res/drawable/ic_brand_telegram.xml` uses the Telegram brand glyph from Font Awesome Free 7.3.1 (Icons: CC BY 4.0; Copyright 2026 Fonticons, Inc.). Telegram and its logo are trademarks of their respective owner.
+
+These marks identify external links and do not imply affiliation or endorsement.
+
 ## Direct runtime/build dependencies
 
 Direct dependencies declared by the current project include:
