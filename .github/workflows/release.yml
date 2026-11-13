@@ -88,10 +88,43 @@ jobs:
     needs: tag-provenance
     permissions:
       contents: write
+      actions: read
     # Only approved release environment may expose signing secrets.
     environment: nekoflash-release
 
     steps:
+      - name: Require green main CI for this exact release SHA
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          TARGET_SHA="$GITHUB_SHA"
+
+          for attempt in $(seq 1 60); do
+            JSON="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/build.yml/runs?head_sha=$TARGET_SHA&event=push&per_page=10")"
+
+            SUCCESS_COUNT="$(printf '%s' "$JSON" | jq '[.workflow_runs[] | select(.head_sha == "'"$TARGET_SHA"'" and .event == "push" and .conclusion == "success")] | length')"
+            FAILURE_COUNT="$(printf '%s' "$JSON" | jq '[.workflow_runs[] | select(.head_sha == "'"$TARGET_SHA"'" and .event == "push" and (.conclusion == "failure" or .conclusion == "cancelled" or .conclusion == "timed_out"))] | length')"
+
+            if [ "$SUCCESS_COUNT" -gt 0 ]; then
+              echo "Exact-SHA main CI PASS: $TARGET_SHA"
+              exit 0
+            fi
+
+            if [ "$FAILURE_COUNT" -gt 0 ]; then
+              echo "::error::Exact-SHA main CI failed for $TARGET_SHA"
+              exit 1
+            fi
+
+            echo "Waiting for exact-SHA main CI: attempt $attempt/60"
+            sleep 30
+          done
+
+          echo "::error::Timed out waiting for exact-SHA main CI: $TARGET_SHA"
+          exit 1
+
       - name: Checkout release source
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
