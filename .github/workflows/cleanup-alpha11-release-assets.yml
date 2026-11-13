@@ -1,0 +1,65 @@
+name: One-shot cleanup of v6.0.0-alpha11 release assets
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/cleanup-alpha11-release-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remove non-user-facing release metadata assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+
+          TAG="v6.0.0-alpha11"
+          KEEP_APK="NekoFlash-6.0.0-alpha11.apk"
+          KEEP_SHA="NekoFlash-6.0.0-alpha11.apk.sha256"
+          KEEP_SOURCE="filesystem-tools-source.tar.gz"
+
+          JSON="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG")"
+
+          printf '%s' "$JSON" |
+            jq -r '.assets[] | select(
+              .name != "'"$KEEP_APK"'" and
+              .name != "'"$KEEP_SHA"'" and
+              .name != "'"$KEEP_SOURCE"'"
+            ) | [.id, .name] | @tsv' |
+          while IFS=$'\t' read -r id name; do
+            [ -n "$id" ] || continue
+            echo "Deleting release asset: $name ($id)"
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$id"
+          done
+
+          REMAINING="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[].name' | sort)"
+          EXPECTED="$(printf '%s\n' "$KEEP_APK" "$KEEP_SHA" "$KEEP_SOURCE" | sort)"
+
+          echo "Remaining custom release assets:"
+          printf '%s\n' "$REMAINING"
+
+          [ "$REMAINING" = "$EXPECTED" ] || {
+            echo "::error::Unexpected release asset set after cleanup"
+            exit 1
+          }
+
+      - name: Remove this one-shot workflow from main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          PATH_NAME=".github/workflows/cleanup-alpha11-release-assets.yml"
+          FILE_SHA="$(gh api "repos/$GITHUB_REPOSITORY/contents/$PATH_NAME?ref=main" --jq '.sha')"
+          gh api -X DELETE "repos/$GITHUB_REPOSITORY/contents/$PATH_NAME" \
+            -f message='chore: remove one-shot release asset cleanup workflow' \
+            -f sha="$FILE_SHA" \
+            -f branch='main'
