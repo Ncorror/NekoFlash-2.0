@@ -4,11 +4,13 @@
 
 ## Release in progress
 
-- Requested release: `v6.0.0-alpha12`, versionCode `235`.
+- Prepared tag: `v6.0.0-alpha12`, versionCode `235`, source commit `382af3250a1bfd6b2b2b13d878f4e27f3ec43e81`.
 - Includes merged PRs #97 (audit/documentation), #98 (Settings community links) and #99 (vector brand icons).
-- The release request waits for the complete main CI at its exact commit, then creates the version tag and requests the existing `nekoflash-release` environment approval before signing/publication.
+- Exact-commit [main CI #756](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43525078852): SUCCESS. 409 JVM tests passed with no failures/errors/skips, Android Lint reported no findings, and API 26/34 each passed 29 installed-app tests plus independent ext4/F2FS SHA-256/fsck checks. Source/security checks and verified tester-APK packaging also passed.
+- [Release workflow](https://github.com/Ncorror/NekoFlash-2.0/actions/runs/43525078829): tag provenance PASS; branch cleanup PASS; signing/publication WAITING for the existing `nekoflash-release` environment approval by `Ncorror`.
 - Publication and the new APK SHA-256 are not confirmed until the release workflow succeeds. The last published signed release remains listed below.
-- Merged branches are pruned after the exact-commit CI gate. Default/protected/security branches, open PR refs and branches changed after their merged PR are retained.
+- Deleted merged branches: `ui/settings-community-links` and `ui/settings-brand-icons`. Only `main` remains; open Issues and PRs: 0. Default/protected/security branches, open PR refs and branches changed after their merged PR are retained by the cleanup safeguards.
+- Next action: open the release workflow, choose **Review deployments → nekoflash-release → Approve and deploy**. The workflow then builds the signed APK, verifies the permanent certificate and publishes the APK, SHA-256 and required filesystem corresponding source. After SUCCESS, record the new APK checksum here and update public download/version labels.
 
 ## Signed release
 
@@ -26,7 +28,7 @@ Public custom assets are deliberately limited to the APK, its SHA-256 file and t
 
 `main` is the development source of truth and may contain post-release maintenance that is not present in the already-signed alpha11 tag. Debug/test artifacts from `main` are not substitutes for the signed Release APK.
 
-The post-release audit and Settings PRs #97–#99 are merged. Main CI run #755 (`ed6248289a71441893347df6fc5e9c656373c4a4`) completed SUCCESS, including both Android API 26/34 integration jobs. At alpha12 preparation there are no open Issues or Pull Requests; the two merged Settings branches are pending cleanup by the release workflow.
+The post-release audit and Settings PRs #97–#99 are merged. Release preparation commit `382af3250a1bfd6b2b2b13d878f4e27f3ec43e81` passed main CI #756 in full. Both merged Settings branches were removed by the release workflow; only `main` remains.
 
 ## Hardware disposition
 
