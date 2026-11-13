@@ -6,7 +6,9 @@
 
 </div>
 
-## Unreleased — post-release audit
+## 6.0.0-alpha12 — 14 November 2026
+
+Maintenance release, versionCode `235`, carrying the completed post-release audit and Settings updates. Hardware qualification remains the alpha11 evidence; this release does not claim another physical-device test campaign.
 
 - Replaced temporary GitHub/Telegram emoji markers in Settings with dedicated vector brand icons and an icon/text row layout.
 - Added direct GitHub repository and Telegram tester-group links to Settings via the system browser/app handler; removed the last visible TestBook wording from diagnostic export.
@@ -16,6 +18,7 @@
 - Consolidated current documentation and removed competing REV/refactor/source-audit snapshots from the active tree.
 - Corrected Pages URLs and replaced the obsolete Sideload picker warning with the shipped explicit Choose → Start behavior.
 - Recorded the remaining administrative gap: repository rulesets were empty when audited; protected release-environment approval is verified separately.
+- Release preparation removes only branches proven merged into current `main`, including exact-head squash/rebase PRs; active PR branches and divergent work are preserved.
 
 ## 6.0.0-alpha11 — 13 November 2026
 

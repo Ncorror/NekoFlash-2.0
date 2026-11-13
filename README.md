@@ -11,7 +11,7 @@ English · [Русский](README_ru.md)
 
 ## Current state
 
-The alpha11 hardware/release campaign is complete. The signed release passed the protected release workflow, permanent-certificate verification and the exact-SHA CI gate. Current `main` contains post-release maintenance and is not the same thing as the already-published signed tag.
+The alpha11 hardware/release campaign is complete. The signed release passed the protected release workflow, permanent-certificate verification and the exact-SHA CI gate. Current `main` prepares alpha12 (versionCode 235) with the completed audit and GitHub/Telegram Settings updates. See [release progress](docs/STATUS.md); alpha12 is not published until its protected release workflow succeeds.
 
 Hardware-qualified highlights:
 

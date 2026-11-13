@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Safely prune branches already contained in main. Requires authenticated gh CLI.
+"""Safely prune branches merged into main. Requires authenticated gh CLI.
 
 Dry-run by default. Protects default branch, security work and open PR refs.
+Recognizes exact-head merged PRs after squash/rebase; preserves newer work.
 No force-push and no deletion of divergent work.
 """
 from __future__ import annotations
@@ -35,6 +36,35 @@ def paginate(endpoint: str):
     raise RuntimeError(f"Too many pages for {endpoint}; stopped before deletion")
 
 
+def open_pr_refs(prs):
+    refs = set()
+    for pr in prs:
+        refs.add(pr["base"]["ref"])
+        head_repo = pr["head"].get("repo")
+        if head_repo and head_repo["full_name"] == REPO:
+            refs.add(pr["head"]["ref"])
+    return refs
+
+
+def merged_into(default: str, name: str, head_sha: str, closed_prs) -> bool:
+    """Require direct ancestry or an exact-head merged PR contained in default."""
+    target = quote(default, safe="")
+    compare = api(f"compare/{target}...{quote(head_sha, safe='')}")
+    if compare.get("ahead_by") == 0:
+        return True
+    for pr in closed_prs:
+        head = pr["head"]
+        head_repo = head.get("repo")
+        if not (pr.get("merged_at") and pr.get("merge_commit_sha")
+                and head_repo and head_repo["full_name"] == REPO
+                and head["ref"] == name and head["sha"] == head_sha):
+            continue
+        merge = api(f"compare/{target}...{quote(pr['merge_commit_sha'], safe='')}")
+        if merge.get("ahead_by") == 0:
+            return True
+    return False
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--execute", action="store_true", help="Actually delete eligible remote branches")
@@ -47,11 +77,8 @@ def main() -> int:
     default = repo["default_branch"]
     branches = paginate("branches")
     prs = paginate("pulls?state=open")
-    active = set()
-    for pr in prs:
-        active.add(pr["base"]["ref"])
-        if pr["head"]["repo"] and pr["head"]["repo"]["full_name"] == REPO:
-            active.add(pr["head"]["ref"])
+    closed_prs = paginate("pulls?state=closed")
+    active = open_pr_refs(prs)
 
     candidates = []
     skipped = []
@@ -63,9 +90,8 @@ def main() -> int:
         if name in active:
             skipped.append((name, "open PR head/base"))
             continue
-        compare = api(f"compare/{quote(default, safe='')}...{quote(name, safe='')}")
-        if compare.get("ahead_by") != 0:
-            skipped.append((name, f"unmerged commits: ahead={compare.get('ahead_by')}"))
+        if not merged_into(default, name, entry["commit"]["sha"], closed_prs):
+            skipped.append((name, "unmerged commits or head changed after merged PR"))
             continue
         candidates.append(name)
 
@@ -87,8 +113,10 @@ def main() -> int:
         if current["object"]["sha"] != next(x["commit"]["sha"] for x in branches if x["name"] == name):
             print(f"SKIP {name}: branch head moved", file=sys.stderr)
             continue
-        compare = api(f"compare/{quote(default, safe='')}...{quote(name, safe='')}")
-        if compare.get("ahead_by") != 0:
+        if name in open_pr_refs(paginate("pulls?state=open")):
+            print(f"SKIP {name}: branch is now used by an open PR", file=sys.stderr)
+            continue
+        if not merged_into(default, name, current["object"]["sha"], paginate("pulls?state=closed")):
             print(f"SKIP {name}: branch no longer merged", file=sys.stderr)
             continue
         api(f"git/refs/heads/{quote(name, safe='')}", "DELETE")

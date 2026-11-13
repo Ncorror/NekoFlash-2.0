@@ -1,6 +1,14 @@
 # NekoFlash 2.0 — current status
 
-**Updated:** 13 November 2026
+**Updated:** 14 November 2026
+
+## Release in progress
+
+- Requested release: `v6.0.0-alpha12`, versionCode `235`.
+- Includes merged PRs #97 (audit/documentation), #98 (Settings community links) and #99 (vector brand icons).
+- The release request waits for the complete main CI at its exact commit, then creates the version tag and requests the existing `nekoflash-release` environment approval before signing/publication.
+- Publication and the new APK SHA-256 are not confirmed until the release workflow succeeds. The last published signed release remains listed below.
+- Merged branches are pruned after the exact-commit CI gate. Default/protected/security branches, open PR refs and branches changed after their merged PR are retained.
 
 ## Signed release
 
@@ -18,13 +26,7 @@ Public custom assets are deliberately limited to the APK, its SHA-256 file and t
 
 `main` is the development source of truth and may contain post-release maintenance that is not present in the already-signed alpha11 tag. Debug/test artifacts from `main` are not substitutes for the signed Release APK.
 
-At the start of the post-release audit:
-- only `main` existed as a long-lived branch;
-- open Issues: 0;
-- open Pull Requests: 0;
-- main CI run #746: SUCCESS.
-
-The audit itself is performed in a short-lived PR branch and must pass the same full CI before merge.
+The post-release audit and Settings PRs #97–#99 are merged. Main CI run #755 (`ed6248289a71441893347df6fc5e9c656373c4a4`) completed SUCCESS, including both Android API 26/34 integration jobs. At alpha12 preparation there are no open Issues or Pull Requests; the two merged Settings branches are pending cleanup by the release workflow.
 
 ## Hardware disposition
 
