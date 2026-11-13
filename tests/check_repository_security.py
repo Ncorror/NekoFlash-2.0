@@ -60,6 +60,9 @@ assert "needs: tag-provenance" in release_job
 assert "environment: nekoflash-release" in release_job
 assert "contents: write" in release_job
 
+assert "concurrency:" in build
+assert "group: build-${{ github.workflow }}-${{ github.ref }}" in build
+assert "cancel-in-progress: true" in build
 assert "environment: ${{ github.event_name == 'workflow_dispatch'" in build
 assert "'nekoflash-release' || 'nekoflash-ci'" in build
 assert "inputs.sign_release && github.ref == 'refs/heads/main'" in build
