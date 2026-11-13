@@ -8,6 +8,7 @@
 
 ## Unreleased — post-release audit
 
+- Added direct GitHub repository and Telegram tester-group links to Settings via the system browser/app handler; removed the last visible TestBook wording from diagnostic export.
 - Hardened sanitized share copies for explicit `adb/fastboot -s SERIAL` selectors; raw forensic logs remain unchanged.
 - Tightened manual release tags to exact current `main` and aligned future release publication with normal/latest Release policy.
 - Renamed the generic APK-only tester kit and removed obsolete REV9/old-repository Termux routes.
