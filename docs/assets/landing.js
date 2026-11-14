@@ -15,7 +15,7 @@
     image.src = tab.dataset.image;
     image.alt = tab.dataset.alt || ('NekoFlash — ' + tab.dataset.title);
     caption.textContent = tab.dataset.caption;
-    counter.textContent = String(tabs.indexOf(tab) + 1).padStart(2, '0') + ' — 04';
+    counter.textContent = String(tabs.indexOf(tab) + 1).padStart(2, '0') + ' — ' + String(tabs.length).padStart(2, '0');
     if (focus) tab.focus();
   }
   tabs.forEach((tab, index) => {
