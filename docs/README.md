@@ -26,7 +26,7 @@ Old REV/refactor/source-audit snapshots were removed from the active tree after 
 
 The public English/Russian project website is https://nekoflash.ncorror.chatgpt.site/ (RU: https://nekoflash.ncorror.chatgpt.site/ru/). GitHub Pages is not enabled; this website is published through the existing public Site, project `appgprj_6af7a14cc7e08191abefd1f6dcca57a1`.
 
-Public static sources are mirrored in this directory. The Site source repository also retains `scripts/render_site.py`, which regenerates the localized home pages, robots.txt and sitemap.xml. Preserve that Site identity when updating it. Current release downloads and checksums must come from GitHub Releases.
+Public static sources are mirrored in this directory. The Site source repository retains `site-data.json` and `scripts/render_site.py`, which regenerate the localized home/help pages and sitemap.xml. The compact home contains the download and a keyboard-accessible screen gallery; setup, compatibility and test details live at `/help/` and `/ru/help/`. Preserve that Site identity when updating it. Current release downloads and checksums must come from GitHub Releases.
 
 [4PDA_POST_RU.bbcode](4PDA_POST_RU.bbcode) is the copyable forum draft, including the Xiaomi unlock tester request. It has not been submitted to 4PDA by the assistant.
 

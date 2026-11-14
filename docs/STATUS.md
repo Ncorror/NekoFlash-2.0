@@ -20,10 +20,11 @@ Public assets are the signed APK, its SHA-256 file and the required filesystem c
 PRs #97–#99 (audit, Settings community links and vector brand icons) are merged. Both merged Settings branches were deleted by the release workflow; only `main` remains. The following documentation/site changes do not modify the signed release APK.
 
 - Public website: [English](https://nekoflash.ncorror.chatgpt.site/) · [Русский](https://nekoflash.ncorror.chatgpt.site/ru/).
-- Website source mirror: this repository's `docs/` directory. Hosting source: `a449d859d029f31ee1e6f20bf5164ff442d8b440`, Site version 1.
-- The site includes release downloads, GitHub/Telegram links, current CI screenshots, RU/EN canonical/hreflang metadata, JSON-LD, robots.txt and a sitemap. Search-engine inclusion is not claimed or verified.
+- Website source mirror: this repository's `docs/` directory. Hosting source: `c21c024478ffd66b6cf37794df79d3fd68be8eeb`, Site version 2 (published successfully on 14 November).
+- The redesigned home contains 136 Russian words (previously 612), a direct signed APK download, a four-screen gallery and a narrow-screen layout. Detailed setup, compatibility, evidence and the Xiaomi retest request are on localized help pages. SHA-256 is available on demand.
+- RU/EN canonical/hreflang metadata, JSON-LD and robots.txt are present; the sitemap covers 12 URLs. Google Search Console ownership verification and sitemap submission are the next account-dependent step. Search-engine inclusion is not claimed or verified.
 - [4PDA BBCode draft](4PDA_POST_RU.bbcode) requests volunteer verification of actual Xiaomi bootloader unlocking. It is a prepared draft, not a claim that a forum post was submitted.
-- Xiaomi sign-in/Fastboot detection are verified; an actual unlock in the current 2.0 line still needs physical verification on a locked device.
+- NekoFlash previously unlocked POCO X3 Pro, POCO F5 and POCO X7 Pro (maintainer-confirmed history). Mi Account sign-in/Fastboot detection are verified in the current campaign; the rewritten unlocking code needs a repeated end-to-end test on a locked device.
 
 ## Hardware disposition
 
