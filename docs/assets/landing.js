@@ -13,7 +13,7 @@
     });
     panel.setAttribute('aria-labelledby', tab.id);
     image.src = tab.dataset.image;
-    image.alt = 'NekoFlash — ' + tab.dataset.title;
+    image.alt = tab.dataset.alt || ('NekoFlash — ' + tab.dataset.title);
     caption.textContent = tab.dataset.caption;
     counter.textContent = String(tabs.indexOf(tab) + 1).padStart(2, '0') + ' — 04';
     if (focus) tab.focus();
