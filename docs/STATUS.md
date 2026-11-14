@@ -20,9 +20,11 @@ Public assets are the signed APK, its SHA-256 file and the required filesystem c
 PRs #97–#99 (audit, Settings community links and vector brand icons) are merged. Both merged Settings branches were deleted by the release workflow; only `main` remains. The following documentation/site changes do not modify the signed release APK.
 
 - Public website: [English](https://nekoflash.ncorror.chatgpt.site/) · [Русский](https://nekoflash.ncorror.chatgpt.site/ru/).
-- Website source mirror: this repository's `docs/` directory. Hosting source: `c21c024478ffd66b6cf37794df79d3fd68be8eeb`, Site version 2 (published successfully on 14 November).
+- Website source mirror: this repository's `docs/` directory. Hosting source: `ecd9310e03af5994821cbda306a4c7aaaa2dda9d`, Site version 3 (published successfully on 14 November; includes the Google verification file).
 - The redesigned home contains 136 Russian words (previously 612), a direct signed APK download, a four-screen gallery and a narrow-screen layout. Detailed setup, compatibility, evidence and the Xiaomi retest request are on localized help pages. SHA-256 is available on demand.
-- RU/EN canonical/hreflang metadata, JSON-LD and robots.txt are present; the sitemap covers 12 URLs. Google Search Console ownership verification and sitemap submission are the next account-dependent step. Search-engine inclusion is not claimed or verified.
+- RU/EN canonical/hreflang metadata, JSON-LD and robots.txt are present; the sitemap covers 12 URLs. Google Search Console URL-prefix ownership was confirmed through the HTML file on 14 November. Google processed `/sitemap.xml` successfully and reported 12 discovered pages. Actual search-engine inclusion remains unverified.
+- URL Inspection reported both home URLs as unknown to the index at setup time. A manual indexing request for `/ru/` was rejected with "Quota exceeded" / daily quota on 14 November; it was not accepted. No repeat or English manual request was sent after that rejection. The successfully processed sitemap remains submitted for all 12 URLs.
+- Keep `googlee972052e7ba1ecb2.html` at the public root when regenerating or deploying the site; removing it can revoke Search Console verification.
 - [4PDA BBCode draft](4PDA_POST_RU.bbcode) requests volunteer verification of actual Xiaomi bootloader unlocking. It is a prepared draft, not a claim that a forum post was submitted.
 - NekoFlash previously unlocked POCO X3 Pro, POCO F5 and POCO X7 Pro (maintainer-confirmed history). Mi Account sign-in/Fastboot detection are verified in the current campaign; the rewritten unlocking code needs a repeated end-to-end test on a locked device.
 

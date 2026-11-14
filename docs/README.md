@@ -30,4 +30,4 @@ Public static sources are mirrored in this directory. The Site source repository
 
 [4PDA_POST_RU.bbcode](4PDA_POST_RU.bbcode) is the copyable forum draft, including the Xiaomi unlock tester request. It has not been submitted to 4PDA by the assistant.
 
-Public guides must describe the shipped behavior. Documentation CI checks local links and rejects known stale references. Metadata and a sitemap help discovery; search-engine indexing is a separate, unverified outcome.
+Public guides must describe the shipped behavior. Documentation CI checks local links and rejects known stale references. Search Console ownership is verified through `googlee972052e7ba1ecb2.html`; preserve this file at the public root. Google accepted the sitemap and discovered 12 URLs. Search-engine indexing remains a separate outcome; see STATUS.md for the verified submission state.
