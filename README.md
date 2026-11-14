@@ -4,14 +4,16 @@
 
 NekoFlash lets one Android device act as a USB host for another Android device and provides ADB, Fastboot, Recovery/Sideload, diagnostics and Xiaomi account/unlock workflows without a PC.
 
-**Latest signed release:** [v6.0.0-alpha11](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha11) · versionCode 234  
-**Release APK SHA-256:** `dfd7648d1b786b1072c0eec850d190fa472059c79b5373b26a67f1392a5c0135`
+**Latest signed release:** [v6.0.0-alpha12](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha12) · versionCode 235
+**Release APK SHA-256:** `f5013cb895d11f7c42272075eb384e0b0bbc9d1fa3d537321504fbd01499e53b`
 
 English · [Русский](README_ru.md)
 
+**Project website:** [https://nekoflash.ncorror.chatgpt.site/](https://nekoflash.ncorror.chatgpt.site/)
+
 ## Current state
 
-The alpha11 hardware/release campaign is complete. The signed release passed the protected release workflow, permanent-certificate verification and the exact-SHA CI gate. Current `main` prepares alpha12 (versionCode 235) with the completed audit and GitHub/Telegram Settings updates. See [release progress](docs/STATUS.md); alpha12 is not published until its protected release workflow succeeds.
+Signed alpha12 is published with the completed audit, GitHub/Telegram Settings updates and the protected permanent-certificate release workflow. Hardware qualification remains the accepted alpha11 evidence; alpha12 does not claim another physical-device campaign.
 
 Hardware-qualified highlights:
 

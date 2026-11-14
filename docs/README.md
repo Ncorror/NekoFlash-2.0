@@ -24,4 +24,10 @@ Old REV/refactor/source-audit snapshots were removed from the active tree after 
 
 ## Public site
 
-The GitHub Pages source is under this directory. Public guides must describe the current behavior, not an old PR candidate. The documentation CI checks local links and rejects known stale public references.
+The public English/Russian project website is https://nekoflash.ncorror.chatgpt.site/ (RU: https://nekoflash.ncorror.chatgpt.site/ru/). GitHub Pages is not enabled; this website is published through the existing public Site, project `appgprj_6af7a14cc7e08191abefd1f6dcca57a1`.
+
+Public static sources are mirrored in this directory. The Site source repository also retains `scripts/render_site.py`, which regenerates the localized home pages, robots.txt and sitemap.xml. Preserve that Site identity when updating it. Current release downloads and checksums must come from GitHub Releases.
+
+[4PDA_POST_RU.bbcode](4PDA_POST_RU.bbcode) is the copyable forum draft, including the Xiaomi unlock tester request. It has not been submitted to 4PDA by the assistant.
+
+Public guides must describe the shipped behavior. Documentation CI checks local links and rejects known stale references. Metadata and a sitemap help discovery; search-engine indexing is a separate, unverified outcome.

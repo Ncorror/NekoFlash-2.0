@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://ncorror.github.io/NekoFlash-2.0/sitemap.xml
+Sitemap: https://nekoflash.ncorror.chatgpt.site/sitemap.xml

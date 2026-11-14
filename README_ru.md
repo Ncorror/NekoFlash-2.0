@@ -4,14 +4,16 @@
 
 NekoFlash позволяет использовать один Android-телефон как USB-host для второго и работать с ADB, Fastboot, Recovery/Sideload, диагностикой и Xiaomi account/unlock без ПК.
 
-**Последний подписанный релиз:** [v6.0.0-alpha11](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha11) · versionCode 234  
-**SHA-256 релизного APK:** `dfd7648d1b786b1072c0eec850d190fa472059c79b5373b26a67f1392a5c0135`
+**Последний подписанный релиз:** [v6.0.0-alpha12](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha12) · versionCode 235
+**SHA-256 релизного APK:** `f5013cb895d11f7c42272075eb384e0b0bbc9d1fa3d537321504fbd01499e53b`
 
 Русский · [English](README.md)
 
+**Сайт проекта:** [https://nekoflash.ncorror.chatgpt.site/ru/](https://nekoflash.ncorror.chatgpt.site/ru/)
+
 ## Текущее состояние
 
-Аппаратная и релизная кампания alpha11 завершена. Подписанный релиз прошёл защищённый release workflow, проверку постоянного сертификата и exact-SHA CI. Текущий `main` готовит alpha12 (versionCode 235): завершённый аудит и обновлённые настройки с GitHub/Telegram. См. [ход релиза](docs/STATUS.md); публикация alpha12 подтверждается только успешным защищённым release workflow.
+Подписанный alpha12 опубликован: завершённый аудит, обновлённые настройки с GitHub/Telegram и проверенный release workflow с постоянным сертификатом. Аппаратные результаты относятся к подтверждённой кампании alpha11; alpha12 не заявляет отдельную новую серию физических тестов.
 
 Основные аппаратные результаты:
 
