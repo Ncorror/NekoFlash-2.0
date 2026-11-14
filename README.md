@@ -1,5 +1,3 @@
-<img src="docs/artwork/nekoflash_launcher_circle_cat_v6.0.0.png" width="88" alt="NekoFlash">
-
 # NekoFlash 2.0
 
 <p align="center"><a href="https://nekoflash.ncorror.chatgpt.site/"><img src="docs/assets/nekoflash-2.0-banner.webp" width="960" alt="NekoFlash 2.0: ADB and Fastboot using a second Android phone without a PC"></a></p>
