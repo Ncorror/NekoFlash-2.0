@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Xiaomi bootloader unlock without a PC — NekoFlash status and guide</title>
+<meta name="description" content="Xiaomi, Redmi and POCO bootloader unlocking from another Android phone: NekoFlash Mi Account workflow, Fastboot requirements and current hardware-test status.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<link rel="canonical" href="https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/">
+<link rel="alternate" hreflang="en" href="https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/">
+<link rel="alternate" hreflang="ru" href="https://nekoflash.ncorror.chatgpt.site/ru/guides/xiaomi-unlock-without-pc/">
+<link rel="alternate" hreflang="x-default" href="https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/">
+<meta name="theme-color" content="#0b1015"><link rel="stylesheet" href="../../assets/site.css">
+<meta property="og:type" content="article"><meta property="og:site_name" content="NekoFlash 2.0">
+<meta property="og:title" content="Xiaomi bootloader unlock without a PC — NekoFlash status and guide"><meta property="og:description" content="Xiaomi, Redmi and POCO bootloader unlocking from another Android phone: NekoFlash Mi Account workflow, Fastboot requirements and current hardware-test status."><meta property="og:url" content="https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"Xiaomi bootloader unlock without a PC: what NekoFlash can do","description":"Xiaomi, Redmi and POCO bootloader unlocking from another Android phone: NekoFlash Mi Account workflow, Fastboot requirements and current hardware-test status.","inLanguage":"en","mainEntityOfPage":"https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/","author":{"@type":"Person","name":"Ncorror","url":"https://github.com/Ncorror"},"dateModified":"2026-11-14","publisher":{"@type":"Organization","name":"NekoFlash","url":"https://nekoflash.ncorror.chatgpt.site/"}}</script>
+</head>
+<body>
+<nav class="nav"><div class="wrap nav-inner"><a class="brand" href="../../"><span>Neko</span>Flash</a><div class="nav-links"><a href="../">Guides</a><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a><a class="lang" href="https://nekoflash.ncorror.chatgpt.site/ru/guides/xiaomi-unlock-without-pc/" hreflang="ru">RU</a></div></div></nav>
+<main><div class="wrap article"><div class="breadcrumbs"><a href="../../">NekoFlash</a> / <a href="../">Guides</a></div>
+<h1>Xiaomi bootloader unlock without a PC: what NekoFlash can do</h1>
+<p class="lead">NekoFlash includes Mi Account sign-in and Xiaomi bootloader unlock workflows using another Android phone as the USB host. The rewritten NekoFlash 2.0 unlock procedure still needs a full physical-device retest: it is not advertised as a verified one-click unlock.</p>
+<section><h2 id="step-1">Important: Xiaomi authorization is still required</h2><p>Removing the PC from the USB connection does not bypass Xiaomi account permissions, device binding, official waiting periods or model/region restrictions. An accepted login does not by itself mean the bootloader can be unlocked. NekoFlash does not promise an account-policy bypass.</p></section>
+<section><h2 id="step-2">What you need</h2><ul><li>A compatible Xiaomi, Redmi or POCO target device and an Android USB-host phone with NekoFlash.</li><li>A reliable data cable/USB OTG connection, plus access to the target’s Fastboot mode.</li><li>The Xiaomi account and device eligibility required by Xiaomi for the current model and firmware.</li><li>Awareness that an authorized bootloader unlock may erase user data.</li></ul></section>
+<section><h2 id="step-3">1. Review eligibility and device state</h2><p>Confirm the exact model, Android/MIUI/HyperOS version, account state and current bootloader status. Follow Xiaomi’s applicable official device-account binding process. Requirements may differ by firmware, region and account.</p></section>
+<section><h2 id="step-4">2. Prepare the Android-to-Android connection</h2><p>Install the signed NekoFlash APK on the host phone, connect the target over USB OTG and open the Xiaomi workflow. Verify that the app identifies the correct target before proceeding. If the target needs Fastboot mode, enter it using the device’s supported procedure.</p></section>
+<section><h2 id="step-5">3. Sign in and inspect the response</h2><p>NekoFlash has hardware evidence for Mi Account sign-in/session acquisition and Fastboot device detection. Carefully read any server waiting-period, eligibility or authentication messages; these are authoritative responses of the Xiaomi service and target device.</p></section>
+<section><h2 id="step-6">4. Unlock only when officially permitted</h2><p>The app’s end-to-end bootloader unlock behavior has not yet been revalidated on a locked device after the rewrite. Do not interpret a successful sign-in or a generic command response as an independently verified unlocked bootloader. A complete test must confirm the bootloader state again after reconnecting the device.</p></section>
+<section><h2 id="step-7">Help us validate the new release</h2><p>Earlier NekoFlash versions were reported by the maintainer to have unlocked POCO X3 Pro, POCO F5 and POCO X7 Pro. This is historical evidence, not a claim that the current alpha12 unlock flow is fully verified. If you already plan a legitimate unlock, share your models, firmware, exact response and diagnostic export with the tester group.</p></section>
+<div class="notice" style="margin:32px 0"><strong>Official project:</strong> NekoFlash 2.0 by Ncorror. Avoid APK downloads from unrelated repository copies.</div>
+<div class="actions"><a class="btn primary" href="https://github.com/Ncorror/NekoFlash-2.0/releases/latest">Download signed APK</a><a class="btn" href="../../">Home</a><a class="btn" href="https://t.me/+NR_FiUmvXlViOTUy">Telegram</a></div>
+</div></main>
+<footer class="footer"><div class="wrap footer-inner"><div>© 2026 NekoFlash 2.0 · Ncorror.</div><div><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/blob/main/PRIVACY.md">Privacy</a></div></div></footer>
+</body></html>
