@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADB without a PC — Run ADB from another Android phone | NekoFlash</title>
+<meta name="description" content="Use ADB without a computer: connect two Android phones via USB OTG, authorize USB debugging, open a shell, install APKs and transfer files with NekoFlash.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<link rel="canonical" href="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/">
+<link rel="alternate" hreflang="en" href="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/">
+<link rel="alternate" hreflang="ru" href="https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/">
+<link rel="alternate" hreflang="x-default" href="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/">
+<meta name="theme-color" content="#0b1015"><link rel="stylesheet" href="../../assets/site.css">
+<meta property="og:type" content="article"><meta property="og:site_name" content="NekoFlash 2.0">
+<meta property="og:title" content="ADB without a PC — Run ADB from another Android phone | NekoFlash"><meta property="og:description" content="Use ADB without a computer: connect two Android phones via USB OTG, authorize USB debugging, open a shell, install APKs and transfer files with NekoFlash."><meta property="og:url" content="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"ADB without a PC: use one Android phone to control another","description":"Use ADB without a computer: connect two Android phones via USB OTG, authorize USB debugging, open a shell, install APKs and transfer files with NekoFlash.","inLanguage":"en","mainEntityOfPage":"https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/","author":{"@type":"Person","name":"Ncorror","url":"https://github.com/Ncorror"},"dateModified":"2026-11-14","publisher":{"@type":"Organization","name":"NekoFlash","url":"https://nekoflash.ncorror.chatgpt.site/"}}</script>
+</head>
+<body>
+<nav class="nav"><div class="wrap nav-inner"><a class="brand" href="../../"><span>Neko</span>Flash</a><div class="nav-links"><a href="../">Guides</a><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a><a class="lang" href="https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/" hreflang="ru">RU</a></div></div></nav>
+<main><div class="wrap article"><div class="breadcrumbs"><a href="../../">NekoFlash</a> / <a href="../">Guides</a></div>
+<h1>ADB without a PC: use one Android phone to control another</h1>
+<p class="lead">NekoFlash turns an Android phone or tablet into the USB host for another Android device. You can use ADB shell, install APKs, and transfer files without connecting either phone to a PC.</p>
+<section><h2 id="step-1">What you need</h2><ul><li>Two Android devices: one host running NekoFlash (Android 8.0+ with USB host/OTG) and one target.</li><li>A USB data cable and, where required, a USB OTG adapter.</li><li>USB debugging enabled on the target, with permission to authorize the host.</li><li>The official signed NekoFlash APK on the host device.</li></ul></section>
+<section><h2 id="step-2">1. Enable USB debugging on the target</h2><p>Open the target’s Android Developer options and enable <strong>USB debugging</strong>. The setting location varies by manufacturer. Do not confuse USB debugging with OEM unlocking: ordinary ADB access does not require an unlocked bootloader.</p></section>
+<section><h2 id="step-3">2. Connect the two phones</h2><p>Connect the target to the NekoFlash phone using a data-capable cable. Grant NekoFlash the Android USB access permission on the host. On the target, approve the RSA fingerprint dialog for this host. If the dialog does not appear, confirm that the cable supports data and that the correct phone is acting as USB host.</p></section>
+<section><h2 id="step-4">3. Run ADB commands</h2><p>Open NekoFlash’s ADB terminal once the connected device reports an authorized ADB session. Start with a harmless check such as <code>adb devices</code> or <code>adb shell getprop ro.product.model</code>, using the command form supported by the chosen app screen. You can then use the app’s built-in shell, APK installation, and Push/Pull file workflows.</p></section>
+<section><h2 id="step-5">4. Transfer files and install APKs</h2><p>Use Push to send a file from the host to a selected target path, or Pull to retrieve one from the target. APK installation requires Android to accept the package; app install permissions and device policies still apply. NekoFlash provides full operation logs and diagnostic export for troubleshooting.</p></section>
+<section><h2 id="step-6">ADB, Fastboot and Recovery are different modes</h2><p>ADB through Android requires USB debugging and host authorization. Fastboot runs in the bootloader, while ADB Sideload is a separate Recovery transfer mode. Switching modes changes which operations are available. See the <a href='../fastboot-from-android/'>Fastboot guide</a> and <a href='../adb-sideload/'>ADB Sideload guide</a>.</p></section>
+<section><h2 id="step-7">What if ADB does not connect?</h2><p>Check the USB host role, data cable, target USB debugging state and RSA authorization. If NekoFlash sees the device but ADB remains unauthorized, resolve authorization on the target first. Collect a diagnostic ZIP if the connection still fails; USB host behavior can vary by hardware.</p></section>
+<div class="notice" style="margin:32px 0"><strong>Official project:</strong> NekoFlash 2.0 by Ncorror. Avoid APK downloads from unrelated repository copies.</div>
+<div class="actions"><a class="btn primary" href="https://github.com/Ncorror/NekoFlash-2.0/releases/latest">Download signed APK</a><a class="btn" href="../../">Home</a><a class="btn" href="https://t.me/+NR_FiUmvXlViOTUy">Telegram</a></div>
+</div></main>
+<footer class="footer"><div class="wrap footer-inner"><div>© 2026 NekoFlash 2.0 · Ncorror.</div><div><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/blob/main/PRIVACY.md">Privacy</a></div></div></footer>
+</body></html>
