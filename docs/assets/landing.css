@@ -24,3 +24,6 @@ footer{border-top:1px solid #ffffff0c;padding:25px 0 29px;color:#6f8595;font-siz
 .search-paths nav a{display:inline-flex;align-items:center;min-height:36px;padding:7px 12px;border:1px solid var(--line);border-radius:7px;color:#bbcfdd;background:#121c24;font-size:11px;font-weight:560}
 .search-paths nav a:hover,.search-paths nav a:focus-visible{color:var(--text);border-color:#537b83;background:#1a2a31}
 @media(max-width:900px){.search-paths{padding-top:4px;padding-bottom:12px}.search-paths-inner{padding:16px 0 18px}.search-paths h2{font-size:15px}.search-paths nav{gap:8px}.search-paths nav a{min-height:38px;font-size:11px;padding-inline:10px}}
+/* Allow the English six-screen gallery to scroll on narrow viewports. */
+.gallery-tabs{justify-content:flex-start;overflow-x:auto;overscroll-behavior-inline:contain;scroll-snap-type:x proximity;scrollbar-width:thin}
+.gallery-tabs button{flex:0 0 auto;min-width:76px;scroll-snap-align:start}
