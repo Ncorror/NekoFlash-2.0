@@ -1,87 +1,106 @@
 # NekoFlash 2.0
 
-<p align="center"><a href="https://nekoflash.ncorror.chatgpt.site/"><img src="docs/assets/nekoflash-2.0-banner.webp" width="960" alt="NekoFlash 2.0: ADB and Fastboot using a second Android phone without a PC"></a></p>
+<p align="center"><a href="https://nekoflash.ncorror.chatgpt.site/"><img src="docs/assets/nekoflash-2.0-banner.webp" width="960" alt="NekoFlash 2.0 — Android flashing over USB OTG, without a PC"></a></p>
 
-NekoFlash lets one Android device act as a USB host for another Android device and provides ADB, Fastboot, Recovery/Sideload, diagnostics and Xiaomi account/unlock workflows without a PC.
+<p align="center"><strong>ADB · Fastboot · Recovery · Sideload</strong><br>Use one Android phone to manage another over USB OTG.</p>
 
-**Latest signed release:** [v6.0.0-alpha12](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha12) · versionCode 235
-**Release APK SHA-256:** `f5013cb895d11f7c42272075eb384e0b0bbc9d1fa3d537321504fbd01499e53b`
+<p align="center">
+  <a href="https://github.com/Ncorror/NekoFlash-2.0/releases/download/v6.0.0-alpha12/NekoFlash-6.0.0-alpha12.apk"><img src="docs/assets/readme/download-en.svg" width="196" height="46" alt="Download APK"></a>
+  <a href="https://github.com/Ncorror/NekoFlash-2.0/releases/download/v6.0.0-alpha12/NekoFlash-6.0.0-alpha12.apk.sha256"><img src="docs/assets/readme/checksum-en.svg" width="142" height="46" alt="SHA-256"></a>
+  <a href="https://github.com/Ncorror/NekoFlash-2.0/releases"><img src="docs/assets/readme/releases-en.svg" width="162" height="46" alt="All releases"></a>
+</p>
+<p align="center">
+  <a href="https://nekoflash.ncorror.chatgpt.site/"><img src="docs/assets/readme/website-en.svg" width="150" height="46" alt="Website"></a>
+  <a href="https://t.me/+NR_FiUmvXlViOTUy"><img src="docs/assets/readme/telegram-en.svg" width="154" height="46" alt="Telegram"></a>
+  <a href="https://nekoflash.ncorror.chatgpt.site/guides/"><img src="docs/assets/readme/guides-en.svg" width="142" height="46" alt="Guides"></a>
+</p>
 
-English · [Русский](README_ru.md)
+<p align="center">Android 8.0+ · USB Host / OTG · No root required on the host<br><strong>English</strong> · <a href="README_ru.md">Русский</a></p>
 
-**Project website:** [https://nekoflash.ncorror.chatgpt.site/](https://nekoflash.ncorror.chatgpt.site/)
+**Current signed release:** [6.0.0-alpha12](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha12) · versionCode **235** · [APK, 4.6 MiB](https://github.com/Ncorror/NekoFlash-2.0/releases/download/v6.0.0-alpha12/NekoFlash-6.0.0-alpha12.apk)
 
-## Use NekoFlash without a computer
+NekoFlash turns an Android phone or tablet into an ADB and Fastboot host. Flash compatible images, send Recovery ZIPs, install APKs, transfer files and run commands directly from your phone. The application keeps complete operation logs and supports the Xiaomi account and bootloader-unlock workflow.
 
-Looking for a way to control or flash an Android device using **another Android phone instead of a PC**? Start with the workflow that matches your device mode:
+## Connect in three steps
 
-- [Flash Android without a PC using another phone](https://nekoflash.ncorror.chatgpt.site/guides/flash-android-without-pc/) — choose the workflow for a Fastboot image, Recovery ZIP or custom recovery.
-- [Fastboot from Android without a PC](https://nekoflash.ncorror.chatgpt.site/guides/fastboot-from-android/) — detect a bootloader, inspect partitions and run device-appropriate Fastboot operations over USB OTG.
-- [Flash a compatible recovery image (TWRP / OrangeFox) from Android](https://nekoflash.ncorror.chatgpt.site/guides/flash-recovery-twrp/) — understand device-specific recovery and boot partition layouts before writing.
-- [ADB Sideload from an Android phone](https://nekoflash.ncorror.chatgpt.site/guides/adb-sideload/) — choose and send an update ZIP to a target in Recovery sideload mode.
-- [ADB without a PC: shell, files and APK installation](https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/) — connect a device with USB debugging, authorize ADB and use the built-in terminal, Push/Pull and APK installation.
-- [Xiaomi / Redmi / POCO bootloader unlock workflow](https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/) — Mi Account sign-in and Fastboot detection are tested, but full bootloader unlocking **still requires a new physical-device validation** in NekoFlash 2.0. Xiaomi eligibility and waiting periods still apply.
+1. **Install the APK on the host phone.** Use the orange download button above and grant installation from your browser or file manager when Android asks.
+2. **Connect the target over USB OTG.** Use a data-capable cable or adapter and allow NekoFlash to access the USB device.
+3. **Choose the target mode.** For ADB, enable USB debugging and accept its RSA prompt. For Fastboot, boot the target into the bootloader. For Sideload, start ADB Sideload in the target's Recovery.
 
-**Official download:** [signed NekoFlash 2.0 APK from GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases/latest). The public source and verified releases are maintained by [Ncorror](https://github.com/Ncorror).
+[Connection help](https://nekoflash.ncorror.chatgpt.site/help/#start) · [Choose a flashing workflow](https://nekoflash.ncorror.chatgpt.site/guides/flash-android-without-pc/)
 
+## What you can do
 
-## Current state
+| Tool | Available operations |
+| --- | --- |
+| **ADB** | Shell, APK installation, Push/Pull and device diagnostics. |
+| **Fastboot** | Quick Flash, a Mass Flash image queue, partition information and direct commands. |
+| **Recovery / Sideload** | Select or clear a ZIP, then send it with a separate Start action. |
+| **Xiaomi** | Mi Account session management and the bootloader-unlock workflow. |
+| **File transfers** | Resume large Pull transfers from durable checkpoints and verify the final SHA-256. |
+| **Operation Center** | Inspect operation status and export complete diagnostic evidence. |
 
-Signed alpha12 is published with the completed audit, GitHub/Telegram Settings updates and the protected permanent-certificate release workflow. Hardware qualification remains the accepted alpha11 evidence; alpha12 does not claim another physical-device campaign.
+Host root is not required. Target operations depend on the device mode, bootloader state and partition layout. NekoFlash supports devices without A/B slots; it does not assume every device uses them.
 
-Hardware-qualified highlights:
+**Xiaomi unlock status:** Mi Account sign-in and Fastboot detection are verified. Full unlocking after the code rewrite still needs a repeated end-to-end test on a locked device. Xiaomi's account eligibility and waiting periods apply. [Current unlock guide](https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/).
 
-- Fastboot format/wipe on unlocked POCO X3 Pro `vayu`: `format userdata`, `fastboot -w`, metadata/cache handling, reboot and Android setup boot — **FIELD PASS**.
-- ADB Pull/Push control on POCO X3 Pro host → POCO X3 Pro target: `framework.jar` Pull and repeated 128 MiB Pull/Push with matching SHA-256 — **FIELD PASS**.
-- POCO F7 / `onyx` remains a documented intermittent USB-host receive compatibility case. Large Pull uses durable checkpoints and final SHA-256 verification; failed USB packets are never silently replayed.
-- Recovery/Sideload, Mass Flash, Fastboot transitions, Xiaomi sign-in, ZIP select/clear and terminal rotation/input have accepted physical evidence on the tested rigs.
+## See the interface
 
-See [current status](docs/STATUS.md) and [hardware validation](docs/HARDWARE_VALIDATION.md).
+<p align="center">
+  <a href="https://nekoflash.ncorror.chatgpt.site/#inside"><img src="docs/assets/en-home.webp" width="176" alt="Home: connected device and diagnostics"></a>
+  <a href="https://nekoflash.ncorror.chatgpt.site/#inside"><img src="docs/assets/en-flash.webp" width="176" alt="Quick Flash: partition and image selection"></a>
+  <a href="https://nekoflash.ncorror.chatgpt.site/#inside"><img src="docs/assets/en-sideload.webp" width="176" alt="Recovery Sideload: ZIP and separate Start action"></a>
+</p>
 
-## Downloads
+Real English-language **development-build (`.dev`)** screenshots; the signed release UI may differ. [Explore all six screens on the website](https://nekoflash.ncorror.chatgpt.site/#inside).
 
-Use [GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases/latest) for the signed public APK.
+## Guides
 
-A release intentionally publishes only:
-- the APK;
-- its SHA-256 file;
-- `filesystem-tools-source.tar.gz`, required corresponding source for bundled filesystem tools.
+- [Flash Android without a PC](https://nekoflash.ncorror.chatgpt.site/guides/flash-android-without-pc/) — choose between a Fastboot image, a Recovery ZIP and custom recovery.
+- [ADB from another Android phone](https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/) — connect, authorize, use the terminal, install APKs and transfer files.
+- [Fastboot from Android](https://nekoflash.ncorror.chatgpt.site/guides/fastboot-from-android/) — detect the target and inspect its partitions before an operation.
+- [Install Recovery, TWRP or OrangeFox](https://nekoflash.ncorror.chatgpt.site/guides/flash-recovery-twrp/) — select an image for the exact model and partition layout.
+- [Send a ZIP with ADB Sideload](https://nekoflash.ncorror.chatgpt.site/guides/adb-sideload/) — prepare Recovery and start the transfer explicitly.
+- [Xiaomi / Redmi / POCO bootloader unlock](https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/) — account requirements and the current verification status.
 
-Debug/test artifacts from Actions are not production releases.
+## Release integrity
 
-## Main features
+Download the public signed APK from [GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases/latest). The **SHA-256** button downloads its checksum file directly.
 
-- ADB shell, install, push/pull and diagnostics.
-- Quick Flash, Mass Flash and direct Fastboot commands.
-- Recovery ADB Sideload with non-mutating ZIP selection and an explicit Start action.
-- Xiaomi account/session and unlock workflow.
-- Operation Center with full diagnostic evidence export.
-- Host-side ext4/F2FS generation for supported Fastboot formatting.
-- Large-file Pull checkpoint/resume with final source/destination SHA-256 verification.
+<details>
+<summary>APK checksum and release contents</summary>
 
-## Safety model
+SHA-256 of `NekoFlash-6.0.0-alpha12.apk`:
 
-NekoFlash is a professional tool. It keeps full raw diagnostic evidence and does not hide direct ADB/Fastboot functionality. It also does not silently retry an ambiguous destructive Fastboot write or a failed ADB packet.
+```text
+f5013cb895d11f7c42272075eb384e0b0bbc9d1fa3d537321504fbd01499e53b
+```
 
-Raw diagnostics may contain device identifiers, commands and paths. Sanitized/shareable exports are a separate copy and do not modify the raw evidence. See [Privacy](PRIVACY.md), [Security](docs/SECURITY.md) and [Professional recovery policy](docs/PROFESSIONAL_RECOVERY_POLICY.md).
+The release contains the signed APK, its `.sha256` file and `filesystem-tools-source.tar.gz`, the required corresponding source for bundled filesystem tools. Actions debug/test artifacts are separate from the signed public release.
 
-## Documentation
+</details>
 
-Start at [docs/README.md](docs/README.md).
+<details>
+<summary>Validation and known device cases</summary>
 
-Key documents:
-- [Status](docs/STATUS.md)
-- [Post-release audit](docs/AUDIT_2026-11-13.md)
-- [Hardware validation](docs/HARDWARE_VALIDATION.md)
-- [USB troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md)
-- [Repository/release security](docs/REPOSITORY_SECURITY.md)
-- [Legal review](docs/LEGAL_REVIEW.md)
-- [Third-party notices](THIRD_PARTY_NOTICES.md)
+The alpha12 release passed **409 JVM tests**, **29 installed-app tests on each of Android API 26 and 34**, independent ext4/F2FS verification and Android Lint. Physical qualification remains the accepted alpha11 campaign; alpha12 does not claim a new hardware campaign.
 
-Historical REV/audit snapshots are preserved by Git history rather than kept as competing current instructions.
+- **POCO X3 Pro / vayu:** Fastboot format/wipe and subsequent Android boot — FIELD PASS.
+- **X3 Pro host → X3 Pro target:** repeated 128 MiB Pull/Push with matching SHA-256 — FIELD PASS.
+- **Recovery/Sideload, Mass Flash, ADB/Fastboot transitions and terminal rotation/input:** accepted field evidence on the documented rigs.
+- **POCO F7 / onyx as host:** intermittent long inbound USB transfer failures remain documented; resumable Pull preserves completed checkpoints.
+- NekoFlash previously unlocked **POCO X3 Pro, POCO F5 and POCO X7 Pro**. The rewritten unlock path awaits another complete hardware test.
 
-## Project
+[Current status](docs/STATUS.md) · [Hardware validation](docs/HARDWARE_VALIDATION.md) · [USB troubleshooting](docs/USB_CONNECTION_TROUBLESHOOTING.md)
 
-Author and maintainer — [Ncorror](https://github.com/Ncorror). Project collaborator — [IQ-HARRY7](https://github.com/IQ-HARRY7).
+</details>
 
-[Apache 2.0](LICENSE) · [Artwork terms](ASSETS_LICENSE.md) · [Changelog](CHANGELOG.md)
+## Help, feedback and contributions
+
+Join [Telegram](https://t.me/+NR_FiUmvXlViOTUy) for discussion or [open a GitHub issue](https://github.com/Ncorror/NekoFlash-2.0/issues) with both phone models, Android/firmware versions, the NekoFlash version, reproduction steps and the exact outcome. Include the application's diagnostic ZIP when needed; complete raw logs are retained.
+
+For development and review, start with [the documentation index](docs/README.md) and [the current status](docs/STATUS.md). [Professional recovery policy](docs/PROFESSIONAL_RECOVERY_POLICY.md) · [Security](docs/SECURITY.md) · [Privacy](PRIVACY.md).
+
+Maintained by [Ncorror](https://github.com/Ncorror), with project collaborator [IQ-HARRY7](https://github.com/IQ-HARRY7).
+
+[Apache 2.0](LICENSE) · [Artwork terms](ASSETS_LICENSE.md) · [Third-party notices](THIRD_PARTY_NOTICES.md) · [Changelog](CHANGELOG.md)
