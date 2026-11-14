@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADB без компьютера — команды с одного Android на другой | NekoFlash</title>
+<meta name="description" content="Как пользоваться ADB без компьютера через USB OTG: подключение двух телефонов, отладка USB, терминал ADB, установка APK и передача файлов с NekoFlash.">
+<meta name="robots" content="index,follow,max-image-preview:large">
+<link rel="canonical" href="https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/">
+<link rel="alternate" hreflang="en" href="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/">
+<link rel="alternate" hreflang="ru" href="https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/">
+<link rel="alternate" hreflang="x-default" href="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/">
+<meta name="theme-color" content="#0b1015"><link rel="stylesheet" href="../../../assets/site.css">
+<meta property="og:type" content="article"><meta property="og:site_name" content="NekoFlash 2.0">
+<meta property="og:title" content="ADB без компьютера — команды с одного Android на другой | NekoFlash"><meta property="og:description" content="Как пользоваться ADB без компьютера через USB OTG: подключение двух телефонов, отладка USB, терминал ADB, установка APK и передача файлов с NekoFlash."><meta property="og:url" content="https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/">
+<script type="application/ld+json">{"@context":"https://schema.org","@type":"TechArticle","headline":"ADB без ПК: управляем Android-телефоном с другого телефона","description":"Как пользоваться ADB без компьютера через USB OTG: подключение двух телефонов, отладка USB, терминал ADB, установка APK и передача файлов с NekoFlash.","inLanguage":"ru","mainEntityOfPage":"https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/","author":{"@type":"Person","name":"Ncorror","url":"https://github.com/Ncorror"},"dateModified":"2026-11-14","publisher":{"@type":"Organization","name":"NekoFlash","url":"https://nekoflash.ncorror.chatgpt.site/"}}</script>
+</head>
+<body>
+<nav class="nav"><div class="wrap nav-inner"><a class="brand" href="../../"><span>Neko</span>Flash</a><div class="nav-links"><a href="../">Инструкции</a><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a><a class="lang" href="https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/" hreflang="en">EN</a></div></div></nav>
+<main><div class="wrap article"><div class="breadcrumbs"><a href="../../">NekoFlash</a> / <a href="../">Инструкции</a></div>
+<h1>ADB без ПК: управляем Android-телефоном с другого телефона</h1>
+<p class="lead">NekoFlash позволяет одному Android-телефону работать USB-хостом для второго. Можно отправлять ADB-команды, устанавливать APK и передавать файлы, не используя компьютер.</p>
+<section><h2 id="step-1">Что потребуется</h2><ul><li>Два Android-устройства: хост с NekoFlash (Android 8.0+ и USB Host/OTG) и целевой телефон.</li><li>Кабель с передачей данных и при необходимости OTG-переходник.</li><li>Включённая «Отладка по USB» на целевом телефоне.</li><li>Подписанный APK NekoFlash из официального GitHub Releases.</li></ul></section>
+<section><h2 id="step-2">1. Включи отладку по USB</h2><p>На целевом устройстве открой настройки разработчика и включи «Отладку по USB». Расположение пункта зависит от прошивки. Для обычного ADB не требуется разблокировать загрузчик — не путай эту настройку с «Заводской разблокировкой».</p></section>
+<section><h2 id="step-3">2. Соедини телефоны по OTG</h2><p>Подключи целевое устройство к телефону с NekoFlash. На хосте разреши приложению доступ к USB. На целевом телефоне подтверди RSA-ключ хоста в появившемся окне. Если запроса нет, проверь кабель с передачей данных и роли USB.</p></section>
+<section><h2 id="step-4">3. Используй терминал ADB</h2><p>После авторизации открой ADB-терминал NekoFlash. Для начала выполни безвредную проверку устройства: <code>adb devices</code> или <code>adb shell getprop ro.product.model</code> в формате команд, который ожидает выбранный экран приложения. Далее доступны Shell, установка APK, Push и Pull.</p></section>
+<section><h2 id="step-5">4. Установка APK и передача файлов</h2><p>Push отправляет файл с хоста на целевое устройство, Pull забирает файл обратно. Установка APK зависит от разрешений Android и политики целевого устройства. NekoFlash сохраняет подробный журнал операций и позволяет экспортировать диагностику.</p></section>
+<section><h2 id="step-6">ADB — не то же самое, что Fastboot</h2><p>Обычный ADB работает при включённой отладке USB и авторизации. Fastboot — режим загрузчика, а ADB Sideload — специальный режим Recovery для отправки ZIP. Для них есть отдельные инструкции: <a href='../fastboot-from-android/'>Fastboot без ПК</a> и <a href='../adb-sideload/'>ADB Sideload без ПК</a>.</p></section>
+<section><h2 id="step-7">Если телефон не определяется</h2><p>Проверь роль USB-хоста, кабель, отладку и RSA-авторизацию на целевом устройстве. Если оно видно, но статус ADB неавторизованный, сначала подтверди доступ на целевом телефоне. При повторяемой ошибке пригодится диагностический ZIP.</p></section>
+<div class="notice" style="margin:32px 0"><strong>Официальный проект:</strong> NekoFlash 2.0 от Ncorror. Не загружай APK из случайных копий репозиториев.</div>
+<div class="actions"><a class="btn primary" href="https://github.com/Ncorror/NekoFlash-2.0/releases/latest">Скачать подписанный APK</a><a class="btn" href="../../">На главную</a><a class="btn" href="https://t.me/+NR_FiUmvXlViOTUy">Telegram</a></div>
+</div></main>
+<footer class="footer"><div class="wrap footer-inner"><div>© 2026 NekoFlash 2.0 · Ncorror.</div><div><a href="https://github.com/Ncorror/NekoFlash-2.0">GitHub</a> · <a href="https://github.com/Ncorror/NekoFlash-2.0/blob/main/PRIVACY.md">Privacy</a></div></div></footer>
+</body></html>
