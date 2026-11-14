@@ -15,11 +15,12 @@ NekoFlash позволяет использовать один Android-теле�
 
 NekoFlash позволяет использовать **один Android-телефон для управления и прошивки другого без ПК** через USB OTG. Выбери инструкцию для нужного режима:
 
+- [Прошить Android без компьютера с другого телефона](https://nekoflash.ncorror.chatgpt.site/ru/guides/flash-android-without-pc/) — выбор между Fastboot-образом, Recovery ZIP и установкой Recovery.
 - [Fastboot без ПК — с одного Android-телефона на другой](https://nekoflash.ncorror.chatgpt.site/ru/guides/fastboot-from-android/) — определение устройства, проверка разделов и операции Fastboot.
 - [Установка Recovery, TWRP или OrangeFox без компьютера](https://nekoflash.ncorror.chatgpt.site/ru/guides/flash-recovery-twrp/) — выбор совместимого образа и проверка схемы разделов.
 - [ADB Sideload без ПК](https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-sideload/) — отправка ZIP из второго телефона через режим Recovery.
-- [ADB без компьютера: терминал, файлы и APK](https://nekoflash.ncorror.chatgpt.site/ru/help/#modes) — USB-отладка, авторизация ADB, Shell, Push/Pull и установка приложений.
-- [Разблокировка загрузчика Xiaomi / Redmi / POCO](https://nekoflash.ncorror.chatgpt.site/ru/help/#unlock) — вход в Mi Account и обнаружение Fastboot проверены; **полная разблокировка в NekoFlash 2.0 пока ждёт повторного аппаратного теста**. Ограничения аккаунта и ожидание определяет Xiaomi.
+- [ADB без компьютера: терминал, файлы и APK](https://nekoflash.ncorror.chatgpt.site/ru/guides/adb-without-pc/) — USB-отладка, авторизация ADB, Shell, Push/Pull и установка приложений.
+- [Разблокировка загрузчика Xiaomi / Redmi / POCO](https://nekoflash.ncorror.chatgpt.site/ru/guides/xiaomi-unlock-without-pc/) — вход в Mi Account и обнаружение Fastboot проверены; **полная разблокировка в NekoFlash 2.0 пока ждёт повторного аппаратного теста**. Ограничения аккаунта и ожидание определяет Xiaomi.
 
 **Официальная загрузка:** [подписанный APK NekoFlash 2.0 на GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases/latest). Актуальные исходники и релизы ведёт [Ncorror](https://github.com/Ncorror).
 

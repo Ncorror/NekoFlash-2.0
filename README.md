@@ -15,11 +15,12 @@ English · [Русский](README_ru.md)
 
 Looking for a way to control or flash an Android device using **another Android phone instead of a PC**? Start with the workflow that matches your device mode:
 
+- [Flash Android without a PC using another phone](https://nekoflash.ncorror.chatgpt.site/guides/flash-android-without-pc/) — choose the workflow for a Fastboot image, Recovery ZIP or custom recovery.
 - [Fastboot from Android without a PC](https://nekoflash.ncorror.chatgpt.site/guides/fastboot-from-android/) — detect a bootloader, inspect partitions and run device-appropriate Fastboot operations over USB OTG.
 - [Flash a compatible recovery image (TWRP / OrangeFox) from Android](https://nekoflash.ncorror.chatgpt.site/guides/flash-recovery-twrp/) — understand device-specific recovery and boot partition layouts before writing.
 - [ADB Sideload from an Android phone](https://nekoflash.ncorror.chatgpt.site/guides/adb-sideload/) — choose and send an update ZIP to a target in Recovery sideload mode.
-- [ADB without a PC: shell, files and APK installation](https://nekoflash.ncorror.chatgpt.site/help/#modes) — connect a device with USB debugging, authorize ADB and use the built-in terminal, Push/Pull and APK installation.
-- [Xiaomi / Redmi / POCO bootloader unlock workflow](https://nekoflash.ncorror.chatgpt.site/help/#unlock) — Mi Account sign-in and Fastboot detection are tested, but full bootloader unlocking **still requires a new physical-device validation** in NekoFlash 2.0. Xiaomi eligibility and waiting periods still apply.
+- [ADB without a PC: shell, files and APK installation](https://nekoflash.ncorror.chatgpt.site/guides/adb-without-pc/) — connect a device with USB debugging, authorize ADB and use the built-in terminal, Push/Pull and APK installation.
+- [Xiaomi / Redmi / POCO bootloader unlock workflow](https://nekoflash.ncorror.chatgpt.site/guides/xiaomi-unlock-without-pc/) — Mi Account sign-in and Fastboot detection are tested, but full bootloader unlocking **still requires a new physical-device validation** in NekoFlash 2.0. Xiaomi eligibility and waiting periods still apply.
 
 **Official download:** [signed NekoFlash 2.0 APK from GitHub Releases](https://github.com/Ncorror/NekoFlash-2.0/releases/latest). The public source and verified releases are maintained by [Ncorror](https://github.com/Ncorror).
 
