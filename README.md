@@ -2,6 +2,8 @@
 
 # NekoFlash 2.0
 
+<p align="center"><a href="https://nekoflash.ncorror.chatgpt.site/"><img src="docs/assets/nekoflash-2.0-banner.webp" width="960" alt="NekoFlash 2.0: ADB and Fastboot using a second Android phone without a PC"></a></p>
+
 NekoFlash lets one Android device act as a USB host for another Android device and provides ADB, Fastboot, Recovery/Sideload, diagnostics and Xiaomi account/unlock workflows without a PC.
 
 **Latest signed release:** [v6.0.0-alpha12](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha12) · versionCode 235

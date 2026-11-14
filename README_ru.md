@@ -2,6 +2,8 @@
 
 # NekoFlash 2.0
 
+<p align="center"><a href="https://nekoflash.ncorror.chatgpt.site/ru/"><img src="docs/assets/nekoflash-2.0-banner.webp" width="960" alt="NekoFlash 2.0: ADB и Fastboot с телефона на телефон без компьютера"></a></p>
+
 NekoFlash позволяет использовать один Android-телефон как USB-host для второго и работать с ADB, Fastboot, Recovery/Sideload, диагностикой и Xiaomi account/unlock без ПК.
 
 **Последний подписанный релиз:** [v6.0.0-alpha12](https://github.com/Ncorror/NekoFlash-2.0/releases/tag/v6.0.0-alpha12) · versionCode 235
