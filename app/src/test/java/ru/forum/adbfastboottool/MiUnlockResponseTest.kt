@@ -1,14 +1,18 @@
 package ru.forum.adbfastboottool
 
-import com.sun.net.httpserver.HttpServer
+import java.net.InetAddress
 import java.net.InetSocketAddress
-import java.util.concurrent.CopyOnWriteArrayList
-import java.util.concurrent.atomic.AtomicInteger
+import java.net.ServerSocket
+import java.net.URI
+import java.util.concurrent.FutureTask
+import java.util.concurrent.TimeUnit
+import kotlin.concurrent.thread
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -54,60 +58,73 @@ class MiUnlockResponseTest {
 
     @Test
     fun clearRetryAndUnlockEachUseTheirOwnNonce() {
-        val requests = CopyOnWriteArrayList<Pair<String, String?>>()
-        val nonceCount = AtomicInteger()
-        val clearCount = AtomicInteger()
-        val server = HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0)
-        server.createContext("/") { exchange ->
-            val path = exchange.requestURI.path
-            val nonce = exchange.requestURI.rawQuery.orEmpty().split("&")
-                .firstOrNull { it.startsWith("nonce=") }
-            requests += path to nonce
-
-            val (status, response) = when (path) {
-                "/api/v2/nonce" -> 200 to """{"nonce":"test-nonce-${nonceCount.incrementAndGet()}"}"""
-                "/api/v2/unlock/device/clear" ->
-                    if (clearCount.incrementAndGet() == 1) 500 to "{}" else 200 to """{"cleanOrNot":1}"""
-                "/api/v3/ahaUnlock" -> 200 to """{"code":20036,"data":{"waitHour":168}}"""
-                else -> 404 to "{}"
+        ServerSocket().use { server ->
+            server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
+            server.soTimeout = 5_000
+            val requests = FutureTask {
+                var nonceCount = 0
+                var clearCount = 0
+                List(6) {
+                    server.accept().use { socket ->
+                        socket.soTimeout = 5_000
+                        val input = socket.getInputStream().bufferedReader(Charsets.US_ASCII)
+                        val request = URI.create(input.readLine().split(" ")[1])
+                        while (!input.readLine().isNullOrEmpty()) {
+                            // Consume the request headers before responding.
+                        }
+                        val (status, response) = when (request.path) {
+                            "/api/v2/nonce" -> "200 OK" to """{"nonce":"test-nonce-${++nonceCount}"}"""
+                            "/api/v2/unlock/device/clear" ->
+                                if (++clearCount == 1) "500 Internal Server Error" to "{}"
+                                else "200 OK" to """{"cleanOrNot":1}"""
+                            "/api/v3/ahaUnlock" -> "200 OK" to """{"code":20036,"data":{"waitHour":168}}"""
+                            else -> "404 Not Found" to "{}"
+                        }
+                        val body = response.toByteArray(Charsets.UTF_8)
+                        socket.getOutputStream().apply {
+                            write(
+                                ("HTTP/1.1 $status\r\nContent-Length: ${body.size}\r\n" +
+                                    "Content-Type: application/json\r\nConnection: close\r\n\r\n")
+                                    .toByteArray(Charsets.US_ASCII)
+                            )
+                            write(body)
+                        }
+                        val nonce = request.rawQuery.orEmpty().split("&").firstOrNull { it.startsWith("nonce=") }
+                        request.path to nonce
+                    }
+                }
             }
-            val bytes = response.toByteArray()
-            exchange.sendResponseHeaders(status, bytes.size.toLong())
-            exchange.responseBody.use { it.write(bytes) }
-        }
-        server.start()
+            thread(isDaemon = true, name = "mi-unlock-test-server") { requests.run() }
 
-        try {
             val client = MiUnlockClient(
-                host = "http://127.0.0.1:${server.address.port}",
+                host = "http://127.0.0.1:${server.localPort}",
                 ssecurity = "AAAAAAAAAAAAAAAAAAAAAA==",
                 serviceCookies = "",
                 userId = "test-account",
                 deviceId = "test-client"
             )
             assertEquals(true, client.checkClear("test-product").clearsData)
-            val result = org.junit.Assert.assertThrows(MiUnlockClient.BusinessException::class.java) {
+            val result = assertThrows(MiUnlockClient.BusinessException::class.java) {
                 client.requestUnlock("test-product", "test-device-token")
             }
             assertEquals(20036, result.code)
             assertEquals(168, result.waitHours)
+            val captured = requests.get(5, TimeUnit.SECONDS)
             assertEquals(
                 listOf(
                     "/api/v2/nonce", "/api/v2/unlock/device/clear",
                     "/api/v2/nonce", "/api/v2/unlock/device/clear",
                     "/api/v2/nonce", "/api/v3/ahaUnlock"
                 ),
-                requests.map { it.first }
+                captured.map { it.first }
             )
-            val firstClearNonce = requests[1].second
-            val retryClearNonce = requests[3].second
-            val unlockNonce = requests[5].second
+            val firstClearNonce = captured[1].second
+            val retryClearNonce = captured[3].second
+            val unlockNonce = captured[5].second
             listOf(firstClearNonce, retryClearNonce, unlockNonce).forEach { assertNotNull(it) }
             assertNotEquals(firstClearNonce, retryClearNonce)
             assertNotEquals(firstClearNonce, unlockNonce)
             assertNotEquals(retryClearNonce, unlockNonce)
-        } finally {
-            server.stop(0)
         }
     }
 }
