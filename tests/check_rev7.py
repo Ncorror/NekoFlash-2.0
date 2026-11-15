@@ -39,7 +39,7 @@ rev56_android_release_vm_blob = '1c2f535d8a4b99baf9e30df180e5e75e1dd2eb36'
 # races with the generic transport-shutdown cancellation path.
 rev57_sideload_verdict_vm_blob = '9029971de3792a2a4ef04760e29b20fa8c5f412b'
 # Mi Unlock diagnostics add connection-scoped error reporting to this exact blob.
-mi_unlock_diagnostics_vm_blob = 'e462394a1baa233cfae58297ab41526763a34216'
+mi_unlock_diagnostics_vm_blob = 'f408c6b03977b508de737183feaae869722a50bb'
 if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
     journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
     assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body

@@ -1075,7 +1075,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     /**
      * Полный процесс разблокировки загрузчика Xiaomi (официальный Mi Unlock).
      * Требует: устройство в fastboot + авторизованный Mi-аккаунт (auth).
-     * Шаги: чтение product+token с устройства → nonce → clear → ahaUnlock →
+     * Шаги: чтение product+token с устройства → nonce → clear → новый nonce → ahaUnlock →
      * staging encryptData + oem unlock.
      */
     fun runMiUnlock(
@@ -1122,11 +1122,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     deviceId = auth.deviceId
                 )
                 log("🌐 Mi Unlock transport: migate-auth + signed-query v3 (${BuildConfig.VERSION_NAME})")
-                log("🌐 Requesting nonce from the Mi server...")
-                val nonce = client.getNonce()
-
-                log("🌐 Checking device...")
-                val clearInfo = client.checkClear(product, nonce)
+                log("🌐 Requesting a nonce and checking whether unlock erases data...")
+                val clearInfo = client.checkClear(product)
                 if (clearInfo.notice.isNotEmpty()) log("ℹ️ ${clearInfo.notice}")
                 log(when (clearInfo.clearsData) {
                     true -> "⚠️ Unlocking WILL ERASE device data"
@@ -1134,8 +1131,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     null -> "⚠️ Xiaomi did not report whether unlocking will erase device data"
                 })
 
-                log("🌐 Requesting unlock from the Mi server...")
-                val encryptDataHex = client.requestUnlock(product, deviceToken, nonce)
+                log("🌐 Requesting a new nonce for the Xiaomi unlock request...")
+                val encryptDataHex = client.requestUnlock(product, deviceToken)
                 log("✅ Server returned unlock data")
 
                 val bytes = hexToBytes(encryptDataHex)

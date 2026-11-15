@@ -49,7 +49,7 @@
     "app/src/main/java/ru/forum/adbfastboottool/MiAccountClient.kt": "3c44abb55c0a3403c5ba4d4bf725350488af0919cbb16922cfeeccf9de843887",
     "app/src/main/java/ru/forum/adbfastboottool/MiAccountSecurityPolicy.kt": "674e70a132c5b914988f401ccdcb6ee4ebe978f84b7508bf97b6c96e5b58b3fa",
     "app/src/main/java/ru/forum/adbfastboottool/MiLoginActivity.kt": "37bba2db65529534fabf209eb966487a072842d30fdf9ade96315b7cdfa20975",
-    "app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt": "6d32d6987e0eeb2d9565ddceb8614aca36d2de671eedd7e9521241ffd63edaf6",
+    "app/src/main/java/ru/forum/adbfastboottool/MiUnlockClient.kt": "32887b4b793ebf5ceca483badb6cfe37f8084b17fbc69804e0c5342b6d2c9a03",
     "app/src/main/java/ru/forum/adbfastboottool/NativeTransferProgress.kt": "c56546d1cb415e44cf6d29f314ea96bc1d47ffeab6901feecac8b33625a7ddce",
     "app/src/main/java/ru/forum/adbfastboottool/NativeUsbfsBackend.kt": "5e7a53e18e4639a29d781cdc324a7a12c94ba8131240ff6f0c8bee4b0a9efc64",
     "app/src/main/java/ru/forum/adbfastboottool/OnboardingGate.kt": "6cc576e89ce409da1c45bae14832ccaf8eba1e83f5d88ce6b7ce67678112f088",
