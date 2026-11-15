@@ -176,6 +176,19 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val _transportSessionId = MutableLiveData<String?>(null)
     val transportSessionId: LiveData<String?> = _transportSessionId
 
+    internal data class MiUnlockRejection(
+        val accountId: String,
+        val zone: String,
+        val transportSessionId: String?,
+        val product: String,
+        val code: Int,
+        val serverText: String?,
+        val waitHours: Int?
+    )
+
+    private val _miUnlockRejection = MutableLiveData<MiUnlockRejection?>(null)
+    internal val miUnlockRejection: LiveData<MiUnlockRejection?> = _miUnlockRejection
+
     private val flashDraftLock = Any()
     private var flashDraftSnapshot: FlashOperationDraft =
         runCatching { recoveryStore.readDraft() }.getOrNull() ?: FlashOperationDraft()
@@ -1067,10 +1080,10 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
      */
     fun runMiUnlock(
         auth: MiAccountClient.AuthResult,
-        onClearInfo: (String, Boolean) -> Unit,
         onAuthExpired: () -> Unit = {}
     ) {
         startOperation(text(R.string.notif_fastboot_command), "Mi Unlock", heavy = true, requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT) {
+            _miUnlockRejection.postValue(null)
             val proto = fastbootProtocol
             if (proto?.isConnected != true) {
                 val message = "Device is not in Fastboot mode. Put it into Fastboot and connect it over OTG."
@@ -1086,6 +1099,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 failOperation(message)
             }
             log("📱 product: $product")
+            val transportSessionId = currentTransportSessionId()
 
             val serial = proto.currentDiagnostics()?.serialno?.trim()?.takeIf { it.isNotBlank() }
             val deviceToken = proto.readXiaomiUnlockToken()
@@ -1114,8 +1128,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 log("🌐 Checking device...")
                 val clearInfo = client.checkClear(product, nonce)
                 if (clearInfo.notice.isNotEmpty()) log("ℹ️ ${clearInfo.notice}")
-                log(if (clearInfo.clearsData) "⚠️ Unlocking WILL ERASE device data" else "ℹ️ Data will not be erased")
-                postMainThread { onClearInfo(clearInfo.notice, clearInfo.clearsData) }
+                log(when (clearInfo.clearsData) {
+                    true -> "⚠️ Unlocking WILL ERASE device data"
+                    false -> "ℹ️ Xiaomi reports that unlocking will not erase device data"
+                    null -> "⚠️ Xiaomi did not report whether unlocking will erase device data"
+                })
 
                 log("🌐 Requesting unlock from the Mi server...")
                 val encryptDataHex = client.requestUnlock(product, deviceToken, nonce)
@@ -1150,6 +1167,11 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             } catch (e: MiUnlockClient.BusinessException) {
                 val message = e.message ?: "Xiaomi code ${e.code}"
                 log("❌ Unlock error: $message")
+                e.waitHours?.let { log("ℹ️ Xiaomi waiting period: $it hours at the time of the response") }
+                _miUnlockRejection.postValue(
+                    MiUnlockRejection(auth.userId, auth.dataCenterZone, transportSessionId, product,
+                        e.code, e.serverText, e.waitHours)
+                )
                 if (e.code == 20045) {
                     log("💡 Code 20045: check dataCenterZone. Current zone: ${auth.dataCenterZone}; choose another zone manually and retry only after checking the account region.")
                 } else {

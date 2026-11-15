@@ -367,7 +367,13 @@ class MainActivity : AppCompatActivity() {
             updateSideloadSelectionUi()
             updateDeviceOverview()
         }
-        viewModel.transportSessionId.observe(this) { updateDeviceOverview() }
+        viewModel.transportSessionId.observe(this) {
+            updateDeviceOverview()
+            if (selectedWindow == "unlock") buildUnlockPage()
+        }
+        viewModel.miUnlockRejection.observe(this) {
+            if (selectedWindow == "unlock") buildUnlockPage()
+        }
 
         viewModel.operationActive.observe(this) { active ->
             val rawProgress = viewModel.operationProgress.value
@@ -2941,7 +2947,6 @@ class MainActivity : AppCompatActivity() {
         val screenRef = WeakReference(this)
         viewModel.runMiUnlock(
             auth = auth,
-            onClearInfo = { _, _ -> },
             onAuthExpired = {
                 val screen = screenRef.get()
                 if (screen == null || screen.isFinishing || screen.isDestroyed) return@runMiUnlock
@@ -2952,6 +2957,15 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(screen, screen.getString(R.string.mi_unlock_session_expired), Toast.LENGTH_LONG).show()
             }
         )
+    }
+
+    private fun miUnlockRejectionHint(code: Int): Int = when (code) {
+        20031 -> R.string.mi_unlock_hint_not_bound
+        20033 -> R.string.mi_unlock_hint_not_authorized
+        20036 -> R.string.mi_unlock_hint_wait
+        20045 -> R.string.mi_unlock_hint_region
+        30002 -> R.string.mi_unlock_hint_community
+        else -> R.string.mi_unlock_hint_other
     }
 
     private fun isBootloaderUnlocked(): Boolean =
@@ -3054,7 +3068,7 @@ class MainActivity : AppCompatActivity() {
             })
         } else {
             container.addView(card().apply {
-                addView(body(getString(R.string.mi_unlock_authorized, auth.userId), "#69C779"))
+                addView(body(getString(R.string.mi_unlock_signed_in, auth.userId), "#69C779"))
                 val advanced = LinearLayout(this@MainActivity).apply {
                     orientation = LinearLayout.VERTICAL
                     visibility = View.GONE
@@ -3120,6 +3134,22 @@ class MainActivity : AppCompatActivity() {
                     }
                 })
             })
+
+            val rejection = viewModel.miUnlockRejection.value
+            if (!unlocked && fastbootReady && rejection != null && rejection.transportSessionId != null &&
+                rejection.transportSessionId == viewModel.transportSessionId.value &&
+                rejection.accountId == auth.userId && rejection.zone == auth.dataCenterZone
+            ) {
+                container.addView(title(getString(R.string.mi_unlock_server_response), "#F2B766"))
+                container.addView(card().apply {
+                    addView(body(getString(R.string.mi_unlock_server_result, rejection.product, rejection.code), "#F2B766"))
+                    rejection.waitHours?.let {
+                        addView(body(getString(R.string.mi_unlock_server_wait_hours, it), "#F3F6FA"))
+                    }
+                    rejection.serverText?.let { addView(body(it)) }
+                    addView(body(getString(miUnlockRejectionHint(rejection.code)), "#F3F6FA"))
+                })
+            }
 
             container.addView(title(getString(R.string.mi_unlock_bootloader_section), if (unlocked) "#69C779" else "#E9782B"))
             container.addView(card().apply {

@@ -44,6 +44,20 @@ class MiUnlockClient(
         private const val MAX_ERROR_BODY_LOG = 300
         private const val SAFE_READ_MAX_ATTEMPTS = 3
         private val SAFE_READ_RETRY_DELAYS_MS = longArrayOf(400L, 1_200L)
+
+        internal fun parseClearInfo(response: JSONObject): ClearInfo =
+            ClearInfo(
+                notice = response.optString("notice", ""),
+                clearsData = when (response.opt("cleanOrNot")?.toString()) {
+                    "0" -> false
+                    "1" -> true
+                    else -> null
+                }
+            )
+
+        internal fun parseWaitHours(response: JSONObject): Int? =
+            (response.optJSONObject("data")?.opt("waitHour") ?: response.opt("data"))
+                ?.toString()?.trim()?.toIntOrNull()?.takeIf { it >= 0 }
     }
 
     /** Шаг 1: получить nonce от сервера. */
@@ -61,7 +75,7 @@ class MiUnlockClient(
     }
 
     /** Шаг 2: проверка устройства (чистятся ли данные при разблокировке). */
-    data class ClearInfo(val notice: String, val clearsData: Boolean)
+    data class ClearInfo(val notice: String, val clearsData: Boolean?)
 
     fun checkClear(product: String, nonce: String): ClearInfo {
         val resp = sendReadWithRetry("/api/v2/unlock/device/clear") {
@@ -74,9 +88,7 @@ class MiUnlockClient(
                 )
             )
         }
-        val notice = resp.optString("notice", "")
-        val clean = resp.optInt("cleanOrNot", -1)
-        return ClearInfo(notice, clean == 1)
+        return parseClearInfo(resp)
     }
 
     /**
@@ -108,7 +120,8 @@ class MiUnlockClient(
 
         val code = resp.optInt("code", -1)
         if (code != 0) {
-            throw BusinessException(code, describeXiaomiJson(resp))
+            val waitHours = if (code == 20036) parseWaitHours(resp) else null
+            throw BusinessException(code, describeXiaomiJson(resp), xiaomiServerText(resp), waitHours)
         }
         return resp.optString("encryptData", "").also {
             if (it.isEmpty()) throw IOException("encryptData empty in server response")
@@ -244,7 +257,9 @@ class MiUnlockClient(
 
     class BusinessException(
         val code: Int,
-        message: String
+        message: String,
+        val serverText: String?,
+        val waitHours: Int?
     ) : IOException(message)
 
     private class HttpStatusException(
@@ -342,16 +357,7 @@ class MiUnlockClient(
     /** Человекочитаемая причина на основе фактического JSON ответа Xiaomi. */
     private fun describeXiaomiJson(json: JSONObject): String {
         val code = if (json.has("code")) json.optInt("code", Int.MIN_VALUE) else Int.MIN_VALUE
-        val serverText = sequenceOf(
-            "descEN",
-            "descEng",
-            "desc",
-            "description",
-            "message",
-            "error"
-        ).map { json.optString(it, "").trim() }
-            .firstOrNull { it.isNotEmpty() }
-            .orEmpty()
+        val serverText = xiaomiServerText(json).orEmpty()
 
         val fallback = when (code) {
             10000 -> "invalid deviceToken or product"
@@ -385,6 +391,12 @@ class MiUnlockClient(
                 "Xiaomi: ${json.toString()}"
         }
     }
+
+    private fun xiaomiServerText(json: JSONObject): String? =
+        sequenceOf("descEN", "descEng", "desc", "description", "message", "error")
+            .mapNotNull { json.opt(it) as? String }
+            .map(String::trim)
+            .firstOrNull { it.isNotEmpty() }
 
     private fun cookieNames(cookieHeader: String): String =
         cookieHeader.split(";")

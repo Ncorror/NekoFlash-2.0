@@ -316,7 +316,16 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_unlock_sign_in_hint">Sign in to continue with Xiaomi authorization.</string>
     <string name="mi_unlock_exchange_loading">Checking Xiaomi authorization…</string>
     <string name="mi_unlock_exchange_failed">Could not complete Xiaomi authorization. Please sign in again.</string>
-    <string name="mi_unlock_authorized">✅ Authorized · ID %1$s</string>
+    <string name="mi_unlock_signed_in">✅ Signed in to Mi Account · ID %1$s</string>
+    <string name="mi_unlock_server_response">LAST XIAOMI RESPONSE</string>
+    <string name="mi_unlock_server_result">%1$s · Xiaomi code %2$d</string>
+    <string name="mi_unlock_server_wait_hours">Hours remaining when Xiaomi replied: %1$d</string>
+    <string name="mi_unlock_hint_not_bound">On the target phone, open Developer options → Mi Unlock status and check that the device is linked to the same Mi Account.</string>
+    <string name="mi_unlock_hint_not_authorized">Xiaomi declined the unlock request for this account. Check the server message and your account’s unlock eligibility.</string>
+    <string name="mi_unlock_hint_wait">Wait for the period set by Xiaomi, then try again. Linking the account again can restart the waiting period.</string>
+    <string name="mi_unlock_hint_region">Check the account and device regions, then review the Xiaomi data center in Advanced options.</string>
+    <string name="mi_unlock_hint_community">On HyperOS, check your unlock permission in Xiaomi Community. On the target phone, check the account link under Mi Unlock status.</string>
+    <string name="mi_unlock_hint_other">Open the operation log for more details from Xiaomi.</string>
     <string name="mi_unlock_region_zone">Region: %1$s · dataCenterZone: %2$s (%3$s)</string>
     <string name="mi_unlock_zone_title">Xiaomi data center</string>
     <string name="mi_unlock_sign_out_switch">Sign out of Mi Account?</string>

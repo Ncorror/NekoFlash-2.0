@@ -320,7 +320,16 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="mi_unlock_sign_in_hint">Войдите в аккаунт для авторизации Xiaomi.</string>
     <string name="mi_unlock_exchange_loading">Проверяем авторизацию Xiaomi…</string>
     <string name="mi_unlock_exchange_failed">Не удалось завершить авторизацию Xiaomi. Войди ещё раз.</string>
-    <string name="mi_unlock_authorized">✅ Авторизовано · ID %1$s</string>
+    <string name="mi_unlock_signed_in">✅ Вход в Mi-аккаунт выполнен · ID %1$s</string>
+    <string name="mi_unlock_server_response">ПОСЛЕДНИЙ ОТВЕТ XIAOMI</string>
+    <string name="mi_unlock_server_result">%1$s · код Xiaomi %2$d</string>
+    <string name="mi_unlock_server_wait_hours">Часов ожидания на момент ответа Xiaomi: %1$d</string>
+    <string name="mi_unlock_hint_not_bound">На целевом телефоне откройте «Для разработчиков → Статус Mi Unlock» и проверьте, что устройство привязано к тому же Mi-аккаунту.</string>
+    <string name="mi_unlock_hint_not_authorized">Xiaomi отклонила запрос для этого аккаунта. Проверьте сообщение сервера и доступность разблокировки для аккаунта.</string>
+    <string name="mi_unlock_hint_wait">Дождитесь окончания срока, заданного Xiaomi, и повторите попытку. Повторная привязка аккаунта может начать отсчёт заново.</string>
+    <string name="mi_unlock_hint_region">Проверьте регион аккаунта и устройства, затем проверьте выбранный центр обработки данных Xiaomi в дополнительных настройках.</string>
+    <string name="mi_unlock_hint_community">На HyperOS проверьте разрешение в Xiaomi Community. На целевом телефоне проверьте привязку аккаунта в разделе «Статус Mi Unlock».</string>
+    <string name="mi_unlock_hint_other">Подробности ответа Xiaomi доступны в журнале операции.</string>
     <string name="mi_unlock_region_zone">Регион: %1$s · dataCenterZone: %2$s (%3$s)</string>
     <string name="mi_unlock_zone_title">Центр обработки данных Xiaomi</string>
     <string name="mi_unlock_sign_out_switch">Выйти из Mi-аккаунта?</string>
