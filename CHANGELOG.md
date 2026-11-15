@@ -6,6 +6,14 @@
 
 </div>
 
+## 6.0.0-alpha13 — 15 November 2026
+
+Xiaomi Unlock hotfix, versionCode `236`.
+
+- Request a fresh Xiaomi nonce for the data-wipe check and the unlock request. Retried checks also obtain a fresh nonce, while the unlock request is sent once.
+- Show the last Xiaomi response, remaining waiting hours when supplied, and localized next steps on the Unlock screen. Report an unknown wipe status when Xiaomi does not supply a wipe flag.
+- On POCO F5 (`marble`), tester Mik confirmed that the previous `10005` response was replaced by Xiaomi’s `20036` response with 164 hours of waiting. Full device-side unlock verification is pending until the waiting period ends.
+
 ## 6.0.0-alpha12 — 14 November 2026
 
 Maintenance release, versionCode `235`, carrying the completed post-release audit and Settings updates. Hardware qualification remains the alpha11 evidence; this release does not claim another physical-device test campaign.
