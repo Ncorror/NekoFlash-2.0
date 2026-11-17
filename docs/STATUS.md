@@ -32,6 +32,14 @@ PRs #97–#99 (audit, Settings community links and vector brand icons) and PR #1
 - **Next step:** check Search Console's discovered-page and indexing reports after Google processes the updated sitemap. Prepared 4PDA/Telegram promotion remains a separate action; no forum post or group message was sent during publication.
 - [4PDA BBCode draft](4PDA_POST_RU.bbcode) requests volunteer verification of actual Xiaomi bootloader unlocking. NekoFlash previously unlocked POCO X3 Pro, POCO F5 and POCO X7 Pro (maintainer-confirmed history). On a locked POCO F5, Xiaomi returned `20036` with 164 hours remaining. A full on-device unlock test is pending the end of that period.
 
+## Mi Unlock result handling — 17 November 2026
+
+The next build completes Mi Unlock on the final OKAY response to oem unlock, after the unlock payload has been accepted. That terminal receipt is persisted before cleanup; a subsequent USB detach or service shutdown cannot replace it with cancellation. The user can let the phone erase data and boot Android without returning to Fastboot for the normal success path.
+
+An absent final response remains unconfirmed; an explicit FAIL keeps the complete device reason and stage. Xiaomi response codes/text, server-provided waiting hours (including 20036), region guidance and session-expiration handling are retained. The optional later Fastboot check is only for unresolved/legacy attempts, is bound to device identity, and cannot overwrite another task's GUI result. The unlock request and device command are never automatically replayed.
+
+This is an implementation change with automated regression coverage, not a new hardware unlock qualification. The published Alpha13 APK remains unchanged until the next release; the POCO F5 end-to-end test is still pending Xiaomi's waiting period.
+
 ## Hardware disposition
 
 | Area | Result |

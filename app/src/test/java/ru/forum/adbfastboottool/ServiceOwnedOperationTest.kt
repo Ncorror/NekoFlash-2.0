@@ -122,6 +122,17 @@ class ServiceOwnedOperationTest {
         assertTrue(operation.serviceLost)
     }
 
+    @Test fun terminalReceiptCannotBeSetBeforeAdmissionOrAfterCompletion() = runBlocking {
+        lateinit var operation: ServiceOwnedOperation
+        operation = task { assertTrue(operation.confirmSuccess("device confirmed")) }
+        assertFalse(operation.confirmSuccess("premature"))
+        operation.acknowledgeForeground()
+        withTimeout(5000) { operation.finished.await() }
+        assertEquals("device confirmed", operation.confirmedSuccessMessage)
+        assertFalse(operation.confirmSuccess("late or unrelated callback"))
+        assertEquals("device confirmed", operation.confirmedSuccessMessage)
+    }
+
     @Test fun registryRejectsOverlapAndIgnoresStaleCompletionTokens() = runBlocking {
         val registry = ServiceOperationRegistry()
         val first = task("one")

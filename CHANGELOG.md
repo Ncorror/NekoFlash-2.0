@@ -6,6 +6,12 @@
 
 </div>
 
+## Unreleased
+
+- Complete Mi Unlock when the bootloader returns the final successful response to oem unlock. Persist that result before USB cleanup so the device can wipe/reboot into Android without a mandatory return to Fastboot.
+- Keep a lost final unlock response unconfirmed, preserve the exact device FAIL reason and stage, and retain Xiaomi rejection codes/text, supplied waiting hours and account/session diagnostics.
+- Prevent optional late unlock verification from overwriting a newer task result. No automatic unlock retry or reboot is added.
+
 ## 6.0.0-alpha13 — 15 November 2026
 
 Xiaomi Unlock hotfix, versionCode `236`.

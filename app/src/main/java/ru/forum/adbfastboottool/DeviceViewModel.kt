@@ -60,7 +60,9 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private class OperationAbort(val outcome: OperationOutcome) :
         RuntimeException(null, null, false, false)
 
-    private class OperationContext {
+    private class OperationContext(private val recordConfirmedSuccess: (String) -> Unit) {
+        fun confirmSuccess(message: String) = recordConfirmedSuccess(message)
+
         fun failOperation(message: String): Nothing =
             throw OperationAbort(OperationOutcome.Failed(message))
 
@@ -1138,22 +1140,25 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 val bytes = hexToBytes(encryptDataHex)
                 val file = File(getApplication<Application>().filesDir, "encryptData")
                 file.outputStream().use { it.write(bytes) }
-                val accepted = try {
-                    proto.stageAndOemUnlock(file)
+                val result = try {
+                    proto.stageAndOemUnlockDetailed(file) {
+                        confirmSuccess(text(R.string.mi_unlock_success_detail))
+                    }
                 } finally {
                     runCatching { file.delete() }
                 }
 
-                if (!accepted) {
-                    val message = "Unlock failed at the device stage"
-                    log("❌ $message")
-                    failOperation(message)
+                when (result) {
+                    MiUnlockDeviceOperation.Result.Confirmed -> Unit
+                    is MiUnlockDeviceOperation.Result.Failed ->
+                        failOperation(text(R.string.mi_unlock_device_failed, result.stage.name, result.reason))
+                    is MiUnlockDeviceOperation.Result.Unconfirmed -> {
+                        // Optional later Fastboot evidence may resolve a lost reply. A received
+                        // final OKAY never creates this marker or requires another Fastboot boot.
+                        persistPendingUnlockVerification(product, serial)
+                        verificationPending(text(R.string.mi_unlock_result_unconfirmed, result.reason))
+                    }
                 }
-
-                persistPendingUnlockVerification(product, serial)
-                log("✅ The oem unlock command was accepted by the device.")
-                log("🔎 Final success will be confirmed only after a new Fastboot connection and getvar:unlocked=yes.")
-                verificationPending("Unlock command accepted. Waiting for reconnect to verify unlocked=yes.")
             } catch (abort: OperationAbort) {
                 throw abort
             } catch (e: MiUnlockClient.SessionExpiredException) {
@@ -2094,6 +2099,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 clearPendingUnlockVerification()
                 val message = "${pending.operationLabel} confirmed by device: getvar:unlocked=$expectedText"
                 log("🎉 $message")
+                val current = operationProgressSnapshot
+                if (activeServiceOperation != null || _operationActive.value == true ||
+                    current?.title != pending.operationLabel || current?.outcome != OperationOutcomeKind.VERIFY_PENDING) {
+                    logFileOnly("Unlock verification kept in diagnostics; another operation owns the GUI result.")
+                    return
+                }
                 postOperationProgress(
                     OperationProgress(
                         title = pending.operationLabel,
@@ -2111,6 +2122,12 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 val actualText = if (actualUnlocked) "yes" else "no"
                 val message = "${pending.operationLabel} not confirmed: device reports getvar:unlocked=$actualText, expected $expectedText"
                 log("❌ $message")
+                val current = operationProgressSnapshot
+                if (activeServiceOperation != null || _operationActive.value == true ||
+                    current?.title != pending.operationLabel || current?.outcome != OperationOutcomeKind.VERIFY_PENDING) {
+                    logFileOnly("Unlock verification kept in diagnostics; another operation owns the GUI result.")
+                    return
+                }
                 postOperationProgress(
                     OperationProgress(
                         title = pending.operationLabel,
@@ -2226,7 +2243,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             sideloadGuiAttemptId = null
             val pending = PersistedOperation(id, title, text, System.currentTimeMillis(), -1, PersistedOperationPhase.PREPARING)
             val result = AtomicReference<OperationOutcome>(OperationOutcome.Success)
-            val task = ServiceOwnedOperation(
+            lateinit var task: ServiceOwnedOperation
+            task = ServiceOwnedOperation(
                 id, title, text, heavy,
                 cancelTransport = {
                     synchronized(operationLaunchLock) {
@@ -2240,7 +2258,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     finishServiceOperation(completed, gen, result.get(), cause)
                 }
             ) {
-                val context = OperationContext()
+                val context = OperationContext { message -> confirmOperationSuccess(task, message) }
                 try {
                     // This body can start only after the service acknowledges startForeground.
                     synchronized(checkpointLock) {
@@ -2292,6 +2310,18 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
+    /** Persist the received terminal result before transport shutdown can cancel the Job. */
+    internal fun confirmOperationSuccess(task: ServiceOwnedOperation, message: String) {
+        check(task.confirmSuccess(message)) { "Operation cannot accept a terminal success receipt" }
+        synchronized(checkpointLock) {
+            val current = persistedOperation?.takeIf { it.id == task.id } ?: return
+            val confirmed = current.copy(detail = message, percent = 100, phase = PersistedOperationPhase.SUCCESS)
+            persistedOperation = confirmed
+            runCatching { recoveryStore.writeOperation(confirmed) }
+                .onFailure { logFileOnly("Confirmed operation checkpoint failed: ${it.message}") }
+        }
+    }
+
     private fun finishServiceOperation(
         task: ServiceOwnedOperation,
         generation: Long,
@@ -2305,6 +2335,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
             }
             val outcome = when {
                 task.startupFailure != null -> OperationOutcome.Failed(requireNotNull(task.startupFailure))
+                // A real terminal response outranks a later detach/cancel/service cleanup.
+                task.confirmedSuccessMessage != null -> OperationOutcome.Success
                 task.serviceLost -> OperationOutcome.Interrupted(text(R.string.rev20_service_lost))
                 // A Recovery-triggered USB detach can cancel this job after the
                 // near-complete stream closure was observed. Keep VERIFY_PENDING,
@@ -2322,7 +2354,8 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 is OperationOutcome.Interrupted -> OperationOutcomeKind.INTERRUPTED
             }
             val message = when (outcome) {
-                OperationOutcome.Success -> if (task.tracksProgress) operationProgressSnapshot?.detail.orEmpty() else text(R.string.layout_operation_center_completed)
+                OperationOutcome.Success -> task.confirmedSuccessMessage
+                    ?: if (task.tracksProgress) operationProgressSnapshot?.detail.orEmpty() else text(R.string.layout_operation_center_completed)
                 is OperationOutcome.Failed -> outcome.message
                 is OperationOutcome.Cancelled -> outcome.message
                 is OperationOutcome.VerifyPending -> outcome.message

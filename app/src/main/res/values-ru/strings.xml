@@ -584,4 +584,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="operation_hint_cancelled">Операция отменена. Уже записанные изменения не откатываются — перед продолжением проверь устройство.</string>
     <string name="operation_hint_failed">Перед повтором проверь подробности и состояние устройства. Журналы доступны ниже.</string>
     <string name="operation_hint_interrupted">Операция прервалась. Перед повтором проверь устройство и журналы.</string>
+    <string name="mi_unlock_success_detail">Загрузчик подтвердил команду разблокировки. Дождись завершения очистки данных, если она выполняется, и запуска устройства. Возвращаться в Fastboot не нужно.</string>
+    <string name="mi_unlock_device_failed">Mi Unlock, этап на устройстве %1$s: %2$s</string>
+    <string name="mi_unlock_result_unconfirmed">Результат разблокировки не подтверждён: %1$s. Проверь устройство после запуска; не повторяй разблокировку автоматически.</string>
 </resources>

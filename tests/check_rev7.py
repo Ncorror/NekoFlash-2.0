@@ -40,22 +40,24 @@ rev56_android_release_vm_blob = '1c2f535d8a4b99baf9e30df180e5e75e1dd2eb36'
 rev57_sideload_verdict_vm_blob = '9029971de3792a2a4ef04760e29b20fa8c5f412b'
 # Mi Unlock diagnostics add connection-scoped error reporting to this exact blob.
 mi_unlock_diagnostics_vm_blob = 'f408c6b03977b508de737183feaae869722a50bb'
-if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
+# Mi Unlock terminal OKAY receipt; durable success before USB detach, exact reviewed snapshot.
+mi_unlock_terminal_vm_blob = '50d14ede8d84159c93835ee82d29a9b930869ca2'
+if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob):
     journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
     assert 'appendCompactMessageLocked(message, declaredLevel)' in journal_body
     assert 'if (duplicate)' not in journal_body
     assert 'recordDuplicateSuppressed()' not in journal_body
-    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
+    if git_blob_sha(raw_vm) in (rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob):
         admission = vm.split('private fun startOperation(')[1].split('val gen = operationGeneration.incrementAndGet()')[0]
         assert 'UsbOperationAdmission.allowed(' in admission
         assert 'FlashOperationService.submit' not in admission
         assert 'No connected ADB/Fastboot device' in admission
         assert 'requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT' in vm
-        if git_blob_sha(raw_vm) in (rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
+        if git_blob_sha(raw_vm) in (rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob):
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT') == 12
             assert vm.count('requiredTransport = UsbOperationAdmission.RequiredTransport.ADB') == 7
             assert vm.count('startOperation(') == 20  # 19 call sites and the function declaration
-    if git_blob_sha(raw_vm) in (rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
+    if git_blob_sha(raw_vm) in (rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob):
         policy_path = root/'app/src/main/java/ru/forum/adbfastboottool/SideloadRecoveryTransitionPolicy.kt'
         policy = policy_path.read_text()
         # Ensure the reviewed recovery switch cannot be promoted into a false
@@ -68,13 +70,13 @@ if git_blob_sha(raw_vm) in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev
         assert 'before.productName.equals(after.productName, true)' in policy
         assert 'transferFinished' in policy
         assert 'fun sideloadZip(' in (root/'app/src/main/java/ru/forum/adbfastboottool/AdbProtocol.kt').read_text()
-    if git_blob_sha(raw_vm) in (rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
+    if git_blob_sha(raw_vm) in (rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob):
         assert vm.count('proto.captureShellCommand("getprop ro.build.version.release")') == 1
         assert 'proto.peerMode == AdbProtocol.PeerMode.DEVICE' in vm
         assert 'generation == connectionGeneration.get()' in vm
         assert vm.count('_adbAndroidRelease.postValue(null)') >= 3
         assert '_adbAndroidRelease.postValue(release)' in vm
-    if git_blob_sha(raw_vm) in (rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob):
+    if git_blob_sha(raw_vm) in (rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob):
         finish = vm.split('private fun finishServiceOperation(')[1].split('private fun releaseOperationWakeLock(')[0]
         assert 'reported is OperationOutcome.VerifyPending -> reported' in finish
         assert finish.index('reported is OperationOutcome.VerifyPending -> reported') < finish.index('cause is CancellationException')

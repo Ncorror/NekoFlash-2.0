@@ -15,7 +15,8 @@ assert 'toLongOrNull(16)' in policy
 assert 'Verdict.Mismatch' in policy and 'Verdict.Invalid' in policy
 assert 'markSessionBroken("Invalid Fastboot DATA acknowledgement' in protocol
 assert 'markSessionBroken(' in protocol
-assert protocol.count('verifyDownloadDataReply(downloadPacket.payload, ') == 3
+assert protocol.count('verifyDownloadDataReply(downloadPacket.payload, ') == 2
+assert protocol.count('verifyDownloadDataReply(reply, expectedBytes)') == 1
 
 flash = protocol.split("private fun flashPartitionDetailedInternal(")[1]
 assert 'verifyDownloadDataReply(downloadPacket.payload, imageSize)' in flash.split('transferDownloadPayload(')[0]
@@ -23,9 +24,10 @@ assert 'verifyDownloadDataReply(downloadPacket.payload, imageSize)' in flash.spl
 download = protocol.split("fun downloadAndRun(file: File, commandAfterDownload: String)")[1]
 assert 'verifyDownloadDataReply(downloadPacket.payload, file.length())' in download.split('transferDownloadPayload(')[0]
 
-unlock = protocol.split("fun stageAndOemUnlock(encryptDataFile: File)")[1]
-assert 'FastbootDownloadSizePolicy.validate(' in unlock.split('writeCommand("download:')[0]
-assert 'verifyDownloadDataReply(downloadPacket.payload, unlockBytes)' in unlock.split('transferDownloadPayload(')[0]
-
-assert (root / "app/src/test/java/ru/forum/adbfastboottool/FastbootDataReplyPolicyTest.kt").is_file()
+unlock = (java/'MiUnlockDeviceOperation.kt').read_text()
+assert 'FastbootDownloadSizePolicy.validate(' in unlock.split('port.write("download:')[0]
+assert 'port.acceptDataSize(ready.payload, bytes)' in unlock.split('port.transfer(file)')[0]
+assert 'onConfirmed()' in unlock.split('"OKAY" ->')[1]
+assert (root/'app/src/test/java/ru/forum/adbfastboottool/MiUnlockDeviceOperationTest.kt').is_file()
+assert (root / 'app/src/test/java/ru/forum/adbfastboottool/FastbootDataReplyPolicyTest.kt').is_file()
 print("PASS REV17: strict DATA length/hex validation, three flows guarded before USB payload")

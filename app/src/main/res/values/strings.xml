@@ -578,4 +578,7 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="operation_hint_cancelled">The operation was cancelled. Changes already written are not rolled back; check the device before continuing.</string>
     <string name="operation_hint_failed">Review the details and device state before retrying. The logs are available below.</string>
     <string name="operation_hint_interrupted">The operation was interrupted. Check the device and logs before retrying.</string>
+    <string name="mi_unlock_success_detail">The bootloader confirmed the unlock command. Wait for the device to finish any data wipe and start. Returning to Fastboot is not required.</string>
+    <string name="mi_unlock_device_failed">Mi Unlock device stage %1$s: %2$s</string>
+    <string name="mi_unlock_result_unconfirmed">The unlock result is not confirmed: %1$s. Check the device after it starts; do not repeat the unlock automatically.</string>
 </resources>

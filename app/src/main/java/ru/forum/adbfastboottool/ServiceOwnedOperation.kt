@@ -27,6 +27,17 @@ internal class ServiceOwnedOperation(
     @Volatile var serviceLost: Boolean = false
         private set
 
+    @Volatile var confirmedSuccessMessage: String? = null
+        private set
+
+    /** Only the operation body may record a received terminal success, even during USB cleanup. */
+    fun confirmSuccess(message: String): Boolean = synchronized(admissionLock) {
+        require(message.isNotBlank())
+        if (!admitted || startupFailure != null || job.isCompleted) return false
+        if (confirmedSuccessMessage == null) confirmedSuccessMessage = message
+        confirmedSuccessMessage == message
+    }
+
     val finished = CompletableDeferred<Unit>()
     val job: Job = CoroutineScope(dispatcher).launch(start = CoroutineStart.LAZY, block = execute)
 

@@ -56,6 +56,83 @@ class MiUnlockResponseTest {
         }
     }
 
+    private fun withUnlockReply(reply: String, status: String = "200 OK", check: (MiUnlockClient) -> Unit) {
+        ServerSocket().use { server ->
+            server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0))
+            server.soTimeout = 5_000
+            val requests = FutureTask {
+                List(2) {
+                    server.accept().use { socket ->
+                        socket.soTimeout = 5_000
+                        val input = socket.getInputStream().bufferedReader(Charsets.US_ASCII)
+                        val request = URI.create(input.readLine().split(" ")[1])
+                        while (!input.readLine().isNullOrEmpty()) { /* Consume headers. */ }
+                        val nonce = request.path == "/api/v2/nonce"
+                        val body = (if (nonce) """{"nonce":"single-use-nonce"}""" else reply).toByteArray()
+                        val httpStatus = if (nonce) "200 OK" else status
+                        socket.getOutputStream().apply {
+                            write(("HTTP/1.1 $httpStatus\r\nContent-Length: ${body.size}\r\n" +
+                                "Content-Type: application/json\r\nConnection: close\r\n\r\n")
+                                .toByteArray(Charsets.US_ASCII))
+                            write(body)
+                        }
+                        request.path
+                    }
+                }
+            }
+            thread(isDaemon = true, name = "mi-unlock-response-test") { requests.run() }
+            check(MiUnlockClient("http://127.0.0.1:${server.localPort}",
+                "AAAAAAAAAAAAAAAAAAAAAA==", "", "test-account", "test-client"))
+            assertEquals(listOf("/api/v2/nonce", "/api/v3/ahaUnlock"), requests.get(5, TimeUnit.SECONDS))
+        }
+    }
+
+    @Test fun businessRefusalPreservesCodeExactServerTextAndWaitingHours() {
+        withUnlockReply("""{"code":20036,"descEN":"Please unlock 164 hours later","data":{"waitHour":164}}""") { client ->
+            val error = assertThrows(MiUnlockClient.BusinessException::class.java) {
+                client.requestUnlock("marble", "test-token")
+            }
+            assertEquals(20036, error.code)
+            assertEquals(164, error.waitHours)
+            assertEquals("Please unlock 164 hours later", error.serverText)
+            org.junit.Assert.assertTrue(error.message!!.contains("Please unlock 164 hours later"))
+        }
+    }
+
+    @Test fun regionBindingAndUnknownRefusalsRetainTheServerReason() {
+        for ((code, text) in listOf(20045 to "Region mismatch", 20031 to "Bind this account to the device",
+            29999 to "Future Xiaomi reason, unchanged")) {
+            withUnlockReply(JSONObject().put("code", code).put("message", text).toString()) { client ->
+                val error = assertThrows(MiUnlockClient.BusinessException::class.java) {
+                    client.requestUnlock("marble", "test-token")
+                }
+                assertEquals(code, error.code)
+                assertEquals(text, error.serverText)
+                assertNull(error.waitHours)
+                org.junit.Assert.assertTrue(error.message!!.contains(text))
+            }
+        }
+    }
+
+    @Test fun expiredSessionRetainsHttpStatusAndDoesNotReplayUnlock() {
+        withUnlockReply("""{"message":"Session revoked"}""", "401 Unauthorized") { client ->
+            val error = assertThrows(MiUnlockClient.SessionExpiredException::class.java) {
+                client.requestUnlock("marble", "test-token")
+            }
+            org.junit.Assert.assertTrue(error.message!!.contains("HTTP 401"))
+            org.junit.Assert.assertTrue(error.message!!.contains("Session revoked"))
+        }
+    }
+
+    @Test fun serverSuccessWithoutUnlockDataIsAnError() {
+        withUnlockReply("""{"code":0}""") { client ->
+            val error = assertThrows(java.io.IOException::class.java) {
+                client.requestUnlock("marble", "test-token")
+            }
+            org.junit.Assert.assertTrue(error.message!!.contains("encryptData empty"))
+        }
+    }
+
     @Test
     fun clearRetryAndUnlockEachUseTheirOwnNonce() {
         ServerSocket().use { server ->

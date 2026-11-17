@@ -1318,62 +1318,39 @@ class FastbootProtocol(
      * API) в download-буфер устройства, затем выполняет oem unlock.
      * Это финальный шаг официального протокола Mi Unlock.
      */
-    fun stageAndOemUnlock(encryptDataFile: File): Boolean = transactionLock.withLock {
-        if (!isConnected) {
-            onLog("❌ No connection to device")
-            return false
-        }
-        if (!encryptDataFile.exists() || !encryptDataFile.isFile || encryptDataFile.length() <= 0L) {
-            onLog("❌ ERROR: unlock file is unavailable or empty")
-            return false
-        }
+    fun stageAndOemUnlock(encryptDataFile: File): Boolean =
+        stageAndOemUnlockDetailed(encryptDataFile) {} == MiUnlockDeviceOperation.Result.Confirmed
 
-        val unlockBytes = encryptDataFile.length()
-        val sizeRejection = FastbootDownloadSizePolicy.validate(
-            unlockBytes, effectiveMaxDownloadSizeBytes()
-        )
-        if (sizeRejection != null) {
-            onLog("❌ ERROR: unlock data size rejected before Fastboot download: ${sizeRejection.reason} (${unlockBytes} bytes)")
-            return false
-        }
-
-        onLog("🔓 Staging unlock data ($unlockBytes bytes)...")
-        val hexSize = String.format("%08x", unlockBytes)
-        if (!writeCommand("download:$hexSize", 5000)) {
-            onLog("❌ ERROR: download command failed for unlock")
-            return false
-        }
-        val downloadPacket = readUntilDataOrFinal(10000) ?: return false
-        when (downloadPacket.type) {
-            "DATA" -> {
-                if (!verifyDownloadDataReply(downloadPacket.payload, unlockBytes)) return false
-                onLog("Bootloader is ready to receive unlock data")
+    internal fun stageAndOemUnlockDetailed(
+        encryptDataFile: File,
+        onConfirmed: () -> Unit
+    ): MiUnlockDeviceOperation.Result = transactionLock.withLock {
+        val port = object : MiUnlockDeviceOperation.Port {
+            override fun connected() = isConnected
+            override fun downloadLimitBytes() = effectiveMaxDownloadSizeBytes()
+            override fun write(command: String, timeoutMs: Int) = writeCommand(command, timeoutMs)
+            override fun readDataOrFinal(timeoutMs: Int) =
+                readUntilDataOrFinal(timeoutMs)?.let { MiUnlockDeviceOperation.Reply(it.type, it.payload, it.raw) }
+            override fun acceptDataSize(reply: String, expectedBytes: Long) =
+                verifyDownloadDataReply(reply, expectedBytes)
+            override fun transfer(file: File): Boolean {
+                if (!transferDownloadPayload(file, "unlock data").success) return false
+                sessionState = SessionState.AWAITING_DATA_FINAL
+                return true
             }
-            "FAIL" -> { logFastbootFailure("Bootloader rejected download", downloadPacket.payload); return false }
-            else   -> { onLog("❌ ERROR: expected DATA, got ${downloadPacket.raw}"); return false }
+            override fun readFinal(timeoutMs: Int) =
+                readUntilFinal(timeoutMs)?.let { MiUnlockDeviceOperation.Reply(it.type, it.payload, it.raw) }
         }
-        if (!transferDownloadPayload(encryptDataFile, "unlock data").success) return false
-        sessionState = SessionState.AWAITING_DATA_FINAL
-
-        val downloadDone = readUntilFinal(30000) ?: return false
-        if (downloadDone.type != "OKAY") {
-            onLog("❌ ERROR: unlock download was not confirmed: ${downloadDone.raw}")
-            return false
+        val result = MiUnlockDeviceOperation.run(port, encryptDataFile, onConfirmed)
+        when (result) {
+            MiUnlockDeviceOperation.Result.Confirmed ->
+                onLog("✅ Bootloader confirmed successful execution of oem unlock.")
+            is MiUnlockDeviceOperation.Result.Failed ->
+                logFastbootFailure("Mi Unlock ${result.stage}", result.reason)
+            is MiUnlockDeviceOperation.Result.Unconfirmed ->
+                onLog("⚠️ Mi Unlock ${result.stage}: ${result.reason}")
         }
-
-        onLog("🔓 Running fastboot oem unlock...")
-        if (!writeCommand("oem unlock", 10000)) {
-            onLog("❌ ERROR: failed to send oem unlock")
-            return false
-        }
-        val unlockDone = readUntilFinal(30000) ?: return false
-        return if (unlockDone.type == "OKAY") {
-            onLog("✅ Bootloader unlocked successfully!")
-            true
-        } else {
-            logFastbootFailure("oem unlock rejected", unlockDone.payload)
-            false
-        }
+        result
     }
 
     // Fix B: after a DATA wedge the onyx OUT endpoint stays stuck and a plain re-handshake
