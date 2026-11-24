@@ -54,11 +54,6 @@ internal class PtyInputEditText @JvmOverloads constructor(
     private fun emitText(text: CharSequence?): Boolean =
         emit(text?.toString().orEmpty().toByteArray(StandardCharsets.UTF_8))
 
-    private fun emitDelete(count: Int): Boolean {
-        if (count <= 0) return true
-        return emit(ByteArray(count) { PtyInputDelta.DEL.toByte() })
-    }
-
     override fun onCreateInputConnection(outAttrs: EditorInfo): InputConnection? {
         val base = super.onCreateInputConnection(outAttrs) ?: return null
         // Android keyboards may replace a landscape EditText with a fullscreen

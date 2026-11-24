@@ -82,7 +82,7 @@
     <string name="battery_optimization_message">For long flashing, it is better to disable battery restrictions for this app. This lowers the risk that Android stops the process during file transfer.</string>
     <string name="battery_optimization_open_error">ERROR: could not open battery settings: %1$s</string>
     <string name="terminal_welcome_title">Welcome to NekoFlash-2.0</string>
-    <string name="terminal_welcome_subtitle">LOCAL TERMINAL</string>
+    <string name="terminal_welcome_subtitle">HOST + DEVICE TERMINAL</string>
     <string name="terminal_welcome_environment">ENVIRONMENT</string>
     <string name="terminal_welcome_host_label">HOST</string>
     <string name="terminal_welcome_host_value">Android %1$s · API %2$d</string>
@@ -94,20 +94,20 @@
     <string name="terminal_welcome_binary_disabled">DISABLED · SAVED</string>
     <string name="terminal_welcome_time_label">TIME</string>
     <string name="terminal_welcome_date_label">DATE</string>
-    <string name="terminal_welcome_command_source">COMMAND SOURCE</string>
-    <string name="terminal_welcome_default_label">DEFAULT</string>
-    <string name="terminal_welcome_app_managed">App-managed commands</string>
-    <string name="terminal_welcome_device_label">DEVICE</string>
-    <string name="terminal_welcome_device_tools">System sh + Fastboot script bridge</string>
-    <string name="terminal_welcome_enable_label">ENABLE SYSTEM SHELL</string>
-    <string name="terminal_welcome_restore_label">DISABLE SYSTEM SHELL</string>
-    <string name="terminal_welcome_fallback_label">IF MISSING</string>
-    <string name="terminal_welcome_fallback_value">Report unavailable; no substitute</string>
+    <string name="terminal_welcome_command_source">COMMAND ROUTING</string>
+    <string name="terminal_welcome_host_route">HOST = ls · cd · pwd · clear</string>
+    <string name="terminal_welcome_adb_route">ADB = adb shell &lt;command&gt;</string>
+    <string name="terminal_welcome_fastboot_route">FASTBOOT = fastboot &lt;command&gt;</string>
+    <string name="terminal_welcome_local_alias">local &lt;command&gt; = force host routing</string>
+    <string name="terminal_welcome_mixed_fastboot">FASTBOOT chain = shell bridge (confirmation)</string>
+    <string name="terminal_welcome_system_shell">Scripts require opt-in and confirmation</string>
+    <string name="terminal_welcome_enable_command">export NEKO_USE_DEVICE_BINARIES=1</string>
+    <string name="terminal_welcome_disable_command">export NEKO_USE_DEVICE_BINARIES=0</string>
     <string name="terminal_welcome_help">QUICK HELP</string>
-    <string name="terminal_welcome_help_hint">For more details, execute:</string>
-    <string name="terminal_welcome_transport">ADB / FASTBOOT keep existing routes</string>
+    <string name="terminal_welcome_help_hint">For syntax and examples, execute:</string>
+    <string name="terminal_welcome_transport">ADB interactive = device-side; local = host</string>
     <string name="terminal_welcome_access_label">ACCESS</string>
-    <string name="terminal_welcome_access_value">App UID; not a root sandbox</string>
+    <string name="terminal_welcome_access_value">App UID · not root</string>
     <string name="system_terminal_ready">NekoFlash local terminal</string>
     <string name="security_full_terminal_active">ADB and Fastboot commands continue through their existing handlers.</string>
     <string name="terminal_zoom_out_symbol">−</string>
@@ -226,7 +226,7 @@ Not requested:
     <string name="console_logs_button">Logs</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
-    <string name="layout_command_hint">Console · local help / adb shell / fastboot getvar all</string>
+    <string name="layout_command_hint">Console · help / adb shell / fastboot getvar all</string>
     <string name="continue_upper">CONTINUE</string>
 
     <!-- 2.5.1 Classic Recovery UI -->
@@ -250,20 +250,21 @@ Not requested:
     <string name="local_terminal_copy_progress">Copying %1$s of %2$s</string>
     <string name="local_terminal_invalid_syntax">Unclosed quote or trailing escape in local command.</string>
     <string-array name="local_terminal_help">
-        <item>Phone commands: echo, pwd, ls, cd, cat, grep, cp, mv, mkdir, rm and clear.</item>
+        <item>Host commands: help, echo, pwd, ls, cd, find, cat, grep, cp, mv, mkdir, rm and clear.</item>
         <item>~ points to Download/NekoFlash. Quote paths that contain spaces.</item>
-        <item>local ls</item>
-        <item>local cd \"ROM files\"</item>
-        <item>local cat \"flash log.txt\" | grep ERROR</item>
-        <item>local echo first &amp;&amp; echo second</item>
-        <item>local mkdir \"New images\"</item>
-        <item>local cp \"boot image.img\" \"New images\"</item>
-        <item>local rm \"old image.img\"</item>
-        <item>cp, mv and rm require confirmation. rm removes regular files only.</item>
-        <item>Logs and .nekoflash-* staging paths are protected from modification.</item>
-        <item>Read-only diagnostics run on this host phone, not the USB-connected target: export NEKO_USE_DEVICE_BINARIES=1.</item>
-        <item>Allowed: getprop, id, uname, uptime, whoami, df, ps and date; reset with export NEKO_USE_DEVICE_BINARIES=0.</item>
-        <item>No shell interpreters, su, run-as, arbitrary executables, scripts or redirection.</item>
+        <item>pwd</item>
+        <item>ls</item>
+        <item>cd &quot;ROM files&quot;</item>
+        <item>find . -name \'*.img\' -type f</item>
+        <item>cat &quot;flash log.txt&quot; | grep ERROR</item>
+        <item>echo first &amp;&amp; echo second</item>
+        <item>local cd &quot;ROM files&quot; forces host routing, including inside an interactive ADB shell.</item>
+<item>local getprop ro.build.version.release runs the host-phone diagnostic after system-shell opt-in.</item>
+        <item>adb shell getprop ro.build.version.release runs on the connected device.</item>
+        <item>fastboot getvar product runs through the app-owned Fastboot connection.</item>
+        <item>Scripts and mixed Fastboot shell commands require export NEKO_USE_DEVICE_BINARIES=1 and confirmation.</item>
+        <item>Scripts run as the app UID, not root. su and run-as are blocked by PATH stubs.</item>
+        <item>Disable system shell with export NEKO_USE_DEVICE_BINARIES=0.</item>
     </string-array>
     <string name="local_terminal_wait_local">A local command is running. Wait for it to finish or tap %1$s.</string>
     <string name="local_terminal_wait_usb">Wait for the USB operation to finish before running a local command.</string>
@@ -693,6 +694,9 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev26_terminal_close">Close terminal</string>
     <string name="rev26_terminal_completed">Completed.</string>
     <string name="rev26_terminal_copy">Copy terminal output</string>
+    <string name="terminal_copy_description">Copy all terminal output. Long-press to select the full transcript.</string>
+    <string name="terminal_transcript_title">Terminal transcript</string>
+    <string name="terminal_transcript_select_hint">Long-press the text and choose Select all to select the complete terminal output.</string>
     <string name="rev26_terminal_copied">Terminal output copied</string>
     <string name="rev26_import_busy">Wait for the current workspace operation to finish before importing.</string>
     <string name="rev26_import_cancelled">Import cancelled. Temporary file removed.</string>

@@ -302,7 +302,15 @@ class MainActivity : AppCompatActivity() {
         findViewById<View>(R.id.btnConsoleLogs).setOnClickListener { showLogsMenu() }
         findViewById<View>(R.id.btnTerminalZoomOut).setOnClickListener { changeTerminalTextSize(-1f) }
         findViewById<View>(R.id.btnTerminalZoomIn).setOnClickListener { changeTerminalTextSize(1f) }
-        findViewById<View>(R.id.btnTerminalCopy).setOnClickListener { copyTerminalOutput() }
+        findViewById<View>(R.id.btnTerminalCopy).apply {
+            contentDescription = getString(R.string.terminal_copy_description)
+            tooltipText = getString(R.string.terminal_copy_description)
+            setOnClickListener { copyTerminalOutput() }
+            setOnLongClickListener {
+                showSelectableTerminalTranscript()
+                true
+            }
+        }
         updateTerminalTextSizeLabel()
         findViewById<View>(R.id.btnConsoleClose).setOnClickListener { consoleDockController.collapse() }
         findViewById<View>(R.id.btnTerminalStop).setOnClickListener {
@@ -1093,35 +1101,18 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val (type, cmd) = when {
-            raw.startsWith("fastboot ", ignoreCase = true) -> "fastboot" to raw.substringAfter(" ").trim()
-            raw.startsWith("adb ", ignoreCase = true) -> "adb" to raw.substringAfter(" ").trim()
-            else -> currentTab to raw
-        }
-
-        val localLine = extractLocalCommand(raw)
-        val trimmedRaw = raw.trimStart()
-        val explicitLocalPrefix = trimmedRaw == "local" ||
-            (trimmedRaw.startsWith("local") && trimmedRaw.getOrNull(5)?.isWhitespace() == true)
-        if (explicitLocalPrefix && localLine != null) {
-            runLocalTerminal(raw, localLine)
-            return
-        }
-
-        if (viewModel.isInteractiveAdbShellActive()) {
-            handleInteractiveAdbShellInput(raw, type, cmd)
-            return
-        }
-
-        if (type != "adb" && localLine != null) {
-            runLocalTerminal(raw, localLine)
-            return
-        }
-
-        when (type) {
-            "fastboot" -> handleFastbootTerminalCommand(cmd)
-            "adb" -> handleAdbTerminalCommand(cmd)
-            else -> {
+        when (val route = TerminalCommandRoutingPolicy.resolve(
+            raw = raw,
+            currentContext = currentTab,
+            interactiveAdbShellActive = viewModel.isInteractiveAdbShellActive(),
+        )) {
+            is TerminalCommandRoutingPolicy.Route.Local -> runLocalTerminal(raw, route.command)
+            is TerminalCommandRoutingPolicy.Route.Adb -> handleAdbTerminalCommand(route.command)
+            is TerminalCommandRoutingPolicy.Route.Fastboot -> handleFastbootTerminalCommand(route.command)
+            is TerminalCommandRoutingPolicy.Route.FastbootShell -> runLocalTerminal(raw, route.command)
+            is TerminalCommandRoutingPolicy.Route.InteractiveAdb ->
+                handleInteractiveAdbShellInput(raw, route.type, route.command)
+            is TerminalCommandRoutingPolicy.Route.Context -> {
                 viewModel.log("> $raw")
                 viewModel.log("⚠️ No ADB/Fastboot context selected. Enter the adb or fastboot prefix.")
             }
@@ -3010,11 +3001,61 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun copyTerminalOutput() {
-        val output = viewModel.terminalSnapshot().joinToString("\n")
+        copyTerminalOutput(TerminalTranscript.plainText(viewModel.terminalSnapshot()))
+    }
+
+    private fun copyTerminalOutput(output: String) {
         if (output.isBlank()) return
         val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         clipboard.setPrimaryClip(ClipData.newPlainText("NekoFlash terminal", output))
         Toast.makeText(this, R.string.rev26_terminal_copied, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showSelectableTerminalTranscript() {
+        val output = TerminalTranscript.plainText(viewModel.terminalSnapshot())
+        if (output.isBlank() || isFinishing || isDestroyed) return
+
+        val transcriptView = TextView(this).apply {
+            text = output
+            setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, consoleLogAdapter.textSizeSp)
+            typeface = android.graphics.Typeface.MONOSPACE
+            setTextColor(getColor(R.color.text_primary))
+            setTextIsSelectable(true)
+            setPadding(dp(12), dp(10), dp(12), dp(10))
+        }
+        val scroll = ScrollView(this).apply {
+            isFillViewport = true
+            addView(
+                transcriptView,
+                ViewGroup.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            val hint = TextView(this@MainActivity).apply {
+                setText(R.string.terminal_transcript_select_hint)
+                setTextColor(getColor(R.color.text_secondary))
+                textSize = 13f
+                setPadding(dp(20), dp(8), dp(20), dp(12))
+            }
+            addView(hint, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ))
+            addView(scroll, LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                minOf(dp(420), (resources.displayMetrics.heightPixels * 0.55f).toInt()),
+            ))
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.terminal_transcript_title)
+            .setView(content)
+            .setPositiveButton(R.string.terminal_copy_short) { _, _ -> copyTerminalOutput(output) }
+            .setNegativeButton(R.string.cancel_upper, null)
+            .show()
     }
 
     private fun showCurrentSessionSummaryDialog() {

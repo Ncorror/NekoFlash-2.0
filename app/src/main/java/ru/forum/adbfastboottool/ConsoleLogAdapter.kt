@@ -197,16 +197,16 @@ internal class ConsoleLogAdapter(initialTextSizeSp: Float) : RecyclerView.Adapte
                     val value = body.trimStart()
                     val bodyColor = when {
                         value.contains("Welcome to NekoFlash-2.0") -> R.color.terminal_welcome_title
-                        value.contains("LOCAL TERMINAL") -> R.color.terminal_welcome_cyan
+                        value.contains("HOST + DEVICE TERMINAL") || value.contains("ХОСТ + УСТРОЙСТВО") -> R.color.terminal_welcome_cyan
                         value.startsWith("export NEKO_USE_DEVICE_BINARIES=1") -> R.color.terminal_welcome_enabled
                         value.startsWith("export NEKO_USE_DEVICE_BINARIES=0") -> R.color.terminal_welcome_reset
-                        value.startsWith("💡") || value.contains("local help") -> R.color.terminal_welcome_help
-                        value.startsWith("✅") || value.startsWith("↗️") || value.startsWith("🟢") -> R.color.terminal_welcome_enabled
-                        value.startsWith("♻️") || value.startsWith("🔴") -> R.color.terminal_welcome_reset
-                        value.startsWith("↩️") -> R.color.terminal_welcome_source
+                        value.startsWith("💡") || value == "help" -> R.color.terminal_welcome_help
+                        value.startsWith("🟢") || value.startsWith("↗") -> R.color.terminal_welcome_enabled
+                        value.startsWith("🔴") || value.startsWith("  export NEKO_USE_DEVICE_BINARIES=0") -> R.color.terminal_welcome_reset
+                        value.startsWith("↩") || value.startsWith("🔗") -> R.color.terminal_welcome_source
                         value.startsWith("📱") || value.startsWith("🧩") || value.startsWith("📁") ||
-                            value.startsWith("🕒") || value.startsWith("📅") || value.startsWith("⚙️") ->
-                            R.color.terminal_welcome_source
+                            value.startsWith("🕒") || value.startsWith("📅") || value.startsWith("⌂") ||
+                            value.startsWith("⚙") || value.startsWith("▣") -> R.color.terminal_welcome_source
                         value.startsWith("🔐") -> R.color.terminal_welcome_note
                         value.startsWith("🔄") -> R.color.terminal_welcome_cyan
                         else -> R.color.terminal_welcome_text

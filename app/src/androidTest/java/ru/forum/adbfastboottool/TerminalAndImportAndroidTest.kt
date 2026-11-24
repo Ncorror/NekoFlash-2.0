@@ -175,22 +175,25 @@ class TerminalAndImportAndroidTest {
         }
     }
 
-    @Test fun localEchoRequiresPrefixInAdbTerminal() {
+    @Test fun bareHostEchoRunsWithoutPrefixInAdbTerminal() {
         val previousWindow = prefs.getString("last_window", null)
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                var batchHint = ""
                 scenario.onActivity { activity ->
                     activity.findViewById<View>(R.id.tabAdb).performClick()
-                    command(activity, "echo local-terminal-fixture")
-                    assertTrue(vm().logSnapshot().contains(activity.getString(
+                    batchHint = activity.getString(
                         R.string.terminal_batch_syntax_hint, "echo local-terminal-fixture"
-                    )))
-                    assertFalse(vm().terminalSnapshot().contains("> [Local] local-terminal-fixture"))
-                    command(activity, "local echo local-terminal-fixture")
+                    )
+                    command(activity, "echo local-terminal-fixture")
                 }
-                waitUntil("local echo output") {
+                waitUntil("bare host echo output in ADB tab") {
                     vm().terminalSnapshot().contains("> [Local] local-terminal-fixture")
                 }
+                assertFalse(
+                    "A supported host command must not be rejected as ADB batch syntax",
+                    vm().logSnapshot().contains(batchHint),
+                )
             }
         } finally {
             prefs.edit().putString("last_window", previousWindow).commit()

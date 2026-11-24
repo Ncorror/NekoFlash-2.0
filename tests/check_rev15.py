@@ -35,6 +35,7 @@ assert 'android.R.id.paste' in widget
 assert '"\\u001B[A"' in widget and '"\\u001B[B"' in widget
 assert "byteArrayOf('\\n'.code.toByte())" in widget
 assert 'const val DEL: Int = 0x7f' in delta
+assert 'private fun emitDelete(' not in widget, 'Obsolete standalone delete emitter returned'
 
 # HOST CLI and raw PTY share the UI, but mode selection is explicit and dynamic.
 assert 'private lateinit var etCommand: PtyInputEditText' in main

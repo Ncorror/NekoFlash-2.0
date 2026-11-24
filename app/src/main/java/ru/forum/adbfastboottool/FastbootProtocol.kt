@@ -2494,11 +2494,6 @@ class FastbootProtocol(
         return true
     }
 
-    private fun parseFastbootDataSize(raw: String?): Long? {
-        val token = raw?.trim()?.takeIf { it.isNotBlank() } ?: return null
-        return try { token.toLong(16) } catch (_: NumberFormatException) { parseFastbootSize(token) }
-    }
-
     /** Host plans must use the same cached value and numeric convention as the DATA preflight. */
     internal fun hostDownloadLimitBytes(): Long? = transactionLock.withLock { effectiveMaxDownloadSizeBytes() }
 

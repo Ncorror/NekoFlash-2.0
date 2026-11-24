@@ -14,6 +14,11 @@ internal class TerminalTranscript {
     fun clear() = lines.clear()
 
     companion object {
+        private val ansiControlSequence = Regex("\u001B\\[[0-?]*[ -/]*[@-~]")
+
+        fun plainText(lines: List<String>): String =
+            lines.joinToString("\n") { ansiControlSequence.replace(it, "") }
+
         fun select(message: String, declaredLevel: DiagnosticLogPolicy.Level?,
                    userInput: Boolean, protocol: Boolean, terminalOperation: Boolean): String? {
             // Keep actual command payload verbatim, including repeated lines.

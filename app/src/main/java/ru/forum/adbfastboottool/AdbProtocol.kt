@@ -2831,19 +2831,6 @@ class AdbProtocol private constructor(
         return ShellPacketHeader(id, length)
     }
 
-    private fun ByteArray.toShellText(): String = String(this, Charsets.UTF_8).replace("\u0000", "")
-
-    private fun logShellOutput(data: ByteArray, isStderr: Boolean) {
-        if (data.isEmpty()) return
-        val text = data.toShellText()
-        if (text.isBlank()) return
-        val prefix = if (isStderr) "│ stderr: " else "│ "
-        text.split('\n').forEach { rawLine ->
-            val line = rawLine.trimEnd('\r')
-            if (line.isNotEmpty()) onLog(prefix + line)
-        }
-    }
-
     private fun writeSyncRequest(stream: AdbStream, id: String, payload: ByteArray): Boolean {
         val packet = ByteBuffer.allocate(8 + payload.size).order(ByteOrder.LITTLE_ENDIAN).apply {
             put(id.toByteArray(Charsets.US_ASCII))

@@ -66,17 +66,22 @@ integrated_workflows_vm_blob = 'c308da05c4846f6f308d6035e656fa9af726186e'
 workflow_followups_vm_blob = 'fdb0b9dbf32f44bdef2fc037aaa2abb221df9a3f'
 # Reviewed merge of the workflow-followups source with the EXEC-TEST terminal/ROM-script source.
 merged_workflows_terminal_vm_blob = 'ce79e1734ceac7e1dd6a00a1b0a7e4acdfe81658'
-workflow_followups_vm_blobs = (workflow_followups_vm_blob, merged_workflows_terminal_vm_blob)
+# Reviewed fix: the localized no-Fastboot string already contains its error label.
+localized_transport_error_vm_blob = '0425e625bbb42988a046c274aca2d28ab54b2f19'
+reviewed_kotlin_warning_cleanup_vm_blob = '928a7fc2118ac8962fbd7d8700cc56d61c4b41ff'
+workflow_followups_vm_blobs = (workflow_followups_vm_blob, merged_workflows_terminal_vm_blob, localized_transport_error_vm_blob, reviewed_kotlin_warning_cleanup_vm_blob)
 mass_flash_slots_vm_blobs = (mass_flash_slots_vm_blob, integrated_workflows_vm_blob)
 terminal_exit_vm_blobs = (reviewed_terminal_exit_vm_blob, integrated_workflows_vm_blob, workflow_followups_vm_blob)
 shell_redirect_vm_blobs = (
     rev59_shell_redirect_vm_blob, local_terminal_vm_blob, retained_local_terminal_vm_blob,
     adb_workflows_vm_blob, mass_flash_slots_vm_blob, merged_local_terminal_vm_blob, *terminal_exit_vm_blobs,
-    merged_workflows_terminal_vm_blob,
+    merged_workflows_terminal_vm_blob, localized_transport_error_vm_blob, reviewed_kotlin_warning_cleanup_vm_blob,
 )
 adb_operation_count = {
     adb_workflows_vm_blob: 8, mass_flash_slots_vm_blob: 8, integrated_workflows_vm_blob: 8,
     workflow_followups_vm_blob: 9, merged_workflows_terminal_vm_blob: 9,
+    localized_transport_error_vm_blob: 9,
+    reviewed_kotlin_warning_cleanup_vm_blob: 9,
 }.get(vm_blob, 7)
 # Mi Unlock terminal OKAY receipt; durable success before USB detach, exact reviewed snapshot.
 mi_unlock_terminal_vm_blob = '50d14ede8d84159c93835ee82d29a9b930869ca2'
@@ -86,7 +91,7 @@ terminal_shell_v2_vm_blob = '517359a09f5ca61de9f2e2cf7d226a51b6ad656c'
 terminal_shell_v2_cache_context_vm_blob = 'ef5bf1292287c16a5570d58e5fcf09ffe465c724'
 terminal_shell_v2_vm_blobs = (
     terminal_shell_v2_vm_blob, terminal_shell_v2_cache_context_vm_blob,
-    merged_workflows_terminal_vm_blob,
+    merged_workflows_terminal_vm_blob, localized_transport_error_vm_blob, reviewed_kotlin_warning_cleanup_vm_blob,
 )
 if vm_blob in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_transport_vm_blob, rev55_recovery_transition_vm_blob, rev56_android_release_vm_blob, rev57_sideload_verdict_vm_blob, mi_unlock_diagnostics_vm_blob, mi_unlock_terminal_vm_blob, *shell_redirect_vm_blobs, *terminal_shell_v2_vm_blobs):
     journal_body = vm.split('private fun logInternal(')[1].split('fun clearLog()')[0]
@@ -160,6 +165,9 @@ if vm_blob in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_t
         assert 'return false\n                return null' not in start_operation
         assert 'return true\n            return task' not in start_operation
         assert start_operation.count('return task') == 1
+        if vm_blob in (localized_transport_error_vm_blob, reviewed_kotlin_warning_cleanup_vm_blob):
+            assert 'log(DiagnosticLogPolicy.Level.ERROR, "$reason Command was not sent.")' in start_operation
+            assert 'log(DiagnosticLogPolicy.Level.ERROR, "ERROR: $reason Command was not sent.")' not in start_operation
         script_submit = vm.split('internal fun submitLocalTerminalScriptCommand(')[1].split('private suspend fun requestLocalOverwrite(')[0]
         assert script_submit.index('val started = startOperation(') < script_submit.index('if (!started) localScriptServiceOwned = false')
         assert script_submit.index(') {') < script_submit.index('if (!started) localScriptServiceOwned = false')
@@ -182,6 +190,9 @@ if vm_blob in (rev51_lossless_vm_blob, rev52_admission_vm_blob, rev52_explicit_t
             assert '0 -> logLocalTerminal("✓ ' in vm
             assert '130 -> logLocalTerminal("! ' in vm
             assert 'R.string.local_terminal_exit_code' in vm
+    if vm_blob == reviewed_kotlin_warning_cleanup_vm_blob:
+        assert 'setActiveOption!!' not in vm
+        assert 'current?.outcome != OperationOutcomeKind.VERIFY_PENDING' not in vm
 elif vm_blob != expected_blob:
     reviewed_change = (
         b'                keyDirectory = adbKeyDir,\n'
@@ -215,7 +226,7 @@ elif vm_blob in mass_flash_slots_vm_blobs:
     assert 'resolveTargets(item.partition, slot, proto::resolveSlotPartitionTargets)' in vm
 else:
     assert 'val ordered = queue' in vm and 'ordered.mapIndexed' in vm
-if vm_blob == merged_workflows_terminal_vm_blob:
+if vm_blob in (merged_workflows_terminal_vm_blob, localized_transport_error_vm_blob, reviewed_kotlin_warning_cleanup_vm_blob):
     assert 'when (output.exitCode)' in vm
     assert '0 -> logLocalTerminal("✓ ' in vm
     assert '130 -> logLocalTerminal("! ' in vm

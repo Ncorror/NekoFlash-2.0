@@ -21,6 +21,13 @@ assert 'writeExecutable("bash", "#!$shellPath' in local_shell_source
 assert 'writeExecutable("bash"' in local_shell_source and 'exec ' in local_shell_source and 'shellPath' in local_shell_source
 assert 'val containsStagingPath = normalized.any' in (java / 'LocalShell.kt').read_text(encoding='utf-8')
 assert 'internal fun submitLocalTerminalScriptCommand(' in vm
+routing = (java / 'TerminalCommandRoutingPolicy.kt').read_text(encoding='utf-8')
+assert 'if (explicitLocal)' in routing and 'localCommand ?: clean.removePrefix("local").trimStart()' in routing
+assert 'if (implicitLocalCommand != null) return Route.Local(implicitLocalCommand)' in routing
+assert routing.index('if (interactiveAdbShellActive)') < routing.index('if (implicitLocalCommand != null)')
+assert 'if (explicitHostShell) return Route.Local(clean)' in routing
+assert 'Route.FastbootShell("sh -c ${quoteForShellArgument(clean)}")' in routing
+assert 'interactiveAdbShellActive' in routing
 assert 'requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT' in vm
 assert 'prepareFastbootSession = false' in vm
 assert 'FastbootShellBridge' in vm
@@ -35,10 +42,10 @@ assert 'private const val WIDTH = 48' in welcome
 assert 'centered("✨ ${details.title}")' in welcome
 assert 'displayWidth(line) == WIDTH' in welcome
 assert 'takeToDisplayWidth(value, CONTENT_WIDTH)' in welcome
-assert all(emoji in welcome for emoji in ('📱', '🧩', '📁', '🕒', '📅', '✅', '⚙️', '↗️', '♻️', '↩️', '🔐', '💡', '🔄'))
+assert all(emoji in welcome for emoji in ('📱', '🧩', '📁', '🕒', '📅', '⌂', '↗', '⚙', '↩', '🔗', '▣', '🔐', '💡', '🔄'))
 assert 'value.startsWith("📱")' in adapter and 'value.startsWith("💡")' in adapter
 assert 'value.startsWith("🟢")' in adapter and 'value.startsWith("🔴")' in adapter
-assert 'local help' in welcome
+assert 'centered("help")' in welcome
 assert 'local ls' not in welcome and 'local cat' not in welcome and 'local grep' not in welcome
 assert 'TerminalWelcomeMessage.isWelcomeLine(item.text)' in adapter
 assert 'textSizeSp)' in adapter
@@ -61,11 +68,11 @@ keys = {
     'terminal_welcome_host_value', 'terminal_welcome_abi_label',
     'terminal_welcome_workspace_label', 'terminal_welcome_workspace_value',
     'terminal_welcome_time_label', 'terminal_welcome_date_label',
-    'terminal_welcome_command_source', 'terminal_welcome_default_label',
-    'terminal_welcome_app_managed', 'terminal_welcome_device_label',
-    'terminal_welcome_device_tools', 'terminal_welcome_enable_label',
-    'terminal_welcome_restore_label', 'terminal_welcome_fallback_label',
-    'terminal_welcome_fallback_value', 'terminal_welcome_help',
+    'terminal_welcome_command_source', 'terminal_welcome_host_route',
+    'terminal_welcome_adb_route', 'terminal_welcome_fastboot_route',
+    'terminal_welcome_local_alias', 'terminal_welcome_mixed_fastboot',
+    'terminal_welcome_system_shell', 'terminal_welcome_enable_command',
+    'terminal_welcome_disable_command', 'terminal_welcome_help',
     'terminal_welcome_help_hint', 'terminal_welcome_transport',
     'terminal_welcome_access_label', 'terminal_welcome_access_value',
 }

@@ -82,7 +82,7 @@
     <string name="battery_optimization_message">Для долгой прошивки лучше отключить ограничения батареи для этого приложения. Это снижает риск, что Android остановит процесс во время передачи файла.</string>
     <string name="battery_optimization_open_error">ОШИБКА: не удалось открыть настройки батареи: %1$s</string>
     <string name="terminal_welcome_title">Welcome to NekoFlash-2.0</string>
-    <string name="terminal_welcome_subtitle">ЛОКАЛЬНЫЙ ТЕРМИНАЛ</string>
+    <string name="terminal_welcome_subtitle">ХОСТ + УСТРОЙСТВО</string>
     <string name="terminal_welcome_environment">СРЕДА</string>
     <string name="terminal_welcome_host_label">ХОСТ</string>
     <string name="terminal_welcome_host_value">Android %1$s · API %2$d</string>
@@ -94,20 +94,20 @@
     <string name="terminal_welcome_binary_disabled">ВЫКЛЮЧЕНО · СОХРАНЕНО</string>
     <string name="terminal_welcome_time_label">ВРЕМЯ</string>
     <string name="terminal_welcome_date_label">ДАТА</string>
-    <string name="terminal_welcome_command_source">ИСТОЧНИК КОМАНД</string>
-    <string name="terminal_welcome_default_label">ПО УМОЛЧАНИЮ</string>
-    <string name="terminal_welcome_app_managed">Команды приложения</string>
-    <string name="terminal_welcome_device_label">УСТРОЙСТВО</string>
-    <string name="terminal_welcome_device_tools">Системный sh + Fastboot bridge</string>
-    <string name="terminal_welcome_enable_label">ВКЛЮЧИТЬ СИСТЕМНУЮ ОБОЛОЧКУ</string>
-    <string name="terminal_welcome_restore_label">ОТКЛЮЧИТЬ СИСТЕМНУЮ ОБОЛОЧКУ</string>
-    <string name="terminal_welcome_fallback_label">ЕСЛИ НЕДОСТУПНО</string>
-    <string name="terminal_welcome_fallback_value">Ошибка, без подмены команды</string>
+    <string name="terminal_welcome_command_source">МАРШРУТ КОМАНД</string>
+    <string name="terminal_welcome_host_route">ХОСТ = ls · cd · pwd · clear</string>
+    <string name="terminal_welcome_adb_route">ADB = adb shell &lt;команда&gt;</string>
+    <string name="terminal_welcome_fastboot_route">FASTBOOT = fastboot &lt;команда&gt;</string>
+    <string name="terminal_welcome_local_alias">local &lt;команда&gt; = выбрать хост</string>
+    <string name="terminal_welcome_mixed_fastboot">FASTBOOT chain = shell bridge (подтверждение)</string>
+    <string name="terminal_welcome_system_shell">Для скриптов нужны разрешение и подтверждение</string>
+    <string name="terminal_welcome_enable_command">export NEKO_USE_DEVICE_BINARIES=1</string>
+    <string name="terminal_welcome_disable_command">export NEKO_USE_DEVICE_BINARIES=0</string>
     <string name="terminal_welcome_help">КРАТКАЯ СПРАВКА</string>
-    <string name="terminal_welcome_help_hint">Подробности и примеры:</string>
-    <string name="terminal_welcome_transport">ADB / FASTBOOT: текущие обработчики</string>
+    <string name="terminal_welcome_help_hint">Синтаксис и примеры:</string>
+    <string name="terminal_welcome_transport">ADB shell = устройство; local = хост</string>
     <string name="terminal_welcome_access_label">ДОСТУП</string>
-    <string name="terminal_welcome_access_value">UID приложения; не root-песочница</string>
+    <string name="terminal_welcome_access_value">UID приложения · без root</string>
     <string name="system_terminal_ready">Локальный терминал NekoFlash</string>
     <string name="security_full_terminal_active">Команды ADB и Fastboot продолжают использовать существующие обработчики.</string>
     <string name="terminal_zoom_out_symbol">−</string>
@@ -226,7 +226,7 @@
     <string name="console_logs_button">Логи</string>
     <string name="layout_icon_up">▲</string>
     <string name="layout_icon_down">▼</string>
-    <string name="layout_command_hint">Консоль · local help / adb shell / fastboot getvar all</string>
+    <string name="layout_command_hint">Консоль · help / adb shell / fastboot getvar all</string>
     <string name="continue_upper">ПРОДОЛЖИТЬ</string>
 
     <!-- 2.5.1 Classic Recovery UI -->
@@ -250,20 +250,21 @@
     <string name="local_terminal_copy_progress">Скопировано %1$s из %2$s</string>
     <string name="local_terminal_invalid_syntax">В локальной команде осталась незакрытая кавычка или обратная косая черта в конце.</string>
     <string-array name="local_terminal_help">
-        <item>Команды телефона: echo, pwd, ls, cd, cat, grep, cp, mv, mkdir, rm и clear.</item>
+        <item>Команды хоста: help, echo, pwd, ls, cd, find, cat, grep, cp, mv, mkdir, rm и clear.</item>
         <item>~ указывает на Download/NekoFlash. Пути с пробелами заключайте в кавычки.</item>
-        <item>local ls</item>
-        <item>local cd \"Мои образы\"</item>
-        <item>local cat \"журнал прошивки.txt\" | grep ERROR</item>
-        <item>local echo first &amp;&amp; echo second</item>
-        <item>local mkdir \"Новые образы\"</item>
-        <item>local cp \"boot образ.img\" \"Новые образы\"</item>
-        <item>local rm \"старый образ.img\"</item>
-        <item>cp, mv и rm требуют подтверждения. rm удаляет только обычные файлы.</item>
-        <item>Журналы и временные .nekoflash-* файлы защищены от изменений.</item>
-        <item>Диагностика только для чтения выполняется на телефоне-хосте, не на USB-устройстве: export NEKO_USE_DEVICE_BINARIES=1.</item>
-        <item>Разрешены: getprop, id, uname, uptime, whoami, df, ps и date; отключить: export NEKO_USE_DEVICE_BINARIES=0.</item>
-        <item>Оболочки, su, run-as, произвольные программы, скрипты и перенаправление вывода недоступны.</item>
+        <item>pwd</item>
+        <item>ls</item>
+        <item>cd &quot;Мои образы&quot;</item>
+        <item>find . -name \'*.img\' -type f</item>
+        <item>cat &quot;журнал прошивки.txt&quot; | grep ERROR</item>
+        <item>echo first &amp;&amp; echo second</item>
+        <item>local cd &quot;Мои образы&quot; принудительно выбирает хост, в том числе в интерактивном ADB shell.</item>
+<item>local getprop ro.build.version.release запускает диагностику телефона-хоста после включения системной оболочки.</item>
+        <item>adb shell getprop ro.build.version.release выполняется на подключённом устройстве.</item>
+        <item>fastboot getvar product выполняется через USB-соединение приложения.</item>
+        <item>Скрипты и смешанные Fastboot shell-команды требуют export NEKO_USE_DEVICE_BINARIES=1 и подтверждения.</item>
+        <item>Скрипты работают с UID приложения, не от root. su и run-as блокируются заглушками PATH.</item>
+        <item>Отключить системную оболочку: export NEKO_USE_DEVICE_BINARIES=0.</item>
     </string-array>
     <string name="local_terminal_wait_local">Локальная команда уже выполняется. Дождитесь завершения или нажмите «%1$s».</string>
     <string name="local_terminal_wait_usb">Дождитесь завершения USB-операции перед запуском локальной команды.</string>
@@ -699,6 +700,9 @@ Android robot attribution: The Android robot is reproduced or modified from work
     <string name="rev26_terminal_close">Закрыть терминал</string>
     <string name="rev26_terminal_completed">Выполнено.</string>
     <string name="rev26_terminal_copy">Копировать вывод терминала</string>
+    <string name="terminal_copy_description">Скопировать весь вывод терминала. Удерживайте, чтобы выделить весь текст.</string>
+    <string name="terminal_transcript_title">Вывод терминала</string>
+    <string name="terminal_transcript_select_hint">Нажмите и удерживайте текст, затем выберите «Выбрать всё», чтобы выделить весь вывод терминала.</string>
     <string name="rev26_terminal_copied">Вывод терминала скопирован</string>
     <string name="rev26_import_busy">Дождитесь завершения текущей операции с рабочей папкой перед импортом.</string>
     <string name="rev26_import_cancelled">Импорт отменён. Временный файл удалён.</string>

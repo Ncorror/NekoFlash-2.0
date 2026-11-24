@@ -30,7 +30,9 @@ class LocalShellTest {
         val echo = shell.execute("echo \"hello world\"", noWorkspace) { false }
         val help = shell.execute("help", noWorkspace) { false }
         assertEquals(listOf("hello world"), echo?.lines)
-        assertTrue(help?.lines?.any { it.contains("echo, pwd, ls, cd, grep, cp, mv") } == true)
+        assertTrue(help?.lines?.any {
+            it == "Commands: help, echo, pwd, ls, cd, find, grep, cp, mv, mkdir, cat, rm, clear"
+        } == true)
     }
 
     @Test fun quickOutputUsesLocalizedHelpAndLeavesFileCommandsToTheWorker() {
@@ -125,6 +127,26 @@ class LocalShellTest {
         assertEquals("~", shell.prompt())
     }
 
+
+    @Test fun findSearchesHostWorkspaceWithoutFollowingLinksAndHonoursFilters() = withWorkspace { root ->
+        File(root, "boot.img").writeText("image")
+        File(root, "system.img").writeText("image")
+        File(root, "notes.txt").writeText("notes")
+        val nested = File(root, "images").apply { mkdir() }
+        File(nested, "vendor.img").writeText("image")
+        val outside = File(root.parentFile, "outside.img").apply { writeText("outside") }
+        try {
+            runCatching { Files.createSymbolicLink(File(root, "outside-link").toPath(), outside.toPath()) }
+            val shell = LocalShell(availableSpace = { Long.MAX_VALUE }, initialHome = root)
+            val workspace: suspend () -> File? = { root }
+            val allImages = shell.execute("find . -name '*.img' -type f", workspace) { false }
+            assertEquals(listOf("./boot.img", "./images/vendor.img", "./system.img"), allImages?.lines)
+            val shallow = shell.execute("find . -name '*.img' -type f -maxdepth 1", workspace) { false }
+            assertEquals(listOf("./boot.img", "./system.img"), shallow?.lines)
+        } finally {
+            outside.delete()
+        }
+    }
 
     @Test fun catAndPipelinesPassOutputBetweenCommands() = withWorkspace { root ->
         File(root, "flash.log").writeText("INFO start\nERROR boot failed\nINFO done\n")
@@ -227,9 +249,17 @@ class LocalShellTest {
         assertNull(extractLocalCommand("fastboot reboot"))
         assertNull(extractLocalCommand("adb shell ls"))
         assertEquals("clear", extractLocalCommand("clear"))
+        assertEquals("ls", extractLocalCommand("ls"))
+        assertEquals("pwd", extractLocalCommand("pwd"))
         assertEquals("cd /storage/emulated/0", extractLocalCommand("cd /storage/emulated/0"))
         assertEquals("sh flash_all.sh", extractLocalCommand("sh flash_all.sh"))
         assertEquals("bash flash_all_lock.sh", extractLocalCommand("bash flash_all_lock.sh"))
+        assertEquals("help", extractLocalCommand("help"))
+        assertEquals("find . -name '*.img'", extractLocalCommand("find . -name '*.img'"))
+        assertEquals("getprop ro.build.version.release", extractLocalCommand("getprop ro.build.version.release"))
+        assertEquals("ls", extractImplicitLocalCommand("ls"))
+        assertEquals("ls && pwd", extractImplicitLocalCommand("ls && pwd"))
+        assertNull(extractImplicitLocalCommand("getprop ro.build.version.release"))
         assertEquals("export NEKO_USE_DEVICE_BINARIES=1", extractLocalCommand("export NEKO_USE_DEVICE_BINARIES=1"))
     }
 
@@ -249,10 +279,50 @@ class LocalShellTest {
         }
     }
 
+    @Test fun bashCommandSubstitutionRunsTheResolvedScriptFromTheCurrentDirectory() = withWorkspace { root ->
+        val home = File(root, "HOME").apply { mkdirs() }
+        val workspaceDirectory = File(home, "Download/NekoFlash").apply { mkdirs() }
+        File(workspaceDirectory, "nekoshrc.sh").writeText("printf 'COMMAND_SUBSTITUTION_OK\\n'\n")
+        val binDirectory = File(home, "bin").apply { mkdirs() }
+        File(binDirectory, "ls").apply {
+            writeText("#!/bin/sh\nprintf 'nekoshrc.sh\\n'\n")
+            setExecutable(true)
+        }
+        val shell = LocalShell(
+            availableSpace = { Long.MAX_VALUE },
+            initialHome = home,
+            initialDeviceBinariesEnabled = true,
+            shellExecutable = File("/bin/sh"),
+        )
+        val workspace: suspend () -> File? = { home }
+        assertTrue(shell.requiresWorkspace("bash $(ls)"))
+        assertNull(shell.quickOutput("bash $(ls)"))
+        assertEquals(0, shell.execute("cd Download/NekoFlash", workspace) { false }?.exitCode)
+
+        val output = mutableListOf<String>()
+        val result = requireNotNull(shell.execute(
+            "bash $(ls)", workspace,
+            confirmOverwrite = { false },
+            onShellOutput = output::add,
+        ))
+        assertEquals(0, result.exitCode)
+        assertTrue(result.streamedOutput)
+        assertTrue(output.any { it.contains("COMMAND_SUBSTITUTION_OK") })
+
+        output.clear()
+        val quotedResult = requireNotNull(shell.execute(
+            "bash \"$(ls)\"", workspace,
+            confirmOverwrite = { false },
+            onShellOutput = output::add,
+        ))
+        assertEquals(0, quotedResult.exitCode)
+        assertTrue(output.any { it.contains("COMMAND_SUBSTITUTION_OK") })
+    }
+
     @Test fun shAndBashExecuteScriptsThroughTheConfiguredSystemShell() = withWorkspace { root ->
         val home = File(root, "HOME").apply { mkdirs() }
         val script = File(home, "flash-test.sh").apply {
-            writeText("printf 'ROM_SCRIPT_OK:%s:%s\\n' \"\$HOME\" \"\$PWD\"\n")
+            writeText("printf 'ROM_SCRIPT_OK:%s:%s:%s\\n' \"\$HOME\" \"\$PWD\" \"\$1\"\n")
         }
         val shell = LocalShell(
             availableSpace = { Long.MAX_VALUE },
@@ -263,22 +333,26 @@ class LocalShellTest {
         val workspace: suspend () -> File? = { home }
         val shellLines = mutableListOf<String>()
         val shResult = requireNotNull(shell.execute(
-            "sh ${script.name}", workspace,
+            "sh ${script.name} 'sh argument with spaces'", workspace,
             confirmOverwrite = { false },
             onShellOutput = shellLines::add,
         ))
         assertEquals(0, shResult.exitCode)
         assertTrue(shResult.streamedOutput)
-        assertTrue(shellLines.any { it.contains("ROM_SCRIPT_OK:${home.absolutePath}:${home.absolutePath}") })
+        assertTrue(shellLines.any {
+            it.contains("ROM_SCRIPT_OK:${home.absolutePath}:${home.absolutePath}:sh argument with spaces")
+        })
 
         shellLines.clear()
         val bashResult = requireNotNull(shell.execute(
-            "bash ${script.name}", workspace,
+            "bash ${script.name} 'bash argument with spaces'", workspace,
             confirmOverwrite = { false },
             onShellOutput = shellLines::add,
         ))
         assertEquals(0, bashResult.exitCode)
-        assertTrue(shellLines.any { it.contains("ROM_SCRIPT_OK:${home.absolutePath}:${home.absolutePath}") })
+        assertTrue(shellLines.any {
+            it.contains("ROM_SCRIPT_OK:${home.absolutePath}:${home.absolutePath}:bash argument with spaces")
+        })
 
         val blocked = File(home, "blocked.sh").apply { writeText("su -c id\n") }
         val blockedResult = requireNotNull(shell.execute(

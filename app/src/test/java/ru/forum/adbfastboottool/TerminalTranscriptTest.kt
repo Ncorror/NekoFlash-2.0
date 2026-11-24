@@ -93,4 +93,15 @@ class TerminalTranscriptTest {
             CompactLogRenderPolicy.format("=== FLASH QUEUE 1/2: boot ===").tone,
         )
     }
+
+    @Test fun clipboardTextContainsEveryRetainedLineInOrderIncludingDuplicates() {
+        val lines = listOf("first", "same", "same", "last")
+        assertEquals("first\nsame\nsame\nlast", TerminalTranscript.plainText(lines))
+    }
+    @Test fun clipboardTextRemovesAnsiControlSequencesWithoutDroppingOutput() {
+        assertEquals(
+            "green text\nplain text",
+            TerminalTranscript.plainText(listOf("\u001B[32mgreen text\u001B[0m", "plain text")),
+        )
+    }
 }

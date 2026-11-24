@@ -1415,7 +1415,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 else -> return FastbootShellBridge.Result(2, listOf("❌ Unsupported Fastboot option: ${values[index]}"))
             }
         }
-        val command = if (setActiveOption != null) listOf("set_active", setActiveOption!!) else values.drop(index)
+        val command = setActiveOption?.let { listOf("set_active", it) } ?: values.drop(index)
         if (command.isEmpty()) return FastbootShellBridge.Result(2, listOf("❌ fastboot: missing command"))
         val verb = command[0].lowercase(Locale.US)
 
@@ -2904,7 +2904,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 log("🎉 $message")
                 val current = operationProgressSnapshot
                 if (activeServiceOperation != null || _operationActive.value == true ||
-                    current?.title != pending.operationLabel || current?.outcome != OperationOutcomeKind.VERIFY_PENDING) {
+                    current?.title != pending.operationLabel || current.outcome != OperationOutcomeKind.VERIFY_PENDING) {
                     logFileOnly("Unlock verification kept in diagnostics; another operation owns the GUI result.")
                     return
                 }
@@ -2927,7 +2927,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 log("❌ $message")
                 val current = operationProgressSnapshot
                 if (activeServiceOperation != null || _operationActive.value == true ||
-                    current?.title != pending.operationLabel || current?.outcome != OperationOutcomeKind.VERIFY_PENDING) {
+                    current?.title != pending.operationLabel || current.outcome != OperationOutcomeKind.VERIFY_PENDING) {
                     logFileOnly("Unlock verification kept in diagnostics; another operation owns the GUI result.")
                     return
                 }
@@ -3044,7 +3044,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                     UsbOperationAdmission.RequiredTransport.ANY_USB ->
                         "No connected ADB/Fastboot device. Connect the target over OTG."
                 }
-                log(DiagnosticLogPolicy.Level.ERROR, "ERROR: $reason Command was not sent.")
+                log(DiagnosticLogPolicy.Level.ERROR, "$reason Command was not sent.")
                 return null
             }
             val gen = operationGeneration.incrementAndGet()
