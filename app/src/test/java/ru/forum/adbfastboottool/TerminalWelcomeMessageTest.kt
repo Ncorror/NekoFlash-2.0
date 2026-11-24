@@ -12,7 +12,8 @@ class TerminalWelcomeMessageTest {
         environment = "ENVIRONMENT",
         hostLabel = "HOST", host = "Android 16 · API 36",
         abiLabel = "ABI", abi = "arm64-v8a",
-        workspaceLabel = "WORKSPACE", workspace = "Download/NekoFlash (~)",
+        workspaceLabel = "HOME", workspace = "Private HOME + public shared link",
+        deviceBinaryLabel = "DEVICE BINARIES", deviceBinaryStatus = "ENABLED · SAVED",
         timeLabel = "TIME", time = "21:56",
         dateLabel = "DATE", date = "22 Nov 2026",
         commandSource = "COMMAND SOURCE",
@@ -37,6 +38,7 @@ class TerminalWelcomeMessageTest {
         assertTrue(lines.any { it.contains("local help") })
         assertTrue(lines.any { it.contains("NEKO_USE_DEVICE_BINARIES=1") })
         assertTrue(lines.any { it.contains("NEKO_USE_DEVICE_BINARIES=0") })
+        assertTrue(lines.any { it.contains("DEVICE BINARIES") && it.contains("ENABLED") })
         assertFalse(lines.any { it.contains("local ls") || it.contains("local cat") || it.contains("local grep") })
     }
 
@@ -46,7 +48,7 @@ class TerminalWelcomeMessageTest {
         assertTrue(framed.isNotEmpty())
         assertTrue(framed.all { it.first() == '║' && it.last() == '║' })
         assertTrue(framed.all { TerminalWelcomeMessage.displayWidth(it) == 48 })
-        listOf("✨", "📱", "🧩", "📁", "🕒", "📅", "✅", "⚙️", "↗️", "♻️", "↩️", "🔐", "💡", "🔄")
+        listOf("✨", "📱", "🧩", "📁", "🟢", "🕒", "📅", "✅", "⚙️", "↗️", "♻️", "↩️", "🔐", "💡", "🔄")
             .forEach { emoji -> assertTrue("Missing $emoji", lines.any { it.contains(emoji) }) }
         assertFalse(framed.any { it.contains("@ ") || it.contains("# ") || it.contains("-> ") })
     }

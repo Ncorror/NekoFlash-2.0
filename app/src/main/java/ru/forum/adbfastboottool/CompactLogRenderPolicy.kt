@@ -86,12 +86,15 @@ object CompactLogRenderPolicy {
     fun format(line: String): FormattedLine {
         val classification = DiagnosticLogPolicy.classify(line)
         val localTone = line.takeIf { it.startsWith(LOCAL_PREFIX) }?.let {
-            when (it.removePrefix(LOCAL_PREFIX).firstOrNull()) {
-                '│' -> Tone.LOCAL_OUTPUT
-                '✓' -> Tone.SUCCESS
-                '!' -> Tone.WARNING
-                '✕' -> Tone.ERROR
-                '◇' -> Tone.SYSTEM
+            val body = it.removePrefix(LOCAL_PREFIX)
+            when {
+                body.startsWith("❌") || body.contains(Regex("(?i)\\b(error|failed|failure|fatal)\\b")) -> Tone.ERROR
+                body.startsWith("⚠️") || body.contains(Regex("(?i)\\b(warning|warn)\\b")) -> Tone.WARNING
+                body.startsWith("✅") || body.startsWith("✓") -> Tone.SUCCESS
+                body.startsWith("◇") -> Tone.SYSTEM
+                body.startsWith("│") -> Tone.LOCAL_OUTPUT
+                body.startsWith("!") -> Tone.WARNING
+                body.startsWith("✕") -> Tone.ERROR
                 else -> Tone.COMMAND
             }
         }

@@ -6,6 +6,7 @@ import android.hardware.usb.UsbDevice
 import android.hardware.usb.UsbManager
 import android.net.Uri
 import android.os.Handler
+import android.os.Environment
 import android.os.Looper
 import android.os.PowerManager
 import android.os.StatFs
@@ -30,6 +31,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.runBlocking
 import java.io.File
 import java.io.IOException
 import java.text.SimpleDateFormat
@@ -61,6 +63,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     internal class LocalOverwriteRequest(val file: File)
     internal class LocalDeleteRequest(val file: File)
+    internal class LocalScriptConfirmationRequest(val message: String)
 
     sealed class OperationOutcome {
         object Success : OperationOutcome()
@@ -109,7 +112,21 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     val operationActive: LiveData<Boolean> = _operationActive
 
     internal val workspaceImport = WorkspaceImportController(application) { log(it) }
-    internal val localShell = LocalShell { StatFs(it.absolutePath).availableBytes }
+    private val terminalPreferences = application.getSharedPreferences("local_terminal", Context.MODE_PRIVATE)
+    internal val localTerminalHome = File(application.filesDir, "HOME")
+    private val publicNekoWorkspace = File(
+        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),
+        "NekoFlash",
+    )
+    internal val localShell = LocalShell(
+        availableSpace = { StatFs(it.absolutePath).availableBytes },
+        initialHome = localTerminalHome,
+        initialDeviceBinariesEnabled = terminalPreferences.getBoolean("device_binaries_enabled", false),
+        onDeviceBinariesChanged = { enabled ->
+            terminalPreferences.edit { putBoolean("device_binaries_enabled", enabled) }
+            refreshTerminalWelcome()
+        },
+    )
     private val _localTerminalRunning = MutableLiveData(false)
     val localTerminalRunning: LiveData<Boolean> = _localTerminalRunning
     private val _localTerminalCopyProgress = MutableLiveData<LocalCopyProgress?>(null)
@@ -118,9 +135,15 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     internal val localTerminalOverwrite: LiveData<LocalOverwriteRequest?> = _localTerminalOverwrite
     private val _localTerminalDelete = MutableLiveData<LocalDeleteRequest?>(null)
     internal val localTerminalDelete: LiveData<LocalDeleteRequest?> = _localTerminalDelete
+    private val _localScriptConfirmation = MutableLiveData<LocalScriptConfirmationRequest?>()
+    internal val localScriptConfirmation: LiveData<LocalScriptConfirmationRequest?> = _localScriptConfirmation
 
     internal fun importWorkspaceFile(uri: android.net.Uri, workspace: File): Boolean = synchronized(operationLaunchLock) {
-        if (viewModelCleared.get() || localTerminalOperation != null) false else workspaceImport.start(uri, workspace)
+        if (viewModelCleared.get() || localTerminalOperation != null || workspaceImport.isBusy || hasUnfinishedUsbOperation()) {
+            false
+        } else {
+            workspaceImport.start(uri, workspace)
+        }
     }
 
     /** Share the launch lock so workspace cleanup cannot race a new operation. */
@@ -286,7 +309,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     val logLines: LiveData<List<String>> = _logLines
 
     private val transcript = TerminalTranscript().apply {
-        TerminalWelcomeMessage.build(application).forEach(::append)
+        TerminalWelcomeMessage.build(application, deviceBinariesEnabled = localShell.isDeviceBinariesEnabled).forEach(::append)
     }
     private val _terminalLines = MutableLiveData(transcript.snapshot())
     internal val terminalLines: LiveData<List<String>> = _terminalLines
@@ -312,6 +335,22 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         if (!terminalPublishScheduled) {
             terminalPublishScheduled = true
             mainHandler.postDelayed(publishTerminal, CompactLogRenderPolicy.RENDER_DEBOUNCE_MS)
+        }
+    }
+    private fun refreshTerminalWelcome() {
+        synchronized(logLock) {
+            val previous = transcript.snapshot()
+            val welcomeCount = previous.takeWhile(TerminalWelcomeMessage::isWelcomeLine).size
+            transcript.clear()
+            TerminalWelcomeMessage.build(
+                getApplication<Application>(),
+                deviceBinariesEnabled = localShell.isDeviceBinariesEnabled,
+            ).forEach(transcript::append)
+            previous.drop(welcomeCount).forEach(transcript::append)
+            if (!terminalPublishScheduled) {
+                terminalPublishScheduled = true
+                mainHandler.postDelayed(publishTerminal, CompactLogRenderPolicy.RENDER_DEBOUNCE_MS)
+            }
         }
     }
     internal fun terminalSnapshot(): List<String> = synchronized(logLock) { transcript.snapshot() }
@@ -361,6 +400,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private var localOverwriteConfirmation: LocalOverwriteConfirmation? = null
     private data class LocalDeleteConfirmation(val request: LocalDeleteRequest, val answer: CompletableDeferred<Boolean>)
     private var localDeleteConfirmation: LocalDeleteConfirmation? = null
+    private data class LocalScriptConfirmation(
+        val request: LocalScriptConfirmationRequest,
+        val answer: CompletableDeferred<Boolean>,
+    )
+    private var localScriptConfirmationState: LocalScriptConfirmation? = null
+    @Volatile private var localScriptFastbootActive = false
+    @Volatile private var localScriptExecutionActive = false
+    @Volatile private var localScriptServiceOwned = false
     private val transportScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val mainHandler = Handler(Looper.getMainLooper())
     private val transportTransitionMutex = Mutex()
@@ -381,7 +428,14 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     private val diagnosticSessionTracker = DiagnosticSessionTracker(processSessionId, buildId = BuildConfig.BUILD_ID)
 
 
+    internal fun refreshLocalTerminalHome() {
+        if (!PermissionGate.hasStorage(getApplication())) return
+        runCatching { localShell.configureHome(localTerminalHome, publicNekoWorkspace) }
+            .onFailure { logLocalTerminal("⚠️ Shared Download link unavailable: ${it.message ?: it.javaClass.simpleName}") }
+    }
+
     init {
+        refreshLocalTerminalHome()
         DiagnosticCrashMarker.install(File(application.filesDir, "diagnostics"), BuildConfig.BUILD_ID)
         restoreOperationState()
         runCatching { recoveryStore.readQuickSource() }
@@ -1311,6 +1365,225 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     internal fun logLocalTerminal(message: String) = log("> [Local] $message")
 
+    private fun executeScriptFastbootCommand(
+        arguments: List<String>,
+        workingDirectory: File,
+    ): FastbootShellBridge.Result {
+        if (arguments.isEmpty()) return FastbootShellBridge.Result(1, listOf("❌ fastboot: missing command"))
+        val proto = fastbootProtocol
+            ?: return FastbootShellBridge.Result(1, listOf("❌ No Fastboot USB session. Connect the device in Fastboot mode first."))
+        if (!proto.isConnected) return FastbootShellBridge.Result(1, listOf("❌ Fastboot USB session is not connected"))
+
+        var index = 0
+        var serial: String? = null
+        var wipe = false
+        var disableVerity = false
+        var disableVerification = false
+        var slot: String? = null
+        var setActiveOption: String? = null
+        val values = arguments.toMutableList()
+        while (index < values.size && values[index].startsWith('-')) {
+            when {
+                values[index] == "-s" -> {
+                    serial = values.getOrNull(index + 1)
+                        ?: return FastbootShellBridge.Result(2, listOf("❌ fastboot -s requires a serial"))
+                    index += 2
+                }
+                values[index] == "-w" -> { wipe = true; index++ }
+                values[index] == "-S" || values[index] == "-i" || values[index] == "-p" -> {
+                    return FastbootShellBridge.Result(2, listOf("❌ ${values[index]} is not implemented by NekoFlash's USB Fastboot transport; refusing to ignore it"))
+                }
+                values[index] == "--disable-verity" -> { disableVerity = true; index++ }
+                values[index] == "--disable-verification" -> { disableVerification = true; index++ }
+                values[index] == "--slot" -> {
+                    slot = values.getOrNull(index + 1)
+                        ?: return FastbootShellBridge.Result(2, listOf("❌ --slot requires a or b"))
+                    index += 2
+                }
+                values[index].startsWith("--slot=") -> {
+                    slot = values[index].substringAfter('=')
+                    index++
+                }
+                values[index].startsWith("--set-active=") -> {
+                    setActiveOption = values[index].substringAfter('=')
+                    index++
+                }
+                values[index] in setOf("--skip-reboot", "--verbose") -> index++
+                values[index] == "--force" -> {
+                    return FastbootShellBridge.Result(2, listOf("❌ ${values[index]} is not implemented; refusing to silently change Fastboot semantics"))
+                }
+                else -> return FastbootShellBridge.Result(2, listOf("❌ Unsupported Fastboot option: ${values[index]}"))
+            }
+        }
+        val command = if (setActiveOption != null) listOf("set_active", setActiveOption!!) else values.drop(index)
+        if (command.isEmpty()) return FastbootShellBridge.Result(2, listOf("❌ fastboot: missing command"))
+        val verb = command[0].lowercase(Locale.US)
+
+        if (serial != null) {
+            if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+            val actual = FastbootSerialSelection.actual(currentUsbSerial()) { proto.getVar("serialno") }
+            if (!FastbootSerialSelection.matches(serial, actual)) {
+                return FastbootShellBridge.Result(1, listOf("❌ Serial mismatch: requested=$serial actual=${actual ?: "unknown"}"))
+            }
+        }
+
+        val subcommand = command.getOrNull(1)?.lowercase(Locale.US).orEmpty()
+        val lockOrWipe = wipe || verb == "erase" ||
+            (verb == "flashing" && subcommand !in setOf("get_unlock_ability", "get-bootloader-info")) ||
+            (verb == "oem" && subcommand !in setOf("device-info", "getvar"))
+        if (lockOrWipe) {
+            val summary = when {
+                wipe -> "The ROM script requested -w. This erases userdata and cache."
+                verb == "erase" -> "The ROM script requested erase ${command.getOrNull(1) ?: "<missing partition>"}."
+                else -> "The ROM script requested ${command.joinToString(" ")}. This changes the bootloader lock state and may permanently prevent booting an unsigned/custom ROM."
+            }
+            val approved = runCatching {
+                runBlocking {
+                    withTimeoutOrNull(120_000L) { requestLocalScriptConfirmation(summary) } ?: false
+                }
+            }.getOrDefault(false)
+            if (!approved || !localScriptExecutionActive) {
+                return FastbootShellBridge.Result(130, listOf("⚠️ User declined or cancelled the destructive Fastboot operation"))
+            }
+        }
+
+        localScriptFastbootActive = true
+        try {
+            if (wipe) {
+                for (partition in listOf("userdata", "cache")) {
+                    if (!proto.beginOperation() || !proto.sendCommand("erase:$partition")) {
+                        return FastbootShellBridge.Result(1, listOf("❌ Wipe failed at erase:$partition"))
+                    }
+                }
+            }
+            return when (verb) {
+                "devices" -> {
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    val actual = currentUsbSerial() ?: proto.getVar("serialno") ?: "unknown"
+                    FastbootShellBridge.Result(0, listOf("$actual	fastboot"))
+                }
+                "getvar" -> {
+                    val key = command.getOrNull(1) ?: return FastbootShellBridge.Result(2, listOf("❌ getvar requires a variable name"))
+                    if (!key.matches(Regex("[A-Za-z0-9_.:-]{1,128}"))) return FastbootShellBridge.Result(2, listOf("❌ Invalid getvar name: $key"))
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    if (key.equals("all", ignoreCase = true)) {
+                        val snapshot = proto.getVarAll() ?: return FastbootShellBridge.Result(1, listOf("❌ getvar all failed or returned an incomplete response"))
+                        if (!snapshot.complete || !snapshot.finalStatus.equals("OKAY", true)) {
+                            return FastbootShellBridge.Result(1, listOf("❌ getvar all was incomplete: ${snapshot.finalStatus}"))
+                        }
+                        FastbootShellBridge.Result(0, snapshot.variables.toSortedMap().map { "(bootloader) ${it.key}: ${it.value}" })
+                    } else {
+                        val value = proto.getVar(key) ?: return FastbootShellBridge.Result(1, listOf("❌ getvar:$key failed or returned no value"))
+                        FastbootShellBridge.Result(0, listOf("(bootloader) $key: $value"))
+                    }
+                }
+                "flash" -> {
+                    val partition = command.getOrNull(1) ?: return FastbootShellBridge.Result(2, listOf("❌ flash requires PARTITION FILE"))
+                    if (!partition.matches(Regex("[A-Za-z0-9_.:-]{1,128}"))) return FastbootShellBridge.Result(2, listOf("❌ Invalid partition name: $partition"))
+                    val imagePath = command.getOrNull(2) ?: return FastbootShellBridge.Result(2, listOf("❌ flash requires PARTITION FILE"))
+                    if (command.size != 3) return FastbootShellBridge.Result(2, listOf("❌ Unsupported extra arguments for fastboot flash"))
+                    val requestedSlot = slot?.removePrefix("_")?.lowercase(Locale.US)
+                    val actualSlot = when (requestedSlot) {
+                        null -> null
+                        "a", "b" -> requestedSlot
+                        "other" -> {
+                            if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready while resolving --slot=other"))
+                            val currentSlot = proto.getVar("current-slot")?.trim()?.removePrefix("_")?.lowercase(Locale.US)
+                            if (currentSlot !in setOf("a", "b")) return FastbootShellBridge.Result(1, listOf("❌ Cannot resolve --slot=other: bootloader did not report current-slot a/b"))
+                            if (currentSlot == "a") "b" else "a"
+                        }
+                        "all" -> "all"
+                        else -> return FastbootShellBridge.Result(2, listOf("❌ Invalid --slot value: $requestedSlot"))
+                    }
+                    val image = File(imagePath).let { if (it.isAbsolute) it else File(workingDirectory, imagePath) }.canonicalFile
+                    if (!image.isFile || !image.canRead()) return FastbootShellBridge.Result(1, listOf("❌ Image file is missing or unreadable: ${image.path}"))
+                    val targetPartitions = when (actualSlot) {
+                        "all" -> {
+                            if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready while resolving --slot=all"))
+                            val hasSlots = proto.getVar("has-slot:$partition")?.trim()?.equals("yes", true) == true
+                            if (hasSlots) listOf("${partition}_a", "${partition}_b") else listOf(partition)
+                        }
+                        null -> listOf(partition)
+                        else -> if (partition.endsWith("_a") || partition.endsWith("_b")) {
+                            if (partition.endsWith("_$actualSlot")) listOf(partition)
+                            else return FastbootShellBridge.Result(2, listOf("❌ Partition $partition conflicts with --slot=$actualSlot"))
+                        } else listOf("${partition}_$actualSlot")
+                    }
+                    val lines = mutableListOf<String>()
+                    for (targetPartition in targetPartitions) {
+                        if (!proto.beginOperation()) return FastbootShellBridge.Result(1, lines + "❌ Fastboot session is not ready before flash:$targetPartition")
+                        val patchedVbmeta = if (
+                            (disableVerity || disableVerification) &&
+                            targetPartition in setOf("vbmeta", "vbmeta_a", "vbmeta_b")
+                        ) {
+                            FastbootVbmeta.createPatchedCopy(
+                                source = image,
+                                temporaryDirectory = File(getApplication<Application>().cacheDir, "terminal-vbmeta"),
+                                disableVerity = disableVerity,
+                                disableVerification = disableVerification,
+                            )
+                        } else null
+                        val result = try {
+                            proto.flashPartitionDetailed(targetPartition, patchedVbmeta ?: image)
+                        } finally {
+                            patchedVbmeta?.delete()
+                        }
+                        if (!result.success) return FastbootShellBridge.Result(1, lines + "❌ ${formatFlashFailure(targetPartition, result)}")
+                        val flagNote = if (patchedVbmeta != null) " (AVB flags updated in a private copy)" else ""
+                        lines += "✅ flash $targetPartition: ${image.name} (${result.dataBytesTransferred} bytes)$flagNote"
+                    }
+                    FastbootShellBridge.Result(0, lines)
+                }
+                "erase" -> {
+                    val partition = command.getOrNull(1) ?: return FastbootShellBridge.Result(2, listOf("❌ erase requires a partition"))
+                    if (!partition.matches(Regex("[A-Za-z0-9_.:-]{1,128}"))) return FastbootShellBridge.Result(2, listOf("❌ Invalid partition name: $partition"))
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    if (command.size != 2) return FastbootShellBridge.Result(2, listOf("❌ Unsupported extra arguments for erase"))
+                    if (proto.sendCommand("erase:$partition")) FastbootShellBridge.Result(0, listOf("✅ erased $partition"))
+                    else FastbootShellBridge.Result(1, listOf("❌ erase $partition failed"))
+                }
+                "set_active", "--set-active" -> {
+                    val activeSlot = command.getOrNull(1)?.removePrefix("_")?.lowercase(Locale.US)
+                        ?: return FastbootShellBridge.Result(2, listOf("❌ set_active requires a or b"))
+                    if (activeSlot !in setOf("a", "b")) return FastbootShellBridge.Result(2, listOf("❌ Invalid active slot: $activeSlot"))
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    if (proto.sendCommand("set_active:$activeSlot")) FastbootShellBridge.Result(0, listOf("✅ active slot set to $activeSlot"))
+                    else FastbootShellBridge.Result(1, listOf("❌ set_active:$activeSlot failed"))
+                }
+                "reboot", "reboot-bootloader", "reboot-edl", "continue" -> {
+                    val wire = when {
+                        verb == "reboot" && command.getOrNull(1) == "bootloader" -> "reboot-bootloader"
+                        verb == "reboot" && command.getOrNull(1) == "fastboot" -> "reboot:fastboot"
+                        verb == "reboot" && command.size > 1 -> return FastbootShellBridge.Result(2, listOf("❌ Unsupported reboot target: ${command.drop(1).joinToString(" ")}"))
+                        else -> verb
+                    }
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    if (proto.sendCommand(wire)) FastbootShellBridge.Result(0, listOf("✅ $wire accepted"))
+                    else FastbootShellBridge.Result(1, listOf("❌ $wire failed"))
+                }
+                "flashing", "oem" -> {
+                    val request = command.joinToString(" ")
+                    if (request.any { it.code !in 32..126 } || request.length > 256) {
+                        return FastbootShellBridge.Result(2, listOf("❌ Invalid Fastboot command arguments"))
+                    }
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    if (proto.runTerminalCommand(request)) FastbootShellBridge.Result(0, listOf("✅ $request"))
+                    else FastbootShellBridge.Result(1, listOf("❌ $request failed"))
+                }
+                "boot" -> {
+                    val imagePath = command.getOrNull(1) ?: return FastbootShellBridge.Result(2, listOf("❌ boot requires an image file"))
+                    val image = File(imagePath).let { if (it.isAbsolute) it else File(workingDirectory, imagePath) }.canonicalFile
+                    if (!proto.beginOperation()) return FastbootShellBridge.Result(1, listOf("❌ Fastboot session is not ready"))
+                    if (proto.downloadAndRun(image, "boot")) FastbootShellBridge.Result(0, listOf("✅ boot ${image.name}"))
+                    else FastbootShellBridge.Result(1, listOf("❌ boot ${image.name} failed"))
+                }
+                else -> FastbootShellBridge.Result(2, listOf("❌ Unsupported Fastboot command: ${command.joinToString(" ")}"))
+            }
+        } finally {
+            localScriptFastbootActive = false
+        }
+    }
+
     internal fun submitLocalTerminalCommand(raw: String, command: String, workspace: File?): LocalTerminalAdmission =
         launchLocalTerminalCommand(localTerminalScope) { cancellation ->
             logLocalTerminal("${localShell.prompt()} $raw")
@@ -1336,10 +1609,13 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                         }
                     },
                     confirmOverwrite = ::requestLocalOverwrite,
-                    confirmDelete = ::requestLocalDelete
+                    confirmDelete = ::requestLocalDelete,
+                    fastbootCommand = ::executeScriptFastbootCommand,
+                    onShellOutput = ::logLocalTerminal,
                 )
                 when {
                     output == null -> logLocalTerminal(text(R.string.local_terminal_workspace_unavailable))
+                    output.streamedOutput -> Unit
                     output.lines.isEmpty() -> logLocalTerminal(
                         text(R.string.local_terminal_working_directory, localShell.prompt(output.directory))
                     )
@@ -1361,6 +1637,86 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
                 logLocalTerminal(text(R.string.local_terminal_failed, elapsed(), error.message ?: error.javaClass.simpleName))
             }
         }
+
+    internal fun submitLocalTerminalScriptCommand(
+        raw: String,
+        command: String,
+        workspace: File?,
+    ): LocalTerminalAdmission {
+        return synchronized(operationLaunchLock) {
+            if (localTerminalOperation != null) return@synchronized LocalTerminalAdmission.LOCAL_BUSY
+            if (workspaceImport.isBusy) return@synchronized LocalTerminalAdmission.WORKSPACE_BUSY
+            if (viewModelCleared.get() || connectionJob?.isCompleted == false || hasUnfinishedUsbOperation()) {
+                return@synchronized LocalTerminalAdmission.USB_BUSY
+            }
+            localScriptServiceOwned = true
+            val started = startOperation(
+                title = "Local ROM script",
+                text = "Executing $raw through the app-owned Fastboot transport",
+                heavy = true,
+                prepareFastbootSession = false,
+                requiredTransport = UsbOperationAdmission.RequiredTransport.FASTBOOT,
+            ) {
+                localScriptExecutionActive = true
+                val startedAt = SystemClock.elapsedRealtime()
+                fun elapsed(): String {
+                    val milliseconds = SystemClock.elapsedRealtime() - startedAt
+                    return if (milliseconds < 1_000L) text(R.string.local_terminal_milliseconds, milliseconds)
+                    else text(R.string.local_terminal_seconds, milliseconds / 1_000.0)
+                }
+                try {
+                    logLocalTerminal("${localShell.prompt()} $raw")
+                    var lastProgressAt: Long? = null
+                    val output = localShell.execute(
+                        line = command,
+                        workspace = { workspace },
+                        cancellation = ImportCancellation(),
+                        onCopyProgress = { copiedBytes, totalBytes ->
+                            val now = SystemClock.elapsedRealtime()
+                            val previous = lastProgressAt
+                            if (previous == null || now - previous >= 100L || copiedBytes == totalBytes) {
+                                _localTerminalCopyProgress.postValue(LocalCopyProgress(copiedBytes, totalBytes))
+                                lastProgressAt = now
+                            }
+                        },
+                        confirmOverwrite = ::requestLocalOverwrite,
+                        confirmDelete = ::requestLocalDelete,
+                        fastbootCommand = ::executeScriptFastbootCommand,
+                        onShellOutput = ::logLocalTerminal,
+                    ) ?: failOperation(text(R.string.local_terminal_workspace_unavailable))
+
+                    when {
+                        output.streamedOutput -> Unit
+                        output.lines.isEmpty() -> logLocalTerminal(
+                            text(R.string.local_terminal_working_directory, localShell.prompt(output.directory))
+                        )
+                        else -> output.lines.forEach(::logLocalTerminal)
+                    }
+                    if (output.exitCode != 0) {
+                        logLocalTerminal("✕ ${text(R.string.local_terminal_failed, elapsed(), text(R.string.local_terminal_exit_code, output.exitCode))}")
+                        failOperation("Local ROM script exited with status ${output.exitCode}")
+                    }
+                    logLocalTerminal("✓ ${text(R.string.local_terminal_finished, elapsed())}")
+                    confirmSuccess("Local ROM script completed successfully (exit 0)")
+                } catch (cancelled: CancellationException) {
+                    logLocalTerminal("! ${text(R.string.local_terminal_cancelled, elapsed())}")
+                    throw cancelled
+                } catch (abort: OperationAbort) {
+                    throw abort
+                } catch (error: Exception) {
+                    logLocalTerminal("✕ ${text(R.string.local_terminal_failed, elapsed(), error.message ?: error.javaClass.simpleName)}")
+                    throw error
+                } finally {
+                    localScriptExecutionActive = false
+                    localScriptFastbootActive = false
+                    localScriptServiceOwned = false
+                    _localTerminalCopyProgress.postValue(null)
+                }
+            } != null
+            if (!started) localScriptServiceOwned = false
+            if (started) LocalTerminalAdmission.STARTED else LocalTerminalAdmission.USB_BUSY
+        }
+    }
 
     private suspend fun requestLocalOverwrite(file: File): Boolean {
         val confirmation = LocalOverwriteConfirmation(LocalOverwriteRequest(file), CompletableDeferred())
@@ -1412,6 +1768,32 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
         confirmation?.answer?.complete(delete)
     }
 
+    private suspend fun requestLocalScriptConfirmation(message: String): Boolean {
+        val confirmation = LocalScriptConfirmation(LocalScriptConfirmationRequest(message), CompletableDeferred())
+        synchronized(operationLaunchLock) {
+            localScriptConfirmationState?.answer?.complete(false)
+            localScriptConfirmationState = confirmation
+            _localScriptConfirmation.postValue(confirmation.request)
+        }
+        return try {
+            confirmation.answer.await()
+        } finally {
+            synchronized(operationLaunchLock) {
+                if (localScriptConfirmationState === confirmation) {
+                    localScriptConfirmationState = null
+                    _localScriptConfirmation.postValue(null)
+                }
+            }
+        }
+    }
+
+    internal fun answerLocalScriptConfirmation(request: LocalScriptConfirmationRequest, approved: Boolean) {
+        val confirmation = synchronized(operationLaunchLock) {
+            localScriptConfirmationState?.takeIf { it.request === request }
+        }
+        confirmation?.answer?.complete(approved)
+    }
+
     internal fun launchLocalTerminalCommand(
         scope: CoroutineScope,
         block: suspend (ImportCancellation) -> Unit
@@ -1445,7 +1827,17 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     internal fun cancelLocalTerminalCommand() {
-        val operation = synchronized(operationLaunchLock) { localTerminalOperation } ?: return
+        val serviceOwned = localScriptServiceOwned
+        val operation = synchronized(operationLaunchLock) {
+            localScriptConfirmationState?.answer?.complete(false)
+            localTerminalOperation
+        }
+        if (serviceOwned) {
+            cancelActiveOperation()
+            return
+        }
+        if (operation == null) return
+        if (localScriptFastbootActive) fastbootProtocol?.cancel()
         if (operation.cancellation.cancel()) operation.job.cancel()
     }
 
@@ -2839,6 +3231,7 @@ class DeviceViewModel(application: Application) : AndroidViewModel(application) 
 
     fun cancelActiveOperation() {
         synchronized(operationLaunchLock) {
+            localScriptConfirmationState?.answer?.complete(false)
             val task = activeServiceOperation
             if (task == null || task.job.isCompleted) {
                 log(text(R.string.operation_cancelled))

@@ -1,5 +1,9 @@
 package ru.forum.adbfastboottool
 
+import android.graphics.Color
+import android.text.SpannableStringBuilder
+import android.text.style.StyleSpan
+import android.graphics.Typeface
 import android.view.LayoutInflater
 import android.text.SpannableString
 import android.text.Spanned
@@ -90,7 +94,66 @@ internal class ConsoleLogAdapter(initialTextSizeSp: Float) : RecyclerView.Adapte
         )
     }
 
-    internal class LineViewHolder(
+    private fun renderAnsi(value: String, defaultColor: Int): CharSequence {
+        val pattern = Regex("\\u001B\\[([0-9;]*)m")
+        val matches = pattern.findAll(value).toList()
+        if (matches.isEmpty()) return value
+        val result = SpannableStringBuilder()
+        var cursor = 0
+        var activeColor = defaultColor
+        var bold = false
+
+        fun appendSegment(end: Int) {
+            if (end <= cursor) return
+            val start = result.length
+            result.append(value, cursor, end)
+            val finish = result.length
+            if (activeColor != defaultColor) result.setSpan(
+                ForegroundColorSpan(activeColor), start, finish, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            if (bold) result.setSpan(
+                StyleSpan(Typeface.BOLD), start, finish, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE,
+            )
+            cursor = end
+        }
+
+        fun ansiColor(code: Int): Int? {
+            val base = arrayOf(
+                Color.rgb(40, 44, 52), Color.rgb(224, 88, 88), Color.rgb(80, 190, 120),
+                Color.rgb(220, 180, 80), Color.rgb(90, 145, 230), Color.rgb(190, 110, 210),
+                Color.rgb(80, 190, 205), Color.rgb(225, 230, 235),
+            )
+            val bright = arrayOf(
+                Color.rgb(105, 110, 120), Color.rgb(255, 105, 105), Color.rgb(120, 235, 155),
+                Color.rgb(255, 220, 115), Color.rgb(125, 175, 255), Color.rgb(225, 145, 240),
+                Color.rgb(115, 225, 240), Color.WHITE,
+            )
+            return when (code) {
+                in 30..37 -> base[code - 30]
+                in 90..97 -> bright[code - 90]
+                else -> null
+            }
+        }
+
+        matches.forEach { match ->
+            appendSegment(match.range.first)
+            val codes = match.groupValues[1].ifEmpty { "0" }.split(';').mapNotNull { it.toIntOrNull() }
+            codes.forEach { code ->
+                when (code) {
+                    0 -> { activeColor = defaultColor; bold = false }
+                    1 -> bold = true
+                    22 -> bold = false
+                    39 -> activeColor = defaultColor
+                    else -> ansiColor(code)?.let { activeColor = it }
+                }
+            }
+            cursor = match.range.last + 1
+        }
+        if (cursor < value.length) appendSegment(value.length)
+        return result
+    }
+
+    internal inner class LineViewHolder(
         private val textView: TextView,
     ) : RecyclerView.ViewHolder(textView) {
         fun bind(item: Item, textSizeSp: Float) {
@@ -105,7 +168,7 @@ internal class ConsoleLogAdapter(initialTextSizeSp: Float) : RecyclerView.Adapte
             textView.ellipsize = if (isWelcome) TextUtils.TruncateAt.END else null
             val defaultColor = ContextCompat.getColor(textView.context, item.tone.colorResource())
             if (!isWelcome) {
-                textView.text = item.text
+                textView.text = renderAnsi(item.text, defaultColor)
                 textView.setTextColor(defaultColor)
                 return
             }
@@ -138,8 +201,8 @@ internal class ConsoleLogAdapter(initialTextSizeSp: Float) : RecyclerView.Adapte
                         value.startsWith("export NEKO_USE_DEVICE_BINARIES=1") -> R.color.terminal_welcome_enabled
                         value.startsWith("export NEKO_USE_DEVICE_BINARIES=0") -> R.color.terminal_welcome_reset
                         value.startsWith("💡") || value.contains("local help") -> R.color.terminal_welcome_help
-                        value.startsWith("✅") || value.startsWith("↗️") -> R.color.terminal_welcome_enabled
-                        value.startsWith("♻️") -> R.color.terminal_welcome_reset
+                        value.startsWith("✅") || value.startsWith("↗️") || value.startsWith("🟢") -> R.color.terminal_welcome_enabled
+                        value.startsWith("♻️") || value.startsWith("🔴") -> R.color.terminal_welcome_reset
                         value.startsWith("↩️") -> R.color.terminal_welcome_source
                         value.startsWith("📱") || value.startsWith("🧩") || value.startsWith("📁") ||
                             value.startsWith("🕒") || value.startsWith("📅") || value.startsWith("⚙️") ->

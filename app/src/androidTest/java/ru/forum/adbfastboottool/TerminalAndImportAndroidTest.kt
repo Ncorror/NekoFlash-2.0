@@ -226,10 +226,10 @@ class TerminalAndImportAndroidTest {
             note.writeText("Workspace note from cat\n")
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 fun run(text: String) = scenario.onActivity { command(it, text) }
-                run("local cd \"${fixture.name}\"")
+                run("local cd \"Download/NekoFlash/${fixture.name}\"")
                 waitUntil("local cd completed") {
                     vm().localTerminalRunning.value != true &&
-                        vm().terminalSnapshot().any { it.contains("~/${fixture.name}") }
+                        vm().terminalSnapshot().any { it.contains("~/Download/NekoFlash/${fixture.name}") }
                 }
 
                 run("local cp \"${source.name}\" \"${copy.name}\"")
@@ -254,8 +254,10 @@ class TerminalAndImportAndroidTest {
 
                 run("local pwd")
                 waitUntil("retained working directory") {
+                    val current = vm().localShell.workingDirectory
                     vm().localTerminalRunning.value != true &&
-                        vm().terminalSnapshot().contains("> [Local] ${fixture.canonicalPath}")
+                        current?.canonicalFile == fixture.canonicalFile &&
+                        current?.let { vm().terminalSnapshot().contains("> [Local] ${it.path}") } == true
                 }
                 run("local mv \"${copy.name}\" \"${moved.name}\"")
                 waitUntil("local mv published") {

@@ -20,6 +20,7 @@ class AdbTerminalTransferTest {
     private lateinit var workspace: File
 
     @Before fun attachParser() {
+        RobolectricStorageFixture.installPrimaryExternalDirectory()
         activity = Robolectric.buildActivity(MainActivity::class.java).get()
         workspace = temporary.newFolder("NekoFlash")
         MainActivity::class.java.getDeclaredField("workspacePath").apply { isAccessible = true }.set(activity, workspace)

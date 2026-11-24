@@ -41,6 +41,7 @@ class FirmwareSelectionLifecycleTest {
     private fun image(name: String = "selected.img") = File(app.filesDir, name).apply { writeBytes(ByteArray(8192) { 7 }) }
     @Suppress("DEPRECATION")
     @Before fun grantMergedPermissionOnOldRobolectric() {
+        RobolectricStorageFixture.installPrimaryExternalDirectory()
         if (Build.VERSION.SDK_INT < 33) {
             val permission = "${app.packageName}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION"
             val info = app.packageManager.getPermissionInfo(permission, 0)

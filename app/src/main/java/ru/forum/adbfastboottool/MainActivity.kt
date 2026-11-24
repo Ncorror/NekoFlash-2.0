@@ -49,7 +49,6 @@ import androidx.core.content.edit
 import androidx.core.graphics.toColorInt
 import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
-import androidx.core.view.doOnNextLayout
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
 import androidx.core.os.LocaleListCompat
@@ -136,6 +135,8 @@ class MainActivity : AppCompatActivity() {
     private var displayedLocalOverwrite: DeviceViewModel.LocalOverwriteRequest? = null
     private var localDeleteDialog: androidx.appcompat.app.AlertDialog? = null
     private var displayedLocalDelete: DeviceViewModel.LocalDeleteRequest? = null
+    private var localScriptConfirmationDialog: androidx.appcompat.app.AlertDialog? = null
+    private var displayedLocalScriptConfirmation: DeviceViewModel.LocalScriptConfirmationRequest? = null
     // Keep completed checkpoint evidence, but do not resurrect its strip after
     // an Activity cold launch (including force-stop and process recreation).
     private var hideRestoredTerminalResultOnColdLaunch: Boolean = false
@@ -468,6 +469,7 @@ class MainActivity : AppCompatActivity() {
         viewModel.localTerminalCopyProgress.observe(this) { renderTerminalOperationStatus() }
         viewModel.localTerminalOverwrite.observe(this, ::renderLocalOverwrite)
         viewModel.localTerminalDelete.observe(this, ::renderLocalDelete)
+        viewModel.localScriptConfirmation.observe(this, ::renderLocalScriptConfirmation)
         viewModel.operationSteps.observe(this) { steps -> renderOperationSteps(steps) }
         viewModel.operationProgress.observe(this) { progress ->
             val operationIsActive = viewModel.operationActive.value == true
@@ -1208,20 +1210,36 @@ class MainActivity : AppCompatActivity() {
             viewModel.logLocalTerminal(getString(R.string.local_terminal_invalid_syntax))
             return
         }
-        val workspace = if (needsWorkspace) {
-            if (!PermissionGate.hasStorage(this)) {
-                viewModel.logLocalTerminal(getString(R.string.local_terminal_workspace_unavailable))
-                showPermissionsDialog()
-                return
-            }
-            if (!::workspacePath.isInitialized || !workspacePath.isDirectory) initWorkspace()
-            if (!ensureWorkspaceReady()) return
-            workspacePath
-        } else {
-            null
+        val workspace = if (needsWorkspace) viewModel.localTerminalHome else null
+        val invokesShell = Regex("(?:^|&&|\\|)\\s*(?:local\\s+)?(?:sh|bash)\\s+").containsMatchIn(command)
+        if (invokesShell && !viewModel.localShell.isDeviceBinariesEnabled) {
+            viewModel.logLocalTerminal("⚠️ Shell execution is disabled. Run: export NEKO_USE_DEVICE_BINARIES=1")
+            return
         }
+        if (invokesShell) {
+            MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.terminal_shell_confirm_title)
+                .setMessage(R.string.terminal_shell_confirm_message)
+                .setPositiveButton(R.string.terminal_script_confirm_continue) { _, _ ->
+                    submitLocalTerminal(raw, command, workspace)
+                }
+                .setNegativeButton(R.string.cancel_upper, null)
+                .show()
+            return
+        }
+        submitLocalTerminal(raw, command, workspace)
+    }
 
-        when (viewModel.submitLocalTerminalCommand(raw, command, workspace)) {
+    private fun submitLocalTerminal(raw: String, command: String, workspace: File?) {
+        val invokesShell = Regex("(?:^|&&|\\|)\\s*(?:local\\s+)?(?:sh|bash)\\s+").containsMatchIn(command)
+        val admission = viewModel.withTerminalCommand {
+            if (invokesShell && viewModel.fastbootProtocol?.isConnected == true) {
+                viewModel.submitLocalTerminalScriptCommand(raw, command, workspace)
+            } else {
+                viewModel.submitLocalTerminalCommand(raw, command, workspace)
+            }
+        }
+        when (admission) {
             DeviceViewModel.LocalTerminalAdmission.STARTED -> Unit
             DeviceViewModel.LocalTerminalAdmission.LOCAL_BUSY -> viewModel.logLocalTerminal(
                 getString(R.string.local_terminal_wait_local, getString(R.string.terminal_stop_button))
@@ -1270,6 +1288,26 @@ class MainActivity : AppCompatActivity() {
                 viewModel.answerLocalDelete(request, delete = false)
             }
             .setOnCancelListener { viewModel.answerLocalDelete(request, delete = false) }
+            .show()
+    }
+
+    private fun renderLocalScriptConfirmation(request: DeviceViewModel.LocalScriptConfirmationRequest?) {
+        if (displayedLocalScriptConfirmation === request) return
+        localScriptConfirmationDialog?.dismiss()
+        localScriptConfirmationDialog = null
+        displayedLocalScriptConfirmation = request
+        if (request == null || isFinishing || isDestroyed) return
+
+        localScriptConfirmationDialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.terminal_script_confirm_title)
+            .setMessage(request.message)
+            .setPositiveButton(R.string.terminal_script_confirm_continue) { _, _ ->
+                viewModel.answerLocalScriptConfirmation(request, approved = true)
+            }
+            .setNegativeButton(R.string.cancel_upper) { _, _ ->
+                viewModel.answerLocalScriptConfirmation(request, approved = false)
+            }
+            .setOnCancelListener { viewModel.answerLocalScriptConfirmation(request, approved = false) }
             .show()
     }
 
@@ -2629,6 +2667,7 @@ class MainActivity : AppCompatActivity() {
         }
         enableOverlayProtection()
         viewModel.refreshQuickFlashSource()
+        viewModel.refreshLocalTerminalHome()
         updateOtgStatus()
         if (PermissionGate.hasStorage(this)) {
             if (!::workspacePath.isInitialized) initWorkspace()
@@ -5413,12 +5452,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         when {
-            pinToTop -> rvConsoleOutput.doOnNextLayout { view ->
-                if (!isFinishing && !isDestroyed && consoleDockController.isExpanded) {
-                    (view as? RecyclerView)?.let { output ->
-                        (output.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(0, 0)
-                    }
-                }
+            pinToTop -> if (!isFinishing && !isDestroyed && consoleDockController.isExpanded) {
+                layoutManager?.scrollToPositionWithOffset(0, 0)
             }
             keepPinnedToBottom -> scrollConsoleToBottom()
             decision.removeCount > 0 && firstVisiblePosition >= 0 -> {
@@ -5514,6 +5549,10 @@ class MainActivity : AppCompatActivity() {
         importDialog = null
         localOverwriteDialog?.dismiss()
         localOverwriteDialog = null
+        localDeleteDialog?.dismiss()
+        localDeleteDialog = null
+        localScriptConfirmationDialog?.dismiss()
+        localScriptConfirmationDialog = null
         if (!isChangingConfigurations && viewModelReady) {
             viewModel.workspaceImport.cancel()
             viewModel.cancelLocalTerminalCommand()

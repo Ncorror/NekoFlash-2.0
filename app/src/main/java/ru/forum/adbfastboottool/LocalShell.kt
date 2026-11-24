@@ -18,13 +18,20 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-internal class LocalShell(private val availableSpace: (File) -> Long) {
+internal class LocalShell(
+    private val availableSpace: (File) -> Long,
+    initialHome: File? = null,
+    initialDeviceBinariesEnabled: Boolean = false,
+    private val onDeviceBinariesChanged: (Boolean) -> Unit = {},
+    private val shellExecutable: File = File("/system/bin/sh"),
+) {
     data class Output(
         val directory: File?,
         val lines: List<String>,
         val clearTerminal: Boolean = false,
         val deviceBinariesEnabled: Boolean = false,
         val exitCode: Int = 0,
+        val streamedOutput: Boolean = false,
     )
 
     private data class CommandResult(
@@ -32,18 +39,62 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         val lines: List<String> = emptyList(),
         val clearTerminal: Boolean = false,
         val diagnostics: List<String> = emptyList(),
+        val streamedOutput: Boolean = false,
     )
 
     private val lock = Mutex()
-    @Volatile private var home: File? = null
-    @Volatile private var cwd: File? = null
-    @Volatile private var deviceBinariesEnabled = false
+    @Volatile private var home: File? = initialHome?.let(::normalizeFile)
+    @Volatile private var cwd: File? = home
+    @Volatile private var previousCwd: File? = null
+    @Volatile private var deviceBinariesEnabled = initialDeviceBinariesEnabled
+    @Volatile private var sharedWorkspace: File? = null
+
+    init {
+        home?.let { check(it.isDirectory || it.mkdirs()) { "Cannot create terminal HOME: $it" } }
+    }
+
+    val isDeviceBinariesEnabled: Boolean get() = deviceBinariesEnabled
+    val homeDirectory: File? get() = home
+    val workingDirectory: File? get() = cwd
+
+    /** HOME remains private; the public workspace is exposed through a private-side link. */
+    fun configureHome(homeDirectory: File, publicWorkspace: File?) {
+        check(homeDirectory.isDirectory || homeDirectory.mkdirs()) { "Cannot create terminal HOME: $homeDirectory" }
+        home = normalizeFile(homeDirectory)
+        sharedWorkspace = publicWorkspace?.let(::normalizeFile)
+        if (cwd == null) cwd = home
+        publicWorkspace?.let { shared ->
+            require(shared.isDirectory || shared.mkdirs()) {
+                "Cannot prepare shared NekoFlash folder: $shared"
+            }
+            val downloads = File(homeDirectory, "Download")
+            require(downloads.isDirectory || downloads.mkdirs()) {
+                "Cannot prepare HOME/Download: $downloads"
+            }
+            val alias = File(downloads, shared.name)
+            if (!Files.exists(alias.toPath(), LinkOption.NOFOLLOW_LINKS)) {
+                runCatching { Files.createSymbolicLink(alias.toPath(), shared.toPath()) }
+                    .getOrElse { throw IllegalStateException("Cannot create shared-folder symlink $alias -> $shared: ${it.message}", it) }
+            } else if (Files.isSymbolicLink(alias.toPath())) {
+                val linkedTarget = alias.toPath().toRealPath()
+                require(linkedTarget == shared.toPath().toRealPath()) {
+                    "HOME shared-folder link points elsewhere: $alias"
+                }
+            } else {
+                require(alias.canonicalFile == shared.canonicalFile) {
+                    "HOME/Download/${shared.name} already exists and is not the expected symlink"
+                }
+            }
+        }
+    }
 
     fun prompt(directory: File? = cwd): String {
-        val root = home ?: return "~"
-        val current = directory ?: root
-        val relative = root.toPath().relativize(current.toPath()).toString()
-        return if (relative.isEmpty()) "~" else "~/$relative"
+        val root = home ?: return (directory ?: File(".")).absolutePath
+        val current = normalizeFile(directory ?: root).toPath()
+        val homePath = normalizeFile(root).toPath()
+        return if (current == homePath) "~" else if (current.startsWith(homePath)) {
+            "~/" + homePath.relativize(current).toString()
+        } else current.toString()
     }
 
     fun quickOutput(line: String, help: List<String> = HELP): Output? {
@@ -68,9 +119,10 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                     "Only NEKO_USE_DEVICE_BINARIES=1 or 0 is supported"
                 }
                 deviceBinariesEnabled = assignment.endsWith("=1")
+                onDeviceBinariesChanged(deviceBinariesEnabled)
                 Output(cwd, listOf(
-                    if (deviceBinariesEnabled) "Device diagnostics enabled; only approved read-only Android commands may run."
-                    else "Device diagnostics disabled; app-managed implementations are used."
+                    if (deviceBinariesEnabled) "System shell enabled and saved. Scripts run as the app UID with Android's system PATH; use trusted scripts only."
+                    else "System shell disabled and saved. App-managed terminal commands remain available."
                 ), deviceBinariesEnabled = deviceBinariesEnabled)
             }
             in COMMANDS -> null
@@ -94,7 +146,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 val name = tokens.firstOrNull()?.value.orEmpty()
                 val args = tokens.drop(1)
                 when (name) {
-                    "pwd", "ls", "cd", "mkdir", "cp", "mv", "rm" -> true
+                    "pwd", "ls", "cd", "mkdir", "cp", "mv", "rm", "sh", "bash" -> true
                     "grep" -> args.size == 2
                     "cat" -> args.isNotEmpty()
                     else -> false
@@ -115,6 +167,8 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         cancellation: ImportCancellation = ImportCancellation(),
         onCopyProgress: (copied: Long, total: Long) -> Unit = { _, _ -> },
         confirmDelete: suspend (File) -> Boolean = { false },
+        fastbootCommand: ((List<String>, File) -> FastbootShellBridge.Result)? = null,
+        onShellOutput: (String) -> Unit = {},
         confirmOverwrite: suspend (File) -> Boolean,
     ): Output? = lock.withLock {
         var committedOutput: Output? = null
@@ -133,9 +187,9 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 var root: File? = null
                 suspend fun workspaceRoot(): File? {
                     if (root == null) {
-                        root = workspace()?.canonicalFile ?: return null
-                        require(root!!.isDirectory) { "Workspace folder is unavailable: $root" }
-                        if (home != root) {
+                        root = home ?: workspace()?.let(::normalizeFile) ?: return null
+                        require(root!!.isDirectory) { "Terminal HOME is unavailable: $root" }
+                        if (home == null) {
                             home = root
                             cwd = root
                         }
@@ -148,6 +202,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 var previousExitCode = 0
                 val outputLines = mutableListOf<String>()
                 var clearTerminal = false
+                var streamedOutput = false
 
                 for (clause in clauses) {
                     checkCancelled()
@@ -166,14 +221,12 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                         val args = tokens.drop(1)
                         finalCommand = name
 
-                        if (stages.size > 1 && name in STATEFUL_COMMANDS) {
+                        if (stages.size > 1 && (name in STATEFUL_COMMANDS || name in SHELL_COMMANDS)) {
                             throw IllegalArgumentException("'$name' cannot be used in a pipeline")
                         }
 
                         val needsWorkspace = when (name) {
-                            "pwd", "ls", "cd", "mkdir", "cp", "mv", "rm" -> true
-                            "grep" -> args.size == 2
-                            "cat" -> args.isNotEmpty()
+                            "pwd", "ls", "cd", "mkdir", "cp", "mv", "rm", "cat", "grep", "sh", "bash" -> true
                             else -> false
                         }
                         val activeRoot = if (needsWorkspace) {
@@ -191,9 +244,12 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                             onCopyProgress = onCopyProgress,
                             confirmOverwrite = confirmOverwrite,
                             confirmDelete = confirmDelete,
+                            fastbootCommand = fastbootCommand,
+                            onShellOutput = onShellOutput,
                             onCommitted = { committedOutput = it },
                         )
                         input = result.lines
+                        streamedOutput = streamedOutput || result.streamedOutput
                         previousExitCode = result.exitCode
                         if (result.clearTerminal) {
                             clearTerminal = true
@@ -208,7 +264,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                         outputLines += input.orEmpty()
                     }
                 }
-                Output(cwd, outputLines, clearTerminal, deviceBinariesEnabled, previousExitCode)
+                Output(cwd, outputLines, clearTerminal, deviceBinariesEnabled, previousExitCode, streamedOutput)
             }
         } catch (cancelled: CancellationException) {
             committedOutput ?: throw cancelled
@@ -226,8 +282,25 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         onCopyProgress: (Long, Long) -> Unit,
         confirmOverwrite: suspend (File) -> Boolean,
         confirmDelete: suspend (File) -> Boolean,
+        fastbootCommand: ((List<String>, File) -> FastbootShellBridge.Result)?,
+        onShellOutput: (String) -> Unit,
         onCommitted: (Output) -> Unit,
     ): CommandResult {
+        if (name in SHELL_COMMANDS) {
+            require(deviceBinariesEnabled) {
+                "Local shell is disabled. Run: export NEKO_USE_DEVICE_BINARIES=1"
+            }
+            val shellResult = runSystemShell(
+                shellName = name,
+                args = args.map { it.value },
+                directory = directory ?: home ?: File("."),
+                fastbootCommand = fastbootCommand,
+                onOutput = onShellOutput,
+                checkCancelled = checkCancelled,
+            )
+            return CommandResult(shellResult.first, shellResult.second, streamedOutput = true)
+        }
+
         if (name in BLOCKED_EXECUTABLES) {
             return CommandResult(126, listOf(
                 "'$name' is blocked. Shell execution, privilege escalation, and app-identity switching are not exposed."
@@ -243,9 +316,10 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 "Only NEKO_USE_DEVICE_BINARIES=1 or 0 is supported"
             }
             deviceBinariesEnabled = assignment.endsWith("=1")
+            onDeviceBinariesChanged(deviceBinariesEnabled)
             return CommandResult(0, listOf(
-                if (deviceBinariesEnabled) "Device diagnostics enabled; only approved read-only Android commands may run."
-                else "Device diagnostics disabled; app-managed implementations are used."
+                if (deviceBinariesEnabled) "System shell enabled and saved. Scripts run as the app UID with Android's system PATH; use trusted scripts only."
+                else "System shell disabled and saved. App-managed terminal commands remain available."
             ))
         }
 
@@ -286,9 +360,9 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
             }
         }
 
-        val workspace = requireNotNull(root) { "Workspace is unavailable" }
+        val terminalHome = requireNotNull(root) { "Terminal HOME is unavailable" }
         val current = requireNotNull(directory)
-        fun path(token: FastbootCommandLine.Token) = resolve(workspace, current, token)
+        fun path(token: FastbootCommandLine.Token) = resolve(current, token)
 
         checkCancelled()
         return when (name) {
@@ -297,15 +371,22 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 CommandResult(0, listOf(current.path))
             }
             "cd" -> {
-                require(input == null && args.size <= 1) { "Usage: cd [directory]" }
-                val next = args.firstOrNull()?.let(::path) ?: workspace
-                require(next.isDirectory) { "Not a directory: $next" }
-                cwd = next
+                require(input == null && args.size <= 1) { "Usage: cd [directory|-]" }
+                val requested = args.firstOrNull()?.value
+                val next = when (requested) {
+                    null, "~" -> terminalHome
+                    "-" -> previousCwd ?: throw IllegalArgumentException("Previous directory is not set")
+                    else -> path(args.single())
+                }
+                require(next.isDirectory && next.canRead()) { "Not an accessible directory: $next" }
+                val normalized = normalizeFile(next)
+                cwd?.let { previous -> if (previous != normalized) previousCwd = previous }
+                cwd = normalized
                 CommandResult(0)
             }
             "ls" -> {
                 require(input == null && args.size <= 1) { "Usage: ls [path]" }
-                val item = args.firstOrNull()?.let(::path) ?: inside(workspace, current)
+                val item = args.firstOrNull()?.let(::path) ?: current
                 CommandResult(0, listEntries(item, checkCancelled))
             }
             "grep" -> {
@@ -336,7 +417,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
             "mkdir" -> {
                 require(input == null && args.size == 1) { "Usage: mkdir DIR" }
                 val folder = path(args.single())
-                requireMutablePath(workspace, folder)
+                requireMutablePath(folder)
                 val output = Output(cwd, listOf("✅ Created directory: ${folder.path}"))
                 cancellation.commit {
                     checkCancelled()
@@ -349,7 +430,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 require(input == null && args.size == 2) { "Usage: $name SOURCE DEST" }
                 val output = transfer(
                     move = name == "mv",
-                    root = workspace,
+                    root = terminalHome,
                     source = path(args[0]),
                     destination = path(args[1]),
                     cancellation = cancellation,
@@ -365,8 +446,8 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                     "Usage: rm FILE (directories and options are not supported)"
                 }
                 val file = path(args.single())
-                requireNoSymlinksForDelete(workspace, current, args.single())
-                requireMutablePath(workspace, file)
+                require(!Files.isSymbolicLink(file.toPath())) { "Symbolic links cannot be removed: $file" }
+                requireMutablePath(file)
                 val before = attributes(file)
                 require(before != null && before.isRegularFile) {
                     "Not a regular file: $file (directories and symbolic links are not removed)"
@@ -386,6 +467,142 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 CommandResult(0, output.lines)
             }
             else -> error("Command dispatch is incomplete: $name")
+        }
+    }
+
+    private suspend fun runSystemShell(
+        shellName: String,
+        args: List<String>,
+        directory: File,
+        fastbootCommand: ((List<String>, File) -> FastbootShellBridge.Result)?,
+        onOutput: (String) -> Unit,
+        checkCancelled: () -> Unit,
+    ): Pair<Int, List<String>> = coroutineScope {
+        require(args.isNotEmpty()) { "Usage: $shellName SCRIPT [arguments] (interactive shells are not supported by this one-command terminal)" }
+        val executable = shellExecutable
+        require(executable.isFile && executable.canExecute()) { "System shell is unavailable: ${executable.path}" }
+        val shellPath = executable.canonicalPath
+        val workingDirectory = directory.takeIf { it.isDirectory } ?: requireNotNull(home)
+        val homeDirectory = requireNotNull(home) { "Terminal HOME is unavailable" }
+        val binDirectory = File(homeDirectory, "bin")
+        check(binDirectory.isDirectory || binDirectory.mkdirs()) { "Cannot create terminal bin directory" }
+        val temporaryDirectory = File(homeDirectory, "tmp")
+        check(temporaryDirectory.isDirectory || temporaryDirectory.mkdirs()) { "Cannot create terminal temporary directory" }
+
+        fun writeExecutable(name: String, content: String) {
+            val file = File(binDirectory, name)
+            if (!file.exists() || file.readText() != content) file.writeText(content)
+            check(file.setExecutable(true, true) || file.canExecute()) { "Cannot make terminal helper executable: $file" }
+        }
+
+        writeExecutable("su", "#!$shellPath\necho 'NekoFlash: su is blocked in the local script environment' >&2\nexit 126\n")
+        writeExecutable("run-as", "#!$shellPath\necho 'NekoFlash: run-as is blocked in the local script environment' >&2\nexit 126\n")
+        writeExecutable("bash", "#!$shellPath\nexec \"$shellPath\" \"\$@\"\n")
+
+        val bridge = fastbootCommand?.let { handler ->
+            FastbootShellBridge { commandArgs, path -> handler(commandArgs, File(path)) }
+        }
+        try {
+            if (bridge != null) {
+                val dollar = '$'
+                val shim = """#!$shellPath
+if [ -z "${dollar}NEKOFLASH_FASTBOOT_PORT" ]; then
+  echo 'NekoFlash: Fastboot bridge is unavailable' >&2
+  exit 125
+fi
+if [ -x /system/bin/nc ]; then
+  NC=/system/bin/nc
+elif [ -x /system/bin/toybox ]; then
+  NC="/system/bin/toybox nc"
+else
+  echo 'NekoFlash: Android netcat/toybox is unavailable' >&2
+  exit 125
+fi
+reply=${dollar}(
+  {
+    printf '%s\n' "${dollar}NEKOFLASH_FASTBOOT_TOKEN"
+    printf '%s\n' "${dollar}PWD"
+    for arg do printf '%s\n' "${dollar}arg"; done
+  } | ${dollar}NC 127.0.0.1 "${dollar}NEKOFLASH_FASTBOOT_PORT"
+) || exit 125
+nl='
+'
+case "${dollar}reply" in
+  *"${dollar}nl"*) code="${dollar}{reply%%"${dollar}nl"*}"; body="${dollar}{reply#*"${dollar}nl"}" ;;
+  *) code="${dollar}reply"; body='' ;;
+esac
+[ -z "${dollar}body" ] || printf '%s\n' "${dollar}body"
+case "${dollar}code" in
+  ''|*[!0-9]*) exit 125 ;;
+  *) exit "${dollar}code" ;;
+esac
+"""
+                writeExecutable("fastboot", shim)
+            }
+
+            val command = mutableListOf(executable.absolutePath)
+            command += args
+            val builder = ProcessBuilder(command)
+                .directory(workingDirectory)
+                .redirectErrorStream(true)
+            val env = builder.environment()
+            env["HOME"] = homeDirectory.absolutePath
+            env["PWD"] = workingDirectory.absolutePath
+            env["TMPDIR"] = temporaryDirectory.absolutePath
+            env["SHELL"] = shellPath
+            env["NEKO_USE_DEVICE_BINARIES"] = if (deviceBinariesEnabled) "1" else "0"
+            bridge?.let {
+                env["NEKOFLASH_FASTBOOT_PORT"] = it.port.toString()
+                env["NEKOFLASH_FASTBOOT_TOKEN"] = it.authToken
+            }
+            val paths = (listOf(binDirectory.absolutePath) + SYSTEM_PATHS).distinct()
+            env["PATH"] = paths.joinToString(":")
+            env["LANG"] = "C.UTF-8"
+            val process = try { builder.start() } catch (error: IOException) {
+                throw IOException("Cannot start Android shell: ${error.message}", error)
+            }
+            val lines = mutableListOf<String>()
+            var totalOutputChars = 0
+            var truncationPublished = false
+            try {
+                val reader = async(Dispatchers.IO) {
+                    process.inputStream.bufferedReader().useLines { sequence ->
+                        sequence.forEach { rawLine ->
+                            checkCancelled()
+                            val safe = when {
+                                rawLine.contains(Regex("(?i)\\b(error|failed|failure|fatal)\\b")) -> "❌ $rawLine"
+                                rawLine.contains(Regex("(?i)\\b(warning|warn)\\b")) -> "⚠️ $rawLine"
+                                rawLine.contains(Regex("(?i)\\b(success|finished|done|okay)\\b")) -> "✅ $rawLine"
+                                else -> rawLine
+                            }
+                            val rendered = "│ $safe".take(MAX_TEXT_PREVIEW_CHARS)
+                            var publish: String? = null
+                            synchronized(lines) {
+                                if (lines.size < MAX_OUTPUT_LINES && totalOutputChars + rendered.length <= MAX_TEXT_OUTPUT_CHARS) {
+                                    lines += rendered
+                                    totalOutputChars += rendered.length
+                                    publish = rendered
+                                } else if (!truncationPublished && lines.size < MAX_OUTPUT_LINES) {
+                                    val marker = "⚠️ Output truncated after $MAX_OUTPUT_LINES lines / $MAX_TEXT_OUTPUT_CHARS characters"
+                                    lines += marker
+                                    totalOutputChars += marker.length
+                                    truncationPublished = true
+                                    publish = marker
+                                }
+                            }
+                            publish?.let(onOutput)
+                        }
+                    }
+                }
+                val waiter = async(Dispatchers.IO) { process.waitFor() }
+                val exitCode = waiter.await()
+                reader.await()
+                exitCode to synchronized(lines) { lines.toList() }
+            } finally {
+                if (process.isAlive) process.destroyForcibly()
+            }
+        } finally {
+            bridge?.close()
         }
     }
 
@@ -501,11 +718,11 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         onCommitted: (Output) -> Unit,
     ): Output {
         require(source.isFile) { "Not a file: $source" }
-        val target = if (destination.isDirectory) inside(root, File(destination, source.name)) else destination
+        val target = normalizeFile(if (destination.isDirectory) File(destination, source.name) else destination)
         val targetDirectory = target.parentFile?.takeIf { it.isDirectory }
             ?: throw IllegalArgumentException("Destination folder does not exist: $target")
-        if (move) requireMutablePath(root, source)
-        requireMutablePath(root, target)
+        if (move) requireMutablePath(source)
+        requireMutablePath(target)
         val before = attributes(target)
         if (before != null) {
             require(before.isRegularFile && !Files.isSameFile(source.toPath(), target.toPath())) {
@@ -517,7 +734,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         }
 
         checkCancelled()
-        require(inside(root, source) == source && inside(root, target) == target) {
+        require(source.exists() && target.parentFile?.isDirectory == true) {
             "A path changed. Run the command again."
         }
         val staged = if (move) source else FilePublication.temporarySibling(target)
@@ -540,7 +757,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
                 }
             }
             checkCancelled()
-            require(inside(root, target) == target) { "Destination path changed: $target" }
+            require(target.parentFile?.isDirectory == true) { "Destination path changed: $target" }
             if (before != null) {
                 val now = attributes(target)
                 require(now != null && now.isRegularFile && now.fileKey() == before.fileKey() &&
@@ -564,30 +781,17 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         }
     }
 
-    /** Never follow a user-created symlink when deleting a file. */
-    private fun requireNoSymlinksForDelete(root: File, directory: File, token: FastbootCommandLine.Token) {
-        val candidate = when {
-            token.literal.startsWith("~") && token.value == "~" -> root.toPath()
-            token.literal.startsWith("~") && token.value.startsWith("~/") ->
-                root.toPath().resolve(token.value.drop(2))
-            else -> directory.toPath().resolve(token.value)
-        }.normalize()
-        require(candidate.startsWith(root.toPath())) { "Path is outside the NekoFlash workspace: $candidate" }
-        var component = root.toPath()
-        for (part in root.toPath().relativize(candidate)) {
-            component = component.resolve(part)
-            require(!Files.isSymbolicLink(component)) {
-                "Symbolic links cannot be used for rm: $component"
-            }
+    private fun requireMutablePath(path: File) {
+        val normalized = path.canonicalFile.toPath()
+        val protectedDirectories = listOfNotNull(
+            home?.let { File(it, "logs") },
+            sharedWorkspace?.let { File(it, "logs") },
+        ).map { normalizeFile(it).toPath() }
+        val containsStagingPath = normalized.any { segment ->
+            segment.toString().startsWith(".nekoflash-")
         }
-    }
-
-    private fun requireMutablePath(root: File, path: File) {
-        val canonical = path.canonicalFile.toPath()
-        val relative = root.toPath().relativize(canonical)
-        val logs = File(root, "logs").canonicalFile.toPath()
-        require(!canonical.startsWith(logs) && relative.none { it.toString().startsWith(".nekoflash-") }) {
-            "Cannot modify an app-managed workspace path: $path"
+        require(protectedDirectories.none { normalized.startsWith(it) } && !containsStagingPath) {
+            "Cannot modify an app-managed log or staging path: $path"
         }
     }
 
@@ -709,23 +913,24 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         null
     }
 
-    private fun resolve(root: File, directory: File, token: FastbootCommandLine.Token): File {
-        val value = token.value
-        require(value.isNotEmpty()) { "Path is empty" }
-        val path = when {
-            token.literal.startsWith("~") && value == "~" -> root.toPath()
-            token.literal.startsWith("~") && value.startsWith("~/") -> root.toPath().resolve(value.drop(2))
+    private fun normalizeFile(file: File): File = file.toPath().toAbsolutePath().normalize().toFile()
+
+    private fun resolve(directory: File, token: FastbootCommandLine.Token): File {
+        val original = token.value
+        require(original.isNotEmpty()) { "Path is empty" }
+        val homeDirectory = requireNotNull(home) { "Terminal HOME is unavailable" }
+        val homePath = homeDirectory.toPath()
+        val homeValue = homeDirectory.absolutePath
+        val value = original
+            .replace("${'$'}{HOME}", homeValue)
+            .replace("${'$'}HOME", homeValue)
+        val raw = when {
+            value == "~" -> homePath
+            value.startsWith("~/") -> homePath.resolve(value.drop(2))
+            File(value).isAbsolute -> File(value).toPath()
             else -> directory.toPath().resolve(value)
         }
-        return inside(root, path.toFile())
-    }
-
-    private fun inside(root: File, candidate: File): File {
-        val resolved = candidate.canonicalFile
-        require(resolved.toPath().startsWith(root.toPath())) {
-            "Path is outside the NekoFlash workspace: $candidate"
-        }
-        return resolved
+        return raw.toAbsolutePath().normalize().toFile()
     }
 
     private fun splitOutsideQuotes(input: String, operator: String): List<String> {
@@ -768,6 +973,7 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         )
         val COMMANDS = setOf("pwd", "ls", "cd", "grep", "cp", "mv", "mkdir", "cat", "rm")
         val STATEFUL_COMMANDS = setOf("cd", "export", "clear")
+        val SHELL_COMMANDS = setOf("sh", "bash")
         val BLOCKED_EXECUTABLES = setOf(
             "sh", "bash", "mksh", "ash", "dash", "zsh", "ksh", "toybox", "busybox", "su", "run-as",
         )
@@ -776,15 +982,17 @@ internal class LocalShell(private val availableSpace: (File) -> Long) {
         val SAFE_ID_OPTIONS = setOf("-u", "-g", "-G", "-n", "-r")
         val SAFE_UNAME_OPTIONS = setOf("-a", "-s", "-r", "-m", "-n", "-v", "-p", "-o")
         val HELP = listOf(
-            "Commands: echo, pwd, ls, cd, grep, cp, mv, mkdir, cat, rm, clear",
+            "Commands: echo, pwd, ls, cd, grep, cp, mv, mkdir, cat, rm, sh, bash, clear",
             "Use 'local' for local commands; quote paths containing spaces.",
             "&& runs the next command only after success; | passes output to the next command.",
-            "App-managed file commands stay inside Download/NekoFlash; rm removes files only and asks first.",
+            "Paths are not workspace-confined: use absolute paths, .., or ~; access is limited by Android permissions.",
+            "HOME is private; ~/Download/NekoFlash links to the public Download/NekoFlash folder when available.",
+            "sh SCRIPT runs Android /system/bin/sh; bash is a compatibility alias to sh (Bash-only syntax may fail).",
             "Logs and .nekoflash-* staging files can be read but not modified.",
-            "Host Android diagnostics (not the USB target) are off by default; enable: export NEKO_USE_DEVICE_BINARIES=1",
-            "Allowed diagnostics: getprop, id, uname, uptime, whoami, df, ps, date.",
-            "Host Android diagnostics use the app UID, without root; su and run-as are blocked.",
-            "No shell interpreters, arbitrary executables, scripts, redirection, or root escalation are exposed.",
+            "System shell is off by default; enable and save: export NEKO_USE_DEVICE_BINARIES=1",
+            "Direct local diagnostics are allowlisted: getprop, id, uname, uptime, whoami, df, ps, date.",
+            "sh and bash scripts receive Android's system PATH and run with this app's UID, not a root sandbox.",
+            "PATH stubs block bare su/run-as only; absolute paths can bypass them. Never run untrusted scripts.",
         )
     }
 }
@@ -796,7 +1004,7 @@ internal fun extractLocalCommand(raw: String): String? {
     if (first == "local") return if (separator < 0) "" else clean.substring(separator).trimStart()
     if (hasUnsupportedShellSyntax(clean)) return null
     return when (first) {
-        "echo", "clear" -> clean
+        "echo", "clear", "pwd", "ls", "cd", "cat", "grep", "cp", "mv", "mkdir", "rm", "sh", "bash" -> clean
         "export" -> clean.takeIf { it.startsWith("export NEKO_USE_DEVICE_BINARIES=") }
         else -> null
     }

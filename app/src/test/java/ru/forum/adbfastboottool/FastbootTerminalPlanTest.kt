@@ -17,6 +17,7 @@ import org.robolectric.annotation.Config
 class FastbootTerminalPlanTest {
     private lateinit var activity: MainActivity
     @Before fun attachParser() {
+        RobolectricStorageFixture.installPrimaryExternalDirectory()
         activity = Robolectric.buildActivity(MainActivity::class.java).get()
         val app: Application = RuntimeEnvironment.getApplication()
         MainActivity::class.java.getDeclaredField("viewModel").apply { isAccessible = true }.set(activity, DeviceViewModel(app))

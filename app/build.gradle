@@ -39,10 +39,10 @@ android {
         unitTests.includeAndroidResources = true
         unitTests.all {
             // Robolectric downloads instrumented Android SDK jars at test runtime.
-            // repo1.maven.org returned HTTP 429 on CI; use the canonical Maven
-            // Central endpoint instead of relying on repeated workflow retries.
-            systemProperty('robolectric.dependency.repo.url', 'https://repo.maven.apache.org/maven2')
-            systemProperty('robolectric.dependency.repo.id', 'mavenCentral')
+            // Use Google's Maven Central mirror to avoid HTTP 429 responses from
+            // repo.maven.apache.org on shared CI runners.
+            systemProperty 'robolectric.dependency.repo.url', 'https://maven-central.storage-download.googleapis.com/maven2/'
+            systemProperty 'robolectric.dependency.repo.id', 'google-maven-central'
             jvmArgs += [
                 '--add-opens=java.base/java.lang=ALL-UNNAMED',
                 '--add-opens=java.base/java.util=ALL-UNNAMED',

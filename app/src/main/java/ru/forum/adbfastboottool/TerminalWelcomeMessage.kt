@@ -20,6 +20,8 @@ internal object TerminalWelcomeMessage {
         val abi: String,
         val workspaceLabel: String,
         val workspace: String,
+        val deviceBinaryLabel: String,
+        val deviceBinaryStatus: String,
         val timeLabel: String,
         val time: String,
         val dateLabel: String,
@@ -40,7 +42,11 @@ internal object TerminalWelcomeMessage {
         val access: String,
     )
 
-    fun build(context: Context, now: Date = Date()): List<String> {
+    fun build(
+        context: Context,
+        now: Date = Date(),
+        deviceBinariesEnabled: Boolean = false,
+    ): List<String> {
         val host = context.getString(
             R.string.terminal_welcome_host_value,
             Build.VERSION.RELEASE,
@@ -57,6 +63,11 @@ internal object TerminalWelcomeMessage {
                 abi = Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown",
                 workspaceLabel = context.getString(R.string.terminal_welcome_workspace_label),
                 workspace = context.getString(R.string.terminal_welcome_workspace_value),
+                deviceBinaryLabel = context.getString(R.string.terminal_welcome_binary_label),
+                deviceBinaryStatus = context.getString(
+                    if (deviceBinariesEnabled) R.string.terminal_welcome_binary_enabled
+                    else R.string.terminal_welcome_binary_disabled,
+                ),
                 timeLabel = context.getString(R.string.terminal_welcome_time_label),
                 time = DateFormat.getTimeFormat(context).format(now),
                 dateLabel = context.getString(R.string.terminal_welcome_date_label),
@@ -108,6 +119,7 @@ internal object TerminalWelcomeMessage {
             row("📱 ${details.hostLabel} = ${details.host}"),
             row("🧩 ${details.abiLabel} = ${details.abi}"),
             row("📁 ${details.workspaceLabel} = ${details.workspace}"),
+            row("${if (details.deviceBinaryStatus.startsWith("ENABLED") || details.deviceBinaryStatus.startsWith("ВКЛЮЧЕНО")) "🟢" else "🔴"} ${details.deviceBinaryLabel} = ${details.deviceBinaryStatus}"),
             row("🕒 ${details.timeLabel} = ${details.time}"),
             row("📅 ${details.dateLabel} = ${details.date}"),
             sectionBottom,

@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.Assert.*
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -19,6 +20,10 @@ import org.robolectric.annotation.Config
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class MiUnlockCompletionTest {
+    @Before fun installPrimaryExternalDirectory() {
+        RobolectricStorageFixture.installPrimaryExternalDirectory()
+    }
+
     private fun finish(vm: DeviceViewModel, task: ServiceOwnedOperation,
         reported: DeviceViewModel.OperationOutcome, cause: Throwable?) {
         DeviceViewModel::class.java.getDeclaredMethod("finishServiceOperation", ServiceOwnedOperation::class.java,

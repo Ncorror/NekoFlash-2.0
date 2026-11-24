@@ -70,6 +70,7 @@ class ForegroundServiceLifecycleTest {
 
     @Suppress("DEPRECATION") // API 26 has no PermissionInfo.getProtection().
     @Before fun grantMergedSignaturePermissionInSimulator() {
+        RobolectricStorageFixture.installPrimaryExternalDirectory()
         if (Build.VERSION.SDK_INT < 33) {
             // Robolectric #9124: the simulator does not grant this merged
             // AndroidX signature permission automatically on API 26–32.

@@ -17,7 +17,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class LocalShellTest {
-    private fun newShell() = LocalShell { Files.getFileStore(it.toPath()).usableSpace }
+    private fun newShell() = LocalShell(availableSpace = { Files.getFileStore(it.toPath()).usableSpace })
 
     private fun withWorkspace(test: suspend (File) -> Unit) = runBlocking {
         val root = Files.createTempDirectory("nekoflash-local").toFile()
@@ -105,15 +105,23 @@ class LocalShellTest {
         assertArrayEquals(bytes, File(root, "backup folder/${source.name}").readBytes())
     }
 
-    @Test fun pathsCannotEscapeWorkspace() = withWorkspace { root ->
+    @Test fun cdCanNavigateOutsideHomeAndReturnByAbsolutePath() = withWorkspace { root ->
         val shell = newShell()
-        val error = try {
-            shell.execute("cd ..", { root }) { false }
-            null
-        } catch (failure: Exception) {
-            failure
-        }
-        assertTrue(error is IllegalArgumentException)
+        val workspace: suspend () -> File? = { root }
+        val parent = requireNotNull(root.parentFile).canonicalFile
+
+        assertEquals(0, shell.execute("cd ..", workspace) { false }?.exitCode)
+        assertEquals(parent.path, shell.execute("pwd", workspace) { false }?.lines?.single())
+        assertEquals(parent.path, shell.prompt())
+        assertEquals(0, shell.execute("cd ${root.canonicalPath}", workspace) { false }?.exitCode)
+        assertEquals("~", shell.prompt())
+        assertEquals(0, shell.execute("cd /", workspace) { false }?.exitCode)
+        assertEquals("/", shell.execute("pwd", workspace) { false }?.lines?.single())
+        assertEquals(0, shell.execute("cd -", workspace) { false }?.exitCode)
+        assertEquals(root.canonicalPath, shell.execute("pwd", workspace) { false }?.lines?.single())
+        assertEquals(0, shell.execute("cd -", workspace) { false }?.exitCode)
+        assertEquals("/", shell.execute("pwd", workspace) { false }?.lines?.single())
+        assertEquals(0, shell.execute("cd \"${'$'}HOME\"", workspace) { false }?.exitCode)
         assertEquals("~", shell.prompt())
     }
 
@@ -138,13 +146,19 @@ class LocalShellTest {
         assertTrue(redirection is IllegalArgumentException)
     }
 
-    @Test fun clearAndDeviceBinaryPreferenceAreSessionScoped() = runBlocking {
-        val shell = newShell()
+    @Test fun deviceBinaryPreferencePersistsAndCanBeDisabled() = runBlocking {
+        var persisted = false
+        val shell = LocalShell(
+            availableSpace = { Long.MAX_VALUE },
+            onDeviceBinariesChanged = { persisted = it },
+        )
         val noWorkspace: suspend () -> File? = { error("workspace must not be requested") }
 
         val enabled = shell.execute("export NEKO_USE_DEVICE_BINARIES=1", noWorkspace) { false }
         assertTrue(enabled?.deviceBinariesEnabled == true)
-        assertTrue(enabled?.lines?.single()?.contains("enabled") == true)
+        assertTrue(persisted)
+        val restored = LocalShell({ Long.MAX_VALUE }, initialDeviceBinariesEnabled = persisted)
+        assertTrue(restored.isDeviceBinariesEnabled)
 
         val clear = shell.execute("clear", noWorkspace) { false }
         assertTrue(clear?.clearTerminal == true)
@@ -152,6 +166,20 @@ class LocalShellTest {
 
         val disabled = shell.execute("export NEKO_USE_DEVICE_BINARIES=0", noWorkspace) { false }
         assertFalse(disabled?.deviceBinariesEnabled == true)
+        assertFalse(persisted)
+        assertFalse(LocalShell({ Long.MAX_VALUE }, initialDeviceBinariesEnabled = persisted).isDeviceBinariesEnabled)
+    }
+
+    @Test fun privateHomeLinksToTheSharedDownloadFolder() = withWorkspace { root ->
+        val privateHome = File(root, "private-home")
+        val publicDownload = File(root, "public/Download/NekoFlash")
+        val shell = LocalShell({ Long.MAX_VALUE }, initialHome = privateHome)
+        shell.configureHome(privateHome, publicDownload)
+        val alias = File(privateHome, "Download/NekoFlash")
+        assertTrue(privateHome.isDirectory)
+        assertTrue(publicDownload.isDirectory)
+        assertTrue(Files.isSymbolicLink(alias.toPath()))
+        assertEquals(publicDownload.canonicalFile, alias.canonicalFile)
     }
 
     @Test fun removeRequiresConfirmationAndCannotDeleteDirectories() = withWorkspace { root ->
@@ -191,7 +219,7 @@ class LocalShellTest {
         assertEquals(listOf("a && b | c"), output?.lines)
     }
 
-    @Test fun terminalRecognizesOnlyLocalPrefixAndBareEcho() {
+    @Test fun terminalRecognizesLocalNavigationAndShellEntrypoints() {
         assertEquals("ls \"ROM files\"", extractLocalCommand("local ls \"ROM files\""))
         assertEquals("echo hello", extractLocalCommand("local echo hello"))
         assertEquals("", extractLocalCommand("local"))
@@ -199,23 +227,74 @@ class LocalShellTest {
         assertNull(extractLocalCommand("fastboot reboot"))
         assertNull(extractLocalCommand("adb shell ls"))
         assertEquals("clear", extractLocalCommand("clear"))
+        assertEquals("cd /storage/emulated/0", extractLocalCommand("cd /storage/emulated/0"))
+        assertEquals("sh flash_all.sh", extractLocalCommand("sh flash_all.sh"))
+        assertEquals("bash flash_all_lock.sh", extractLocalCommand("bash flash_all_lock.sh"))
         assertEquals("export NEKO_USE_DEVICE_BINARIES=1", extractLocalCommand("export NEKO_USE_DEVICE_BINARIES=1"))
     }
 
 
-    @Test fun shellInterpretersRemainUnavailableEvenWithDeviceBinariesEnabled() = runBlocking {
-        val shell = newShell()
-        val noWorkspace: suspend () -> File? = { error("workspace must not be requested") }
-        shell.execute("export NEKO_USE_DEVICE_BINARIES=1", noWorkspace) { false }
-        val result = shell.execute("local sh -c echo", noWorkspace) { false }
-        assertTrue(result?.lines?.single()?.contains("blocked") == true)
+    @Test fun shAndBashAreShellEntrypointsWhenDeviceBinariesAreEnabled() = withWorkspace { home ->
+        val shell = LocalShell(
+            availableSpace = { Long.MAX_VALUE },
+            initialHome = home,
+            initialDeviceBinariesEnabled = true,
+        )
+        val workspace: suspend () -> File? = { home }
+        for (name in listOf("sh", "bash")) {
+            val error = runCatching {
+                shell.execute("local $name", workspace) { false }
+            }.exceptionOrNull()
+            assertTrue("$name should explain its non-interactive script usage", error?.message?.contains("Usage: $name SCRIPT") == true)
+        }
+    }
+
+    @Test fun shAndBashExecuteScriptsThroughTheConfiguredSystemShell() = withWorkspace { root ->
+        val home = File(root, "HOME").apply { mkdirs() }
+        val script = File(home, "flash-test.sh").apply {
+            writeText("printf 'ROM_SCRIPT_OK:%s:%s\\n' \"\$HOME\" \"\$PWD\"\n")
+        }
+        val shell = LocalShell(
+            availableSpace = { Long.MAX_VALUE },
+            initialHome = home,
+            initialDeviceBinariesEnabled = true,
+            shellExecutable = File("/bin/sh"),
+        )
+        val workspace: suspend () -> File? = { home }
+        val shellLines = mutableListOf<String>()
+        val shResult = requireNotNull(shell.execute(
+            "sh ${script.name}", workspace,
+            confirmOverwrite = { false },
+            onShellOutput = shellLines::add,
+        ))
+        assertEquals(0, shResult.exitCode)
+        assertTrue(shResult.streamedOutput)
+        assertTrue(shellLines.any { it.contains("ROM_SCRIPT_OK:${home.absolutePath}:${home.absolutePath}") })
+
+        shellLines.clear()
+        val bashResult = requireNotNull(shell.execute(
+            "bash ${script.name}", workspace,
+            confirmOverwrite = { false },
+            onShellOutput = shellLines::add,
+        ))
+        assertEquals(0, bashResult.exitCode)
+        assertTrue(shellLines.any { it.contains("ROM_SCRIPT_OK:${home.absolutePath}:${home.absolutePath}") })
+
+        val blocked = File(home, "blocked.sh").apply { writeText("su -c id\n") }
+        val blockedResult = requireNotNull(shell.execute(
+            "sh ${blocked.name}", workspace,
+            confirmOverwrite = { false },
+            onShellOutput = shellLines::add,
+        ))
+        assertEquals(126, blockedResult.exitCode)
+        assertTrue(shellLines.any { it.contains("su is blocked") })
     }
 
     @Test fun privilegeEscalationAndArbitraryBinariesStayBlocked() = runBlocking {
         val shell = newShell()
         val noWorkspace: suspend () -> File? = { error("workspace must not be requested") }
         shell.execute("export NEKO_USE_DEVICE_BINARIES=1", noWorkspace) { false }
-        for (command in listOf("sh", "bash", "toybox", "busybox", "su", "run-as")) {
+        for (command in listOf("toybox", "busybox", "su", "run-as")) {
             val result = shell.execute("local $command", noWorkspace) { false }
             assertTrue("$command must be blocked", result?.lines?.single()?.contains("blocked") == true)
         }
